@@ -32,3 +32,31 @@ rmcp_codes = {
     0x12: 'Illegal or unrecognized parameter',
 }
 
+ipmi_completion_codes = {
+    0x0: "Success",
+    0xc0: "Node Busy",
+    0xc1: "Invalid command",
+    0xc2: "Invalid command for given LUN",
+    0xc3: "Timeout while processing command",
+    0xc4: "Out of storage space on BMC",
+    0xc5: "Reservation canceled or invalid reservation ID",
+    0xc6: "Request data truncated",
+    0xc7: "Request data length invalid",
+    0xc8: "Request data field length limit exceeded",
+    0xc9: "Parameter out of range",
+    0xca: "Cannot return number of requested data bytes",
+    0xcb: "Requested sensor, data, or record not present",
+    0xcc: "Invalid data field in request",
+    0xcd: "Command illegal for specified sensor or record type",
+    0xce: "Command response could not be provided",
+    0xcf: "Cannot execute duplicated request",
+    0xd0: "SDR repository in update mode",
+    0xd1: "Device in firmware update mode",
+    0xd2: "BMC initialization in progress",
+    0xd3: "Internal destination unavailable",
+    0xd4: "Insufficient privilege level or firmware firewall",
+    0xd5: "Command not supported in present state",
+    0xd6: "Cannot execute command because subfunction disabled or unavailable",
+    0xff: "Unspecified",
+}
+

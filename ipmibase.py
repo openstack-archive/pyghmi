@@ -7,11 +7,16 @@ from collections import deque
 from time import time
 from hashlib import md5
 from struct import pack, unpack
-from ipmi_constants import payload_types
+from ipmi_constants import payload_types, ipmi_completion_codes
 from random import random
 
 initialtimeout = 0.5 #minimum timeout for first packet to retry in any given session.  This will be randomized to stagger out retries in case of congestion
 
+def get_ipmi_errstr():
+    if code in ipmi_completion_codes:
+        return ipmi_completion_codes[code]
+    else:
+        return "Unknown code "+code+" encountered"
 class IPMISession:
     poller=select.poll()
     bmc_handlers={}
@@ -40,15 +45,30 @@ class IPMISession:
         #but does not increase buffers for applications that do less creative things
         #TODO: perhaps spread sessions across a socket pool when rmem_max is small, still get ~65/socket, but avoid long queues that might happen with
         #low rmem_max and putting thousands of nodes in line
-    def __init__(self,bmc,userid,password,port=623):
+    '''
+    This function handles the synchronous caller case in liue of a client provided callback
+    '''
+    def _sync_login(self,response):
+        if 'error' in response:
+            raise Exception(response['error'])
+
+    def __init__(self,bmc,userid,password,port=623,onlogon=None):
         self.bmc=bmc
         self.userid=userid
         self.password=password
         self.port=port
+        if (onlogon is None):
+            self.async=False
+            self.onlogon=self._sync_login
+        else:
+            self.async=True
+            self.onlogon=onlogon
         if not hasattr(IPMISession,'socket'):
             self._createsocket()
         self.login()
     def _initsession(self):
+        self.ipmicallback=None
+        self.ipmicallbackargs=None
         self.sessioncontext=0
         self.sequencenumber=0
         self.sessionid=0
@@ -143,13 +163,31 @@ class IPMISession:
         print hashdata
         return hashdata
 
-    def _got_channel_auth_cap(self):
-        pass
-
+    def _got_channel_auth_cap(self,response):
+        if (response['error']):
+            if self.onlogonargs is not None:
+                args = (response,self.onlogonargs)
+            else:
+                args = (response,)
+            self.onlogon(*args)
+            return
+        code = response['code']
+        if code == 0xcc and self.ipmi15only is not None: #tried ipmi 2.0 against a 1.5 which should work, but some bmcs thought 'reserved' meant 'must be zero'
+            self.ipmi15only=1
+            return self._get_channel_auth_cap()
+        if code != 0:
+            response['error']=get_ipmi_errstr(code)+" while trying to get channel authentication capabilities"
+            if self.onlogonargs is not None:
+                args = (response,self.onlogonargs)
+            else:
+                args = (response,)
+            self.onlogon(*args)
+            return
+            
 
         
     def _get_channel_auth_cap(self):
-        self.callback=self._got_channel_auth_cap
+        self.ipmicallback=self._got_channel_auth_cap
         if (self.ipmi15only):
             self._send_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x0e,0x04])
         else:
@@ -245,7 +283,11 @@ class IPMISession:
         del payload[0:2]
         response['data']=payload
         self.timeout=initialtimeout+(0.5*random())
-        print repr(response)
+        if self.ipmicallbackargs is not None:
+            args=(response,self.ipmicallbackargs)
+        else:
+            args=(response,)
+        self.ipmicallback(*args)
 
     def _timedout(self):
         #TODO: retransmit and error handling on lost packets
