@@ -3,7 +3,8 @@
 import select
 import Crypto
 import socket
-import ipmi_constants as ic
+from struct import pack, unpack
+from ipmi_constants import payload_types
 from random import random
 
 initialtimeout = 0.5 #minimum timeout for first packet to retry in any given session.  This will be randomized to stagger out retries in case of congestion
@@ -54,23 +55,70 @@ class IPMISession:
         self.tabooseq={} #this tracks netfn,command,seqlun combinations that were retried so that 
                          #we don't loop around and reuse the same request data and cause potential ambiguity in return
         self.ipmi15only=0 #default to supporting ipmi 2.0.  Strictly by spec, this should gracefully be backwards compat, but some 1.5 implementations checked reserved bits
-    def _preppayload(self,netfn,command,data=[]):
+    def _checksum(self,*data): #Two's complement over the data
+        csum=sum(data)
+        csum=csum^0xff
+        csum+=1 
+        return csum
+
+    '''
+        This function generates the core ipmi payload that would be applicable for any channel (including KCS)
+    '''
+    def _make_ipmi_payload(self,netfn,command,data=()):
         self.expectedcmd=command
         self.expectednetfn=netfn
-        seqincrement=7
-        while self.tabooseq[(netfn,command,seqlun)] and $seqincrement:
+        seqincrement=7 #IPMI spec forbids gaps bigger then 7 in seq number.  Risk the taboo rather than violate the rules
+        while (netfn,command,self.seqlun) in self.tabooseq and self.tabooseq[(netfn,command,self.seqlun)] and seqincrement:
+            self.tabooseq[(netfn,command,self.seqlun)]-=1 #Allow taboo to eventually expire after a few rounds
             self.seqlun += 4 #the last two bits are lun, so add 4 to add 1
             self.seqlun &= 0xff #we only have one byte, wrap when exceeded
-            seqincrement-- #IPMI spec forbids gaps bigger than 7, avoid that gap
-            
+            seqincrement-=1
+        header=[0x20,netfn<<2] #figure 13-4, first two bytes are rsaddr and netfn, rsaddr is always 0x20 since we are addressing BMC
+        reqbody=[self.rqaddr,self.seqlun,command]+list(data)
+        headsum=self._checksum(*header)
+        bodysum=self._checksum(*reqbody)
+        payload=header+[headsum]+reqbody+[bodysum]
+        return payload
+
+    def _prep_ipmi_net_payload(self,netfn,command,data):
+        ipmipayload=self._make_ipmi_payload(netfn,command,data)
+        payload_type = payload_types['ipmi']
+        if hasattr(self,"integrity_algorithm"):
+            payload_type |=  0b01000000
+        if hasattr(self,"confidentiality_algorithm"):
+            payload_type |=  0b10000000
+        self._xmit_payload(payload=ipmipayload,type=payload_type)
+    def _xmit_payload(self,payload=None,type=None):
+        if payload is None:
+            payload=self.lastpayload
+        if type is None:
+            type=self.lasttype
+        message = [0x6,0,0xff,0x07] #constant RMCP header for IPMI
+        baretype = type & 0b00111111
+        self.lastpayload=payload
+        self.lasttype=type
+        message.append(self.authtype)
+        if (self.ipmiversion == 2.0):
+            message.append(type)
+            if (type == 2):
+                pass #TODO: OEM payloads, currently not supported
+            message += unpack("!4B",pack("!I",self.sessionid))
+        message += unpack("!4B",pack("!I",self.sequencenumber))
+        if (self.ipmiversion == 1.5):
+            message += unpack("!4B",pack("!I",self.sessionid))
+
+
+    def _got_channel_auth_cap(self):
+        pass
+
 
         
     def _get_channel_auth_cap(self):
         self.callback=self._got_channel_auth_cap
         if (self.ipmi15only):
-            self._preppayload(netfn=0x6,command=0x38,data=[0x0e,0x04])
+            self._prep_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x0e,0x04])
         else:
-            self._preppayload(netfn=0x6,command=0x38,data=[0x0e,0x04])
+            self._prep_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x8e,0x04])
     def login(self):
         self._initsession()
         self._get_channel_auth_cap()
