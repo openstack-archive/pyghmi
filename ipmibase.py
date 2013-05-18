@@ -15,7 +15,7 @@ class IPMISession:
     sessions_waiting={}
     peeraddr_to_nodes={}
     def _createsocket(self):
-        IPMISession.socket = socket.socket(socket.AF_INET6) #INET6 can do IPv4 if you are nice to it
+        IPMISession.socket = socket.socket(socket.AF_INET6,socket.SOCK_DGRAM) #INET6 can do IPv4 if you are nice to it
         try: #we will try to fixup our receive buffer size if we are smaller than allowed.  
             maxmf = open("/proc/sys/net/core/rmem_max")
             rmemmax = int(maxmf.read())
@@ -52,6 +52,7 @@ class IPMISession:
         self.seqlun=0
         self.rqaddr=0x81 #per IPMI table 5-4, software ids in the ipmi spec may be 0x81 through 0x8d.  We'll stick with 0x81 for now, do not forsee a reason to adjust
         self.logged=0
+        self.sockaddr=None #when we confirm a working sockaddr, put it here to skip getaddrinfo
         self.tabooseq={} #this tracks netfn,command,seqlun combinations that were retried so that 
                          #we don't loop around and reuse the same request data and cause potential ambiguity in return
         self.ipmi15only=0 #default to supporting ipmi 2.0.  Strictly by spec, this should gracefully be backwards compat, but some 1.5 implementations checked reserved bits
@@ -59,6 +60,7 @@ class IPMISession:
         csum=sum(data)
         csum=csum^0xff
         csum+=1 
+        csum &= 0xff
         return csum
 
     '''
@@ -80,15 +82,15 @@ class IPMISession:
         payload=header+[headsum]+reqbody+[bodysum]
         return payload
 
-    def _prep_ipmi_net_payload(self,netfn,command,data):
+    def _send_ipmi_net_payload(self,netfn,command,data):
         ipmipayload=self._make_ipmi_payload(netfn,command,data)
         payload_type = payload_types['ipmi']
         if hasattr(self,"integrity_algorithm"):
             payload_type |=  0b01000000
         if hasattr(self,"confidentiality_algorithm"):
             payload_type |=  0b10000000
-        self._xmit_payload(payload=ipmipayload,type=payload_type)
-    def _xmit_payload(self,payload=None,type=None):
+        self._pack_payload(payload=ipmipayload,type=payload_type)
+    def _pack_payload(self,payload=None,type=None):
         if payload is None:
             payload=self.lastpayload
         if type is None:
@@ -106,8 +108,18 @@ class IPMISession:
         message += unpack("!4B",pack("!I",self.sequencenumber))
         if (self.ipmiversion == 1.5):
             message += unpack("!4B",pack("!I",self.sessionid))
+            if not self.authtype == 0:
+                self._ipmi15authcode(payload)
+            message.append(len(payload))
+            message += payload
+        elif self.ipmiversion == 2.0:
+            pass
+            #TODO: ipmi 2.0
+        self.netpacket = pack("!%dB"%len(message),*message)
+        self._xmit_packet()
 
-
+    def _ipmi15authcode(self,*payload):
+        pass #TODO
     def _got_channel_auth_cap(self):
         pass
 
@@ -116,17 +128,21 @@ class IPMISession:
     def _get_channel_auth_cap(self):
         self.callback=self._got_channel_auth_cap
         if (self.ipmi15only):
-            self._prep_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x0e,0x04])
+            self._send_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x0e,0x04])
         else:
-            self._prep_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x8e,0x04])
+            self._send_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x8e,0x04])
     def login(self):
         self._initsession()
         self._get_channel_auth_cap()
+    def _xmit_packet(self):
+        if self.sockaddr:
+            return
         for res in socket.getaddrinfo(self.bmc,self.port,0,socket.SOCK_DGRAM):
             sockaddr = res[4]
             if (res[0] == socket.AF_INET): #convert the sockaddr to AF_INET6
                 newhost='::ffff:'+sockaddr[0]
                 sockaddr = (newhost,sockaddr[1])
+            IPMISession.socket.sendto(self.netpacket,sockaddr)
 
 if __name__ == "__main__":
     ipmis = IPMISession(bmc="10.240.181.1",userid="USERID",password="Passw0rd")
