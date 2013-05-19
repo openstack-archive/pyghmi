@@ -357,8 +357,8 @@ class IPMISession:
         data += [
             0,0,0,8,1,0,0,0, #table 13-17, SHA-1
             1,0,0,8,1,0,0,0, #SHA-1 integrity
-            #2,0,0,8,1,0,0,0, #AES privacy
-            2,0,0,8,0,0,0,0, #no privacy confalgo
+            2,0,0,8,1,0,0,0, #AES privacy
+            #2,0,0,8,0,0,0,0, #no privacy confalgo
         ]
         self.sessioncontext='OPENSESSION';
         self._pack_payload(payload=data,payload_type=payload_types['rmcpplusopenreq'])
@@ -484,12 +484,12 @@ class IPMISession:
             if encrypted:
                 iv = rawdata[16:32]
                 decrypter = AES.new(self.aeskey,AES.MODE_CBC,iv)
-                decrypted = decrypter.decrypt(pack("%dB"%len(payload),*payload))
+                decrypted = decrypter.decrypt(pack("%dB"%len(payload[16:]),*payload[16:]))
                 payload = unpack("%dB"%len(decrypted),decrypted)
                 padsize = payload[-1]+1
                 print "payload before: "
                 print payload
-                payload = payload[:-padsize]
+                payload = list(payload[:-padsize])
                 print "payload after: "
                 print payload
             self._parse_ipmi_payload(payload)
@@ -602,7 +602,7 @@ class IPMISession:
             return
         self.sessionid=self.pendingsessionid
         self.integrityalgo='sha1'
-        #self.confalgo='aes'
+        self.confalgo='aes'
         self.sequencenumber=1
         self.sessioncontext='ESTABLISHED'
         self._req_priv_level()
