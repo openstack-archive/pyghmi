@@ -32,6 +32,26 @@ rmcp_codes = {
     0x12: 'Illegal or unrecognized parameter',
 }
 
+command_completion_codes = {
+    0x39: {
+        0x81: "Invalid user name",
+        0x82: "Null user disabled",
+    },
+    0x3a: {
+        0x81: "No available login slots",
+        0x82: "No available login slots for requested user",
+        0x83: "No slot available with requested privilege level",
+        0x84: "Session sequence number out of range",
+        0x85: "Invalid session ID",
+        0x86: "Requested privilege level exceeds requested user permissions on this channel",
+    },
+    0x3b: {
+        0x80: "User is not allowed requested priveleg level",
+        0x81: "Requested privilege level is not allowed over this channel",
+        0x82: "Cannot disable user level authentication",
+    },
+}
+
 ipmi_completion_codes = {
     0x0: "Success",
     0xc0: "Node Busy",
