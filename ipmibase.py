@@ -265,7 +265,7 @@ class IPMISession:
         password += '\x00'*padneeded
         passdata = unpack("16B",password)
         if checkremotecode:
-            seqbytes = unpack("!4B",pack("<I",self.remotesequencenumber))
+            seqbytes = unpack("!4B",pack("<I",self.remsequencenumber))
         else:
             seqbytes = unpack("!4B",pack("<I",self.sequencenumber))
         sessdata = unpack("!4B",pack("<I",self.sessionid))
@@ -430,13 +430,18 @@ class IPMISession:
             remsessid = unpack("<I",data[9:13])[0] 
             if remsessid != self.sessionid:
                 return -1 #does not match our session id, drop it
-            #new we need a mutable representation of the packet, rather than copying pieces of the packet over and over
+            #now we need a mutable representation of the packet, rather than copying pieces of the packet over and over
             rsp=list(unpack("!%dB"%len(data),data))
-            authcode=0
-            if rsp[4] == 2: # we have an authcode in this ipmi 1.5 packet...
-                authcode=rsp[13:29]
-                del rsp[13:29]
+            authcode=False
+            if data[4] == '\x02': # we have an authcode in this ipmi 1.5 packet...
+                authcode=data[13:29]
+                del rsp[13:29] #this is why we needed a mutable representation
             payload=list(rsp[14:14+rsp[13]])
+            if authcode:
+                expectedauthcode=self._ipmi15authcode(payload,checkremotecode=True)
+                expectedauthcode=pack("%dB"%len(expectedauthcode),*expectedauthcode)
+                if expectedauthcode != authcode:
+                    return
             self._parse_ipmi_payload(payload)
         elif data[4] == '\x06':
             self._handle_ipmi2_packet(data)
