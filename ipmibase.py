@@ -104,7 +104,7 @@ class IPMISession:
         self.sockaddr=None #when we confirm a working sockaddr, put it here to skip getaddrinfo
         self.tabooseq={} #this tracks netfn,command,seqlun combinations that were retried so that 
                          #we don't loop around and reuse the same request data and cause potential ambiguity in return
-        self.ipmi15only=1 #default to supporting ipmi 2.0.  Strictly by spec, this should gracefully be backwards compat, but some 1.5 implementations checked reserved bits
+        self.ipmi15only=0 #default to supporting ipmi 2.0.  Strictly by spec, this should gracefully be backwards compat, but some 1.5 implementations checked reserved bits
     def _checksum(self,*data): #Two's complement over the data
         csum=sum(data)
         csum=csum^0xff
@@ -170,7 +170,9 @@ class IPMISession:
         if (self.ipmiversion == 2.0):
             message.append(payload_type)
             if (payload_type == 2):
-                pass #TODO: OEM payloads, currently not supported
+                raise Exception("TODO: OEM Payloads")
+            elif (payload_type == 1):
+                raise Exception("TODO: SOL Payload")
             message += unpack("!4B",pack("<I",self.sessionid))
         message += unpack("!4B",pack("<I",self.sequencenumber))
         if (self.ipmiversion == 1.5):
@@ -183,8 +185,7 @@ class IPMISession:
             if (totlen in (56,84,112,128,156)):
                 message.append(0) #Legacy pad as mandated by ipmi spec
         elif self.ipmiversion == 2.0:
-            pass
-            #TODO: ipmi 2.0
+            raise Exception("TODO: IPMI 2.0")
         self.netpacket = pack("!%dB"%len(message),*message)
         self._xmit_packet()
 
@@ -384,8 +385,7 @@ class IPMISession:
         self.ipmicallback(*args)
 
     def _timedout(self):
-        #TODO: retransmit and error handling on lost packets
-        pass
+        raise Exception("TODO: proper retries")
         
     def _xmit_packet(self,waitforpending=True):
         if waitforpending:
