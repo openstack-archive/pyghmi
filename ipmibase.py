@@ -1,17 +1,34 @@
 #!/usr/bin/env python
 # This represents the low layer message framing portion of IPMI
+import os
 import select
-import Crypto
+from Crypto.Hash import HMAC, SHA
+from Crypto.Cipher import AES
 import socket
+import atexit
 from collections import deque
 from time import time
 from hashlib import md5
 from struct import pack, unpack
-from ipmi_constants import payload_types, ipmi_completion_codes, command_completion_codes
+from ipmi_constants import payload_types, ipmi_completion_codes, command_completion_codes, payload_types, rmcp_codes
 from random import random
 
 initialtimeout = 0.5 #minimum timeout for first packet to retry in any given session.  This will be randomized to stagger out retries in case of congestion
 
+def _aespad(data): # ipmi demands a certain pad scheme, per table 13-20 AES-CBC encrypted payload fields
+    newdata=list(data)
+    currlen=len(data)+1 #need to count the pad length field as well
+    neededpad=currlen%16
+    if neededpad: #if it happens to be zero, hurray, but otherwise invert the sense of the padding
+        neededpad = 16-neededpad
+    padval=1
+    while padval <= neededpad:
+        newdata.append(padval)
+        padval+=1
+    newdata.append(neededpad)
+    return newdata
+
+    
 '''
 In order to simplify things, in a number of places there is a callback facility and optional arguments to pass in.
 An OO oriented caller may find the additional argument needless. Allow them to ignore it by skipping the argument if None
@@ -41,8 +58,16 @@ class IPMISession:
     bmc_handlers={}
     waiting_sessions={}
     peeraddr_to_nodes={}
+    '''
+    Upon exit of python, make sure we play nice with BMCs by assuring closed sessions for all that we tracked
+    '''
+    @classmethod
+    def _cleanup(cls):
+        for session in cls.bmc_handlers.itervalues():
+            session.logout()
     @classmethod
     def _createsocket(cls):
+        atexit.register(cls._cleanup)
         cls.socket = socket.socket(socket.AF_INET6,socket.SOCK_DGRAM) #INET6 can do IPv4 if you are nice to it
         try: #we will try to fixup our receive buffer size if we are smaller than allowed.  
             maxmf = open("/proc/sys/net/core/rmem_max")
@@ -71,10 +96,14 @@ class IPMISession:
         if 'error' in response:
             raise Exception(response['error'])
 
-    def __init__(self,bmc,userid,password,port=623,onlogon=None,onlogonargs=None):
+    def __init__(self,bmc,userid,password,port=623,kg=None,onlogon=None,onlogonargs=None):
         self.bmc=bmc
         self.userid=userid
         self.password=password
+        if kg is not None:
+            self.kg=kg
+        else:
+            self.kg=password
         self.port=port
         self.onlogonargs=onlogonargs
         if (onlogon is None):
@@ -90,9 +119,16 @@ class IPMISession:
             while not self.logged:
                 IPMISession.wait_for_rsp()
     def _initsession(self):
+        self.localsid=2017673555 #this number can be whatever we want.  I picked 'xCAT' minus 1 so that a hexdump of packet would show xCAT
+        self.privlevel=4 #for the moment, assume admin access TODO: make flexible
+        self.confalgo=0
+        self.aeskey=None
+        self.integrityalgo=0
+        self.k1=None
+        self.rmcptag=1
         self.ipmicallback=None
         self.ipmicallbackargs=None
-        self.sessioncontext=0
+        self.sessioncontext=None
         self.sequencenumber=0
         self.sessionid=0
         self.authtype=0
@@ -152,9 +188,9 @@ class IPMISession:
     def _send_ipmi_net_payload(self,netfn,command,data):
         ipmipayload=self._make_ipmi_payload(netfn,command,data)
         payload_type = payload_types['ipmi']
-        if hasattr(self,"integrity_algorithm"):
+        if self.integrityalgo:
             payload_type |=  0b01000000
-        if hasattr(self,"confidentiality_algorithm"):
+        if self.confalgo:
             payload_type |=  0b10000000
         self._pack_payload(payload=ipmipayload,payload_type=payload_type)
     def _pack_payload(self,payload=None,payload_type=None):
@@ -169,10 +205,12 @@ class IPMISession:
         message.append(self.authtype)
         if (self.ipmiversion == 2.0):
             message.append(payload_type)
-            if (payload_type == 2):
+            if (baretype == 2):
                 raise Exception("TODO: OEM Payloads")
-            elif (payload_type == 1):
+            elif (baretype == 1):
                 raise Exception("TODO: SOL Payload")
+            elif baretype not in payload_types.values():
+                raise Exception("Unrecognized payload type %d"%baretype)
             message += unpack("!4B",pack("<I",self.sessionid))
         message += unpack("!4B",pack("<I",self.sequencenumber))
         if (self.ipmiversion == 1.5):
@@ -185,7 +223,35 @@ class IPMISession:
             if (totlen in (56,84,112,128,156)):
                 message.append(0) #Legacy pad as mandated by ipmi spec
         elif self.ipmiversion == 2.0:
-            raise Exception("TODO: IPMI 2.0")
+            psize = len(payload)
+            if self.confalgo:
+                pad = (psize+1)%16 #pad has to account for one byte field as in the _aespad function
+                if pad: #if no pad needed, then we take no more action
+                    pad = 16-pad
+                newpsize=psize+pad+17 #new payload size grew according to pad size, plus pad length, plus 16 byte IV (Table 13-20)
+                message.append(newpsize&0xff)
+                message.append(newpsize>>8);
+                iv=os.urandom(16) 
+                message += list(unpack("16B",iv))
+                payloadtocrypt=_aespad(payload)
+                crypter = AES.new(self.aeskey,AES.MODE_CBC,iv)
+                crypted = crypter.encrypt(pack("%dB"%len(payloadtocrypt),*payloadtocrypt))
+                crypted = list(unpack("%dB"%len(crypted),crypted))
+                message += crypted
+            else: #no confidetiality algorithm
+                message.append(psize&0xff)
+                message.append(psize>>8);
+                message += list(payload)
+            if self.integrityalgo: #see table 13-8, RMCP+ packet format TODO: SHA256 which is now allowed
+                integdata = message[4:]
+                neededpad=(len(integdata)-2)%4
+                if neededpad:
+                    needpad = 4-neededpad
+                message += [0xff]*neededpad
+                message.append(neededpad)
+                message.append(7) #reserved, 7 is the required value for the specification followed
+                authcode = HMAC.new(self.k1,pack("%dB"%len(integdata),*integdata),SHA).digest()[:12] #SHA1-96 per RFC2404 truncates to 96 bits
+                message += unpack("12B",authcode)
         self.netpacket = pack("!%dB"%len(message),*message)
         self._xmit_packet()
 
@@ -256,7 +322,6 @@ class IPMISession:
         data=response['data']
         self.sessionid=unpack("<I",pack("4B",*data[1:5]))[0]
         self.sequencenumber=unpack("<I",pack("4B",*data[5:9]))[0]
-        self.privlevel=4 #ipmi 1.5 we are going to settle for nothing less than administrator for now
         self._req_priv_level()
     def _req_priv_level(self):
         self.ipmicallback=self._got_priv_level
@@ -280,13 +345,29 @@ class IPMISession:
         self._send_ipmi_net_payload(netfn=0x6,command=0x39,data=reqdata)
 
     def _open_rmcpplus_request(self):
-        raise Exception("TODO: implement ipmi 2.0")
+        self.authtype=6
+        self.localsid+=1 #have unique local session ids to ignore aborted login attempts from the past
+        self.rmcptag+=1
+        data = [
+            self.rmcptag,
+            0, #request as much privilege as the channel will give us
+            0,0, #reserved
+            ]
+        data += list(unpack("4B",pack("<I",self.localsid)))
+        data += [
+            0,0,0,8,1,0,0,0, #table 13-17, SHA-1
+            1,0,0,8,1,0,0,0, #SHA-1 integrity
+            #2,0,0,8,1,0,0,0, #AES privacy
+            2,0,0,8,0,0,0,0, #no privacy confalgo
+        ]
+        self.sessioncontext='OPENSESSION';
+        self._pack_payload(payload=data,payload_type=payload_types['rmcpplusopenreq'])
     def _get_channel_auth_cap(self):
         self.ipmicallback=self._got_channel_auth_cap
         if (self.ipmi15only):
-            self._send_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x0e,0x04])
+            self._send_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x0e,self.privlevel])
         else:
-            self._send_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x8e,0x04])
+            self._send_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x8e,self.privlevel])
     def login(self):
         self._initsession()
         self._get_channel_auth_cap()
@@ -329,11 +410,16 @@ class IPMISession:
         if not (data[0] == '\x06' and data[2:4] == '\xff\x07'): #packed data is not ipmi
             return
         try:
-            cls.bmc_handlers[sockaddr]._handle_ipmi_packet(data)
+            cls.bmc_handlers[sockaddr]._handle_ipmi_packet(data,sockaddr=sockaddr)
             cls.pending-=1
         except KeyError:
             pass
-    def _handle_ipmi_packet(self,data):
+    def _handle_ipmi_packet(self,data,sockaddr=None):
+        if self.sockaddr is None and sockaddr is not None:
+            self.sockaddr=sockaddr
+        elif self.sockaddr is not None and sockaddr is not None and self.sockaddr != sockaddr:
+            return #here, we might have sent an ipv4 and ipv6 packet to kick things off
+                   #ignore the second reply since we have one satisfactory answer
         if data[4] in ('\x00','\x02'): #This is an ipmi 1.5 paylod
             remsequencenumber = unpack('<I',data[5:9])[0]
             if hasattr(self,'remsequencenumber') and remsequencenumber < self.remsequencenumber:
@@ -352,9 +438,146 @@ class IPMISession:
                 del rsp[13:29]
             payload=list(rsp[14:14+rsp[13]])
             self._parse_ipmi_payload(payload)
+        elif data[4] == '\x06':
+            self._handle_ipmi2_packet(data)
+        else:
+            return #unrecognized data, assume evil
+    
                 
 
 
+    def _handle_ipmi2_packet(self,data):
+        data = list(unpack("%dB"%len(data),data)) #we need mutable array of bytes
+        ptype = data[5]&0b00111111
+        #the first 16 bytes are header information as can be seen in 13-8 that we will toss out
+        if ptype == 0x11: #rmcp+ response
+            return self._got_rmcp_response(data[16:])
+        elif ptype == 0x13:
+            return self._got_rakp2(data[16:])
+        elif ptype == 0x15:
+            return self._got_rakp4(data[16:])
+        elif ptype == 0: #good old ipmi payload
+            #If I'm endorsing a shared secret scheme, then at the very least it needs to do mutual assurance
+            if not (data[5]&0b01000000): #This would be the line that might trip up some crappy, insecure BMC implementation
+                return
+            raise Exception("TODO: handle_ipmi2")
+    def _got_rmcp_response(self,data):
+        #see RMCP+ open session response table
+        if not (self.sessioncontext and self.sessioncontext != "Established"):
+            return -9; #ignore payload as we are not in a state for the response to make sense
+        if data[0] != self.rmcptag:
+            return -9 #use rmcp tag to track and reject stale responses so that the state doesn't go odd
+        if data[1] !=0: #response code...
+            if data[1] in rmcp_codes:
+                errstr=rmcp_codes[data[1]]
+            else:
+                errstr="Unrecognized RMCP code %d"%data[1]
+            _call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
+            return -9
+        self.allowedpriv=data[2]
+        #TODO: check privelege level allowed?  admin was xCAT requirement, but 
+        localsid=unpack("<I",pack("4B",*data[4:8]))[0]
+        if self.localsid != localsid: #whatever this is, it isn't for the current session id in question
+            return -9
+        self.pendingsessionid=unpack("<I",pack("4B",*data[8:12]))[0]
+        #TODO: currently, we take it for granted that the responder accepted our integrity/auth/confidentiality proposal
+        self._send_rakp1()
+    def _send_rakp1(self):
+        self.rmcptag+=1
+        self.randombytes=os.urandom(16)
+        userlen=len(self.userid)
+        payload = [self.rmcptag,0,0,0]+ \
+            list(unpack("4B",pack("<I",self.pendingsessionid)))+\
+            list(unpack("16B",self.randombytes))+\
+            [self.privlevel,0,0]+\
+            [userlen]+\
+            list(unpack("%dB"%userlen,self.userid))
+        self.sessioncontext="EXPECTINGRAKP2"
+        self._pack_payload(payload=payload,payload_type=payload_types['rakp1'])
+    def _got_rakp2(self,data):
+        if not (self.sessioncontext in ('EXPECTINGRAKP2','EXPECTINGRAKP4')):
+            return -9 #if we are not expecting rakp2, ignore. In a retry scenario, replying from stale RAKP2 after sending RAKP3 seems to be best
+        if data[0] != self.rmcptag: #ignore mismatched tags for retry logic
+            return -9
+        if data[1] != 0: #if not successful, consider next move
+            if data[1] == 2: #invalid sessionid 99% of the time means a retry scenario invalidated an in-flight transaction
+                return
+            if data[1] in rmcp_codes:
+                errstr=rmcp_codes[data[1]]
+            else:
+                errstr="Unrecognized RMCP code %d"%data[1]
+            _call_with_optional_args(self.onlogon,{'error': errstr+" in RAKP2"},self.onlogonargs)
+            return -9
+        localsid=unpack("<I",pack("4B",*data[4:8]))[0]
+        if localsid != self.localsid:
+            return -9 #if it isn't the session we are trying to negotiate, ignore it
+        self.remoterandombytes = pack("16B",*data[8:24])
+        self.remoteguid=pack("16B",*data[24:40])
+        userlen=len(self.userid)
+        hmacdata=pack("<II",localsid,self.pendingsessionid)+\
+            self.randombytes+self.remoterandombytes+self.remoteguid+\
+            pack("2B",self.privlevel,userlen)+\
+            self.userid
+        expectedhash = HMAC.new(self.password,hmacdata,SHA).digest()
+        givenhash = pack("%dB"%len(data[40:]),*data[40:])
+        if givenhash != expectedhash:
+            self.sessioncontext="FAILED"
+            _call_with_optional_args(self.onlogon,{'error': "Incorrect password provided"},self.onlogonargs)
+            return -9
+        #We have now validated that the BMC and client agree on password, time to store the keys
+        self.sik=HMAC.new(self.kg,self.randombytes+self.remoterandombytes+pack("2B",self.privlevel,userlen)+self.userid,SHA).digest()
+        self.k1=HMAC.new(self.sik,'x01'*20).digest()
+        self.k2=HMAC.new(self.sik,'x02'*20).digest()
+        self.aeskey=self.k2[0:16]
+        self.sessioncontext="EXPECTINGRAKP4"
+        self._send_rakp3()
+    def _send_rakp3(self): #rakp message 3
+        self.rmcptag+=1
+        #rmcptag, then status 0, then two reserved 0s
+        payload=[self.rmcptag,0,0,0]+\
+            list(unpack("4B",pack("<I",self.pendingsessionid)))
+        hmacdata = self.remoterandombytes+\
+            pack("<I",self.localsid)+\
+            pack("2B",self.privlevel,len(self.userid))+\
+            self.userid
+        authcode=HMAC.new(self.password,hmacdata,SHA).digest()
+        payload += list(unpack("%dB"%len(authcode),authcode))
+        self._pack_payload(payload=payload,payload_type=payload_types['rakp3'])
+    def _got_rakp4(self,data):
+        if self.sessioncontext != "EXPECTINGRAKP4" or data[0] != self.rmcptag:
+            return -9
+        if data[1] != 0:
+            if data[1] == 2 and self.logontries: #if we retried RAKP3 because RAKP4 got dropped, BMC can consider it done and we must restart
+                self.relog()
+            if data[1] == 15 and self.logontries: #ignore 15 value if we are retrying.  xCAT did but I can't recall why exactly
+                return
+            if data[1] in rmcp_codes:
+                errstr=rmcp_codes[data[1]]
+            else:
+                errstr="Unrecognized RMCP code %d"%data[1]
+            _call_with_optional_args(self.onlogon,{'error': errstr+" reported in RAKP4"},self.onlogonargs)
+            return -9
+        localsid=unpack("<I",pack("4B",*data[4:8]))[0]
+        if localsid != self.localsid: #ignore if wrong session id indicated
+            return -9
+        hmacdata=self.randombytes+\
+            pack("<I",self.pendingsessionid)+\
+            self.remoteguid
+        expectedauthcode = HMAC.new(self.sik,hmacdata,SHA).digest()[:12]
+        authcode=pack("%dB"%len(data[8:]),*data[8:])
+        if authcode != expectedauthcode:
+            _call_with_optional_args(self.onlogon,{'error': "Invalid RAKP4 integrity code (wrong Kg?)"},self.onlogonargs)
+            return
+        self.sessionid=self.pendingsessionid
+        self.integrityalgo='sha1'
+        #self.confalgo='aes'
+        self.sequencenumber=1
+        self.sessioncontext='ESTABLISHED'
+        self._req_priv_level()
+
+    '''
+    Internal function to parse IPMI nugget once extracted from its framing
+    '''
     def _parse_ipmi_payload(self,payload):
         #For now, skip the checksums since we are in LAN only, TODO: if implementing other channels, add checksum checks here
         if not (payload[4] == self.seqlun and payload[1]>>2 == self.expectednetfn and payload[5] == self.expectedcmd):
@@ -423,6 +646,6 @@ class IPMISession:
 
 
 if __name__ == "__main__":
-    ipmis = IPMISession(bmc="10.240.181.1",userid="USERID",password="Passw0rd")
+    import sys
+    ipmis = IPMISession(bmc=sys.argv[1],userid=sys.argv[2],password=os.environ['IPMIPASS'])
     print ipmis.raw_command(command=2,data=[1],netfn=0)
-    ipmis.logout()
