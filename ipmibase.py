@@ -466,7 +466,7 @@ class IPMISession:
             if not (data[5]&0b01000000): #This would be the line that might trip up some crappy, insecure BMC implementation
                 return
             encrypted=0
-            if data[6]&0b10000000:
+            if data[5]&0b10000000:
                 encrypted=1
             authcode=rawdata[-12:]
             expectedauthcode=HMAC.new(self.k1,rawdata[4:-12],SHA).digest()[:12]
@@ -476,8 +476,23 @@ class IPMISession:
             if sid != self.localsid: #session id mismatch, drop it
                 return
             remseqnumber=unpack("<I",rawdata[10:14])[0]
-            print remseqnumber
-            raise Exception("TODO: handle_ipmi2")
+            if hasattr(self,'remseqnumber') and (remseqnumber < self.remseqnumber) and (self.remseqnumber != 0xffffffff): 
+                return
+            self.remseqnumber=remseqnumber
+            psize=data[14]+(data[15]<<8)
+            payload=data[16:16+psize]
+            if encrypted:
+                iv = rawdata[16:32]
+                decrypter = AES.new(self.aeskey,AES.MODE_CBC,iv)
+                decrypted = decrypter.decrypt(pack("%dB"%len(payload),*payload))
+                payload = unpack("%dB"%len(decrypted),decrypted)
+                padsize = payload[-1]+1
+                print "payload before: "
+                print payload
+                payload = payload[:-padsize]
+                print "payload after: "
+                print payload
+            self._parse_ipmi_payload(payload)
     def _got_rmcp_response(self,data):
         #see RMCP+ open session response table
         if not (self.sessioncontext and self.sessioncontext != "Established"):
@@ -596,6 +611,8 @@ class IPMISession:
     Internal function to parse IPMI nugget once extracted from its framing
     '''
     def _parse_ipmi_payload(self,payload):
+        print "got payload of %d"%len(payload)
+        print payload
         #For now, skip the checksums since we are in LAN only, TODO: if implementing other channels, add checksum checks here
         if not (payload[4] == self.seqlun and payload[1]>>2 == self.expectednetfn and payload[5] == self.expectedcmd):
             return -1 #this payload is not a match for our outstanding ipmi packet
