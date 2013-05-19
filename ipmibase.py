@@ -487,11 +487,7 @@ class IPMISession:
                 decrypted = decrypter.decrypt(pack("%dB"%len(payload[16:]),*payload[16:]))
                 payload = unpack("%dB"%len(decrypted),decrypted)
                 padsize = payload[-1]+1
-                print "payload before: "
-                print payload
                 payload = list(payload[:-padsize])
-                print "payload after: "
-                print payload
             self._parse_ipmi_payload(payload)
     def _got_rmcp_response(self,data):
         #see RMCP+ open session response table
@@ -611,8 +607,6 @@ class IPMISession:
     Internal function to parse IPMI nugget once extracted from its framing
     '''
     def _parse_ipmi_payload(self,payload):
-        print "got payload of %d"%len(payload)
-        print payload
         #For now, skip the checksums since we are in LAN only, TODO: if implementing other channels, add checksum checks here
         if not (payload[4] == self.seqlun and payload[1]>>2 == self.expectednetfn and payload[5] == self.expectedcmd):
             return -1 #this payload is not a match for our outstanding ipmi packet
