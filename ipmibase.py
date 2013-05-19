@@ -245,7 +245,7 @@ class IPMISession:
             if self.integrityalgo: #see table 13-8, RMCP+ packet format TODO: SHA256 which is now allowed
                 neededpad=(len(message)-2)%4
                 if neededpad:
-                    needpad = 4-neededpad
+                    neededpad = 4-neededpad
                 message += [0xff]*neededpad
                 message.append(neededpad)
                 message.append(7) #reserved, 7 is the required value for the specification followed
