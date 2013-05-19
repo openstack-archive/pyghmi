@@ -243,13 +243,13 @@ class IPMISession:
                 message.append(psize>>8);
                 message += list(payload)
             if self.integrityalgo: #see table 13-8, RMCP+ packet format TODO: SHA256 which is now allowed
-                integdata = message[4:]
-                neededpad=(len(integdata)-2)%4
+                neededpad=(len(message)-2)%4
                 if neededpad:
                     needpad = 4-neededpad
                 message += [0xff]*neededpad
                 message.append(neededpad)
                 message.append(7) #reserved, 7 is the required value for the specification followed
+                integdata = message[4:]
                 authcode = HMAC.new(self.k1,pack("%dB"%len(integdata),*integdata),SHA).digest()[:12] #SHA1-96 per RFC2404 truncates to 96 bits
                 message += unpack("12B",authcode)
         self.netpacket = pack("!%dB"%len(message),*message)
@@ -446,8 +446,8 @@ class IPMISession:
                 
 
 
-    def _handle_ipmi2_packet(self,data):
-        data = list(unpack("%dB"%len(data),data)) #we need mutable array of bytes
+    def _handle_ipmi2_packet(self,rawdata):
+        data = list(unpack("%dB"%len(rawdata),rawdata)) #we need mutable array of bytes
         ptype = data[5]&0b00111111
         #the first 16 bytes are header information as can be seen in 13-8 that we will toss out
         if ptype == 0x11: #rmcp+ response
@@ -460,6 +460,18 @@ class IPMISession:
             #If I'm endorsing a shared secret scheme, then at the very least it needs to do mutual assurance
             if not (data[5]&0b01000000): #This would be the line that might trip up some crappy, insecure BMC implementation
                 return
+            encrypted=0
+            if data[6]&0b10000000:
+                encrypted=1
+            authcode=rawdata[-12:]
+            expectedauthcode=HMAC.new(self.k1,rawdata[4:-12],SHA).digest()[:12]
+            if authcode != expectedauthcode:
+                return #BMC failed to assure integrity to us, drop it
+            sid=unpack("<I",rawdata[6:10])[0]
+            if sid != self.localsid: #session id mismatch, drop it
+                return
+            remseqnumber=unpack("<I",rawdata[10:14])[0]
+            print remseqnumber
             raise Exception("TODO: handle_ipmi2")
     def _got_rmcp_response(self,data):
         #see RMCP+ open session response table
@@ -526,8 +538,8 @@ class IPMISession:
             return -9
         #We have now validated that the BMC and client agree on password, time to store the keys
         self.sik=HMAC.new(self.kg,self.randombytes+self.remoterandombytes+pack("2B",self.privlevel,userlen)+self.userid,SHA).digest()
-        self.k1=HMAC.new(self.sik,'x01'*20).digest()
-        self.k2=HMAC.new(self.sik,'x02'*20).digest()
+        self.k1=HMAC.new(self.sik,'\x01'*20,SHA).digest()
+        self.k2=HMAC.new(self.sik,'\x02'*20,SHA).digest()
         self.aeskey=self.k2[0:16]
         self.sessioncontext="EXPECTINGRAKP4"
         self._send_rakp3()
