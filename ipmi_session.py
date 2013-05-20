@@ -33,7 +33,7 @@ def _aespad(data): # ipmi demands a certain pad scheme, per table 13-20 AES-CBC 
 In order to simplify things, in a number of places there is a callback facility and optional arguments to pass in.
 An OO oriented caller may find the additional argument needless. Allow them to ignore it by skipping the argument if None
 '''
-def _call_with_optional_args(callback,*args):
+def call_with_optional_args(callback,*args):
     newargs=[]
     for arg in args:
         if arg is not None:
@@ -53,7 +53,7 @@ def get_ipmi_error(response,suffix=""):
     else:
         return "Unknown code "+code+" encountered"
 
-class IPMISession:
+class ipmi_session:
     poller=select.poll()
     bmc_handlers={}
     waiting_sessions={}
@@ -112,12 +112,12 @@ class IPMISession:
         else:
             self.async=True
             self.onlogon=onlogon
-        if not hasattr(IPMISession,'socket'):
+        if not hasattr(ipmi_session,'socket'):
             self._createsocket()
         self.login()
         if not self.async:
             while not self.logged:
-                IPMISession.wait_for_rsp()
+                ipmi_session.wait_for_rsp()
     def _initsession(self):
         self.localsid=2017673555 #this number can be whatever we want.  I picked 'xCAT' minus 1 so that a hexdump of packet would show xCAT
         self.privlevel=4 #for the moment, assume admin access TODO: make flexible
@@ -183,7 +183,7 @@ class IPMISession:
         self._send_ipmi_net_payload(netfn,command,data)
         if callback is None:
             while self.lastresponse is None:
-                IPMISession.wait_for_rsp()
+                ipmi_session.wait_for_rsp()
             return self.lastresponse
     def _send_ipmi_net_payload(self,netfn,command,data):
         ipmipayload=self._make_ipmi_payload(netfn,command,data)
@@ -276,14 +276,14 @@ class IPMISession:
 
     def _got_channel_auth_cap(self,response):
         if 'error' in response:
-            _call_with_optional_args(self.onlogon,response,self.onlogonargs)
+            call_with_optional_args(self.onlogon,response,self.onlogonargs)
             return
         if response['code'] == 0xcc and self.ipmi15only is not None: #tried ipmi 2.0 against a 1.5 which should work, but some bmcs thought 'reserved' meant 'must be zero'
             self.ipmi15only=1
             return self._get_channel_auth_cap()
         errstr = get_ipmi_error(response,suffix=" while trying to get channel authentication capabalities")
         if errstr:
-            _call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
+            call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
             return
         data = response['data']
         self.currentchannel=data[0]
@@ -291,7 +291,7 @@ class IPMISession:
             self.ipmiversion=2.0
         if self.ipmiversion == 1.5:
             if not (data[1] & 0b100):
-                _call_with_optional_args(self.onlogon,{'error': "MD5 is required but not enabled or available on target BMC"},self.onlogonargs)
+                call_with_optional_args(self.onlogon,{'error': "MD5 is required but not enabled or available on target BMC"},self.onlogonargs)
                 return
             self._get_session_challenge()
         elif self.ipmiversion == 2.0:
@@ -300,7 +300,7 @@ class IPMISession:
     def _got_session_challenge(self,response):
         errstr=get_ipmi_error(response,suffix=" while getting session challenge")
         if errstr:
-            _call_with_optional_args(self.onlogon,{'error':errstr},self.onlogonargs)
+            call_with_optional_args(self.onlogon,{'error':errstr},self.onlogonargs)
             return
         data = response['data']
         self.sessionid=unpack("<I",pack("4B",*data[0:4]))[0]
@@ -317,7 +317,7 @@ class IPMISession:
     def _activated_session(self,response):
         errstr = get_ipmi_error(response)
         if errstr:
-            _call_with_optional_args(self.onlogon,{'error':errstr},self.onlogonargs)
+            call_with_optional_args(self.onlogon,{'error':errstr},self.onlogonargs)
             return
         data=response['data']
         self.sessionid=unpack("<I",pack("4B",*data[1:5]))[0]
@@ -329,10 +329,10 @@ class IPMISession:
     def _got_priv_level(self,response):
         errstr=get_ipmi_error(response,suffix=" while requesting privelege level %d for %s"%(self.privlevel,self.userid))
         if errstr:
-            _call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
+            call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
             return
         self.logged=1
-        _call_with_optional_args(self.onlogon,{'success':True},self.onlogonargs)
+        call_with_optional_args(self.onlogon,{'success':True},self.onlogonargs)
 
     def _get_session_challenge(self):
         reqdata=[2]
@@ -500,7 +500,7 @@ class IPMISession:
                 errstr=rmcp_codes[data[1]]
             else:
                 errstr="Unrecognized RMCP code %d"%data[1]
-            _call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
+            call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
             return -9
         self.allowedpriv=data[2]
         #TODO: check privelege level allowed?  admin was xCAT requirement, but 
@@ -534,7 +534,7 @@ class IPMISession:
                 errstr=rmcp_codes[data[1]]
             else:
                 errstr="Unrecognized RMCP code %d"%data[1]
-            _call_with_optional_args(self.onlogon,{'error': errstr+" in RAKP2"},self.onlogonargs)
+            call_with_optional_args(self.onlogon,{'error': errstr+" in RAKP2"},self.onlogonargs)
             return -9
         localsid=unpack("<I",pack("4B",*data[4:8]))[0]
         if localsid != self.localsid:
@@ -550,7 +550,7 @@ class IPMISession:
         givenhash = pack("%dB"%len(data[40:]),*data[40:])
         if givenhash != expectedhash:
             self.sessioncontext="FAILED"
-            _call_with_optional_args(self.onlogon,{'error': "Incorrect password provided"},self.onlogonargs)
+            call_with_optional_args(self.onlogon,{'error': "Incorrect password provided"},self.onlogonargs)
             return -9
         #We have now validated that the BMC and client agree on password, time to store the keys
         self.sik=HMAC.new(self.kg,self.randombytes+self.remoterandombytes+pack("2B",self.privlevel,userlen)+self.userid,SHA).digest()
@@ -583,7 +583,7 @@ class IPMISession:
                 errstr=rmcp_codes[data[1]]
             else:
                 errstr="Unrecognized RMCP code %d"%data[1]
-            _call_with_optional_args(self.onlogon,{'error': errstr+" reported in RAKP4"},self.onlogonargs)
+            call_with_optional_args(self.onlogon,{'error': errstr+" reported in RAKP4"},self.onlogonargs)
             return -9
         localsid=unpack("<I",pack("4B",*data[4:8]))[0]
         if localsid != self.localsid: #ignore if wrong session id indicated
@@ -594,7 +594,7 @@ class IPMISession:
         expectedauthcode = HMAC.new(self.sik,hmacdata,SHA).digest()[:12]
         authcode=pack("%dB"%len(data[8:]),*data[8:])
         if authcode != expectedauthcode:
-            _call_with_optional_args(self.onlogon,{'error': "Invalid RAKP4 integrity code (wrong Kg?)"},self.onlogonargs)
+            call_with_optional_args(self.onlogon,{'error': "Invalid RAKP4 integrity code (wrong Kg?)"},self.onlogonargs)
             return
         self.sessionid=self.pendingsessionid
         self.integrityalgo='sha1'
@@ -618,7 +618,7 @@ class IPMISession:
         self.expectedcmd=0x1ff
         self.seqlun += 4 #prepare seqlun for next transmit
         self.seqlun &= 0xff #when overflowing, wrap around
-        del IPMISession.waiting_sessions[self]
+        del ipmi_session.waiting_sessions[self]
         self.lastpayload=None #render retry mechanism utterly incapable of doing anything, though it shouldn't matter
         self.last_payload_type=None
         del payload[0:5] # remove header of rsaddr/netfn/lun/checksum/rq/seq/lun
@@ -640,23 +640,23 @@ class IPMISession:
         
     def _xmit_packet(self,waitforpending=True):
         if waitforpending:
-            IPMISession.wait_for_rsp(timeout=0) #take a convenient opportunity to drain the socket queue if applicable
-            while IPMISession.pending > IPMISession.maxpending:
-                IPMISession.wait_for_rsp()
-        IPMISession.waiting_sessions[self]={}
-        IPMISession.waiting_sessions[self]['ipmisession']=self
-        IPMISession.waiting_sessions[self]['timeout']=self.timeout+time()
-        IPMISession.pending+=1
+            ipmi_session.wait_for_rsp(timeout=0) #take a convenient opportunity to drain the socket queue if applicable
+            while ipmi_session.pending > ipmi_session.maxpending:
+                ipmi_session.wait_for_rsp()
+        ipmi_session.waiting_sessions[self]={}
+        ipmi_session.waiting_sessions[self]['ipmisession']=self
+        ipmi_session.waiting_sessions[self]['timeout']=self.timeout+time()
+        ipmi_session.pending+=1
         if self.sockaddr:
-            IPMISession.socket.sendto(self.netpacket,self.sockaddr)
+            ipmi_session.socket.sendto(self.netpacket,self.sockaddr)
         else: #he have not yet picked a working sockaddr for this connection, try all the candidates that getaddrinfo provides
             for res in socket.getaddrinfo(self.bmc,self.port,0,socket.SOCK_DGRAM):
                 sockaddr = res[4]
                 if (res[0] == socket.AF_INET): #convert the sockaddr to AF_INET6
                     newhost='::ffff:'+sockaddr[0]
                     sockaddr = (newhost,sockaddr[1],0,0)
-                IPMISession.bmc_handlers[sockaddr]=self
-                IPMISession.socket.sendto(self.netpacket,sockaddr)
+                ipmi_session.bmc_handlers[sockaddr]=self
+                ipmi_session.socket.sendto(self.netpacket,sockaddr)
         if self.sequencenumber: #seq number of zero will be left alone as it is special, otherwise increment
             self.sequencenumber += 1
     def logout(self,callback=None,callback_args=None):
@@ -675,5 +675,5 @@ class IPMISession:
 
 if __name__ == "__main__":
     import sys
-    ipmis = IPMISession(bmc=sys.argv[1],userid=sys.argv[2],password=os.environ['IPMIPASS'])
+    ipmis = ipmi_session(bmc=sys.argv[1],userid=sys.argv[2],password=os.environ['IPMIPASS'])
     print ipmis.raw_command(command=2,data=[1],netfn=0)
