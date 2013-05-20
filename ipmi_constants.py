@@ -33,11 +33,11 @@ rmcp_codes = {
 }
 
 command_completion_codes = {
-    0x39: {
+    (7,0x39): {
         0x81: "Invalid user name",
         0x82: "Null user disabled",
     },
-    0x3a: {
+    (7,0x3a): {
         0x81: "No available login slots",
         0x82: "No available login slots for requested user",
         0x83: "No slot available with requested privilege level",
@@ -45,11 +45,17 @@ command_completion_codes = {
         0x85: "Invalid session ID",
         0x86: "Requested privilege level exceeds requested user permissions on this channel",
     },
-    0x3b: {
+    (7,0x3b): { #Set session privilege level
         0x80: "User is not allowed requested priveleg level",
         0x81: "Requested privilege level is not allowed over this channel",
         0x82: "Cannot disable user level authentication",
     },
+    (1,8): { #set system boot options
+        0x80: "Parameter not supported",
+        0x81: "Attempt to set set 'set in progress' when not 'set complete'",
+        0x82: "Attempt to write read-only parameter",
+    }
+    
 }
 
 ipmi_completion_codes = {

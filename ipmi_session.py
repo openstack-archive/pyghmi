@@ -43,11 +43,12 @@ def get_ipmi_error(response,suffix=""):
     if 'error' in response:
         return response['error']+suffix
     code = response['code']
-    command = response['commmand']
+    command = response['command']
+    netfn = response['netfn']
     if code == 0:
         return False
-    if command in command_completion_codes and code in command_completion_codes[command]:
-        return command_completion_codes[command][code]+suffix
+    if (netfn,command) in command_completion_codes and code in command_completion_codes[(netfn,command)]:
+        return command_completion_codes[(netfn,command)][code]+suffix
     elif code in ipmi_completion_codes:
         return ipmi_completion_codes[code]+suffix
     else:
@@ -625,7 +626,7 @@ class ipmi_session:
         response['netfn'] =  payload[1]>>2
         del payload[0:5] # remove header of rsaddr/netfn/lun/checksum/rq/seq/lun
         del payload[-1] # remove the trailing checksum
-        response['commmand']=payload[0]
+        response['command']=payload[0]
         response['code']=payload[1]
         del payload[0:2]
         response['data']=payload
@@ -674,3 +675,4 @@ if __name__ == "__main__":
     import sys
     ipmis = ipmi_session(bmc=sys.argv[1],userid=sys.argv[2],password=os.environ['IPMIPASS'])
     print ipmis.raw_command(command=2,data=[1],netfn=0)
+    print get_ipmi_error({'command':8,'code':128,'netfn':1})
