@@ -43,7 +43,7 @@ def get_ipmi_error(response,suffix=""):
     if 'error' in response:
         return response['error']+suffix
     code = response['code']
-    command = response['cmd']
+    command = response['commmand']
     if code == 0:
         return False
     if command in command_completion_codes and code in command_completion_codes[command]:
@@ -621,19 +621,16 @@ class ipmi_session:
         del ipmi_session.waiting_sessions[self]
         self.lastpayload=None #render retry mechanism utterly incapable of doing anything, though it shouldn't matter
         self.last_payload_type=None
+        response={}
+        response['netfn'] =  payload[1]>>2
         del payload[0:5] # remove header of rsaddr/netfn/lun/checksum/rq/seq/lun
         del payload[-1] # remove the trailing checksum
-        response={}
-        response['cmd']=payload[0]
+        response['commmand']=payload[0]
         response['code']=payload[1]
         del payload[0:2]
         response['data']=payload
         self.timeout=initialtimeout+(0.5*random())
-        if self.ipmicallbackargs is not None:
-            args=(response,self.ipmicallbackargs)
-        else:
-            args=(response,)
-        self.ipmicallback(*args)
+        call_with_optional_args(self.ipmicallback,response,self.ipmicallbackargs)
 
     def _timedout(self):
         raise Exception("TODO: proper retries")
