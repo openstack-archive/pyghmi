@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# Copyright 2013 IBM Corp.
 # This represents the low layer message framing portion of IPMI
 import os
 import select
