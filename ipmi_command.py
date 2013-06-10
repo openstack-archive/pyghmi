@@ -31,12 +31,15 @@ class ipmi_command:
     def get_bootdev(self,callback=None,callback_args=None):
         self.commandcallback=callback
         self.commandcallbackargs=callback_args
-        self.requestpending=True
         self.ipmi_session.raw_command(netfn=0,command=9,data=(5,0,0),callback=self._got_bootdev)
-        if callback is None:
+        return self._waitifsync()
+    def _waitifsync(self):
+        self.requestpending=True
+        if self.commandcallback is None:
             while self.requestpending:
                 ipmi_session.wait_for_rsp()
             return self.lastresponse
+        return True
         
     def set_bootdev(self,bootdev,callback=None,callback_args=None,persist=None,uefiboot=None):
         self.commandcallback=callback
@@ -98,14 +101,23 @@ class ipmi_command:
             call_with_optional_args(self.commandcallback,self.lastresponse,self.commandcallbackargs)
         
     def get_power(self,callback=None,callback_args=None):
-        response=self.ipmi_session.raw_command(netfn=0,command=1,callback=callback,callback_args=callback_args)
-        if response: #this means there was no callback
-            if 'error' in response:
-                raise Exception(response['error'])
-            if response['data'][0]&1:
-                return {'powerstate': 'on' }
-            else:
-                return {'powerstate': 'on' }
+        self.commandcallback=callback
+        self.commandcallbackargs=callback_args
+        self.ipmi_session.raw_command(netfn=0,command=1,callback=self._got_power)
+        return self._waitifsync()
+    def _got_power(self,response):
+        self.requestpending=False
+        if 'error' in response:
+            _raiseorcall(self.commandcallback,response,self.commandcallbackargs)
+            return
+        assert(response['command'] == 1 and response['netfn'] == 1)
+        if response['data'][0]&1:
+            self.lastresponse={'powerstate': 'on'}
+        else:
+            self.lastresponse={'powerstate': 'off'}
+        if self.commandcallback:
+            call_with_optional_args(self.commandcallback,self.lastresponse,self.commandcallbackargs)
+        
 if __name__ == "__main__":
     import sys
     import os
