@@ -101,6 +101,8 @@ class ipmi_session:
         self.bmc=bmc
         self.userid=userid
         self.password=password
+        self.noretry=False
+        self.nowait=False
         if kg is not None:
             self.kg=kg
         else:
@@ -370,6 +372,7 @@ class ipmi_session:
         else:
             self._send_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x8e,self.privlevel])
     def login(self):
+        self.logontries=5
         self._initsession()
         self._get_channel_auth_cap()
     @classmethod
@@ -380,6 +383,7 @@ class ipmi_session:
                 break
             if parms['timeout'] <= curtime:
                 timeout=0 #exit after one guaranteed pass
+                continue
             if timeout is not None and timeout < parms['timeout']-curtime:
                 continue #timeout is smaller than the current session would need
             timeout = parms['timeout']-curtime #set new timeout value
@@ -401,10 +405,10 @@ class ipmi_session:
         for session,parms in cls.waiting_sessions.iteritems():
             if parms['timeout'] < curtime: #timeout has expired, time to give up on it and trigger timeout response in the respective session
                 sessionstodel.append(session) #defer deletion until after loop as to avoid confusing the for loop
-                cls.pending -= 1
-                session._timedout()
         for session in sessionstodel:
+            cls.pending -= 1
             del cls.waiting_sessions[session]
+            session._timedout()
         return len(cls.waiting_sessions)
     @classmethod
     def _route_ipmiresponse(cls,sockaddr,data):
@@ -572,12 +576,16 @@ class ipmi_session:
         authcode=HMAC.new(self.password,hmacdata,SHA).digest()
         payload += list(unpack("%dB"%len(authcode),authcode))
         self._pack_payload(payload=payload,payload_type=payload_types['rakp3'])
+    def _relog(self):
+        self._initsession()
+        self.logontries -= 1
+        return self._get_channel_auth_cap()
     def _got_rakp4(self,data):
         if self.sessioncontext != "EXPECTINGRAKP4" or data[0] != self.rmcptag:
             return -9
         if data[1] != 0:
             if data[1] == 2 and self.logontries: #if we retried RAKP3 because RAKP4 got dropped, BMC can consider it done and we must restart
-                self.relog()
+                self._relog()
             if data[1] == 15 and self.logontries: #ignore 15 value if we are retrying.  xCAT did but I can't recall why exactly
                 return
             if data[1] in rmcp_codes:
@@ -634,10 +642,37 @@ class ipmi_session:
         call_with_optional_args(self.ipmicallback,response,self.ipmicallbackargs)
 
     def _timedout(self):
-        raise Exception("TODO: proper retries")
-        
-    def _xmit_packet(self,waitforpending=True):
-        if waitforpending:
+        if not self.lastpayload:
+            return
+        self.nowait=True
+        self.timeout += 1
+        if self.noretry:
+            return
+        if self.timeout > 5:
+            response={'error': 'timeout'}
+            call_with_optional_args(self.ipmicallback,response,self.ipmicallbackargs)
+            self.nowait=False
+            return
+        elif self.sessioncontext == 'FAILED':
+            self.nowait=False
+            return
+        if self.sessioncontext == 'OPENSESSION':
+            #In this case, we want to craft a new session request to have unambiguous session id regardless of how packet was dropped or delayed
+            #in this case, it's safe to just redo the request
+            self._open_rmcpplus_request()
+        elif self.sessioncontext == 'EXPECTINGRAKP2' or self.sessioncontext == 'EXPECTINGRAKP4':
+            #If we can't be sure which RAKP was dropped or that RAKP3/4 was just delayed, the most reliable thing to do is
+            #rewind and start over
+            #bmcs do not take kindly to receiving RAKP1 or RAKP3 twice
+            self._relog()
+        else: #in IPMI case, the only recourse is to act as if the packet is idempotent.  SOL has more sophisticated retry handling
+            #the biggest risks are reset sp, which is often fruitless to retry and chassis reset, which sometimes will shoot itself systematically
+            #in the head in a shared port case making replies impossible
+            self.hasretried=1 #remember so that we can track taboo  combinations of sequence number, netfn, and lun due to ambiguity on the wire
+            self._pack_payload()
+        self.nowait=False
+    def _xmit_packet(self):
+        if not self.nowait: #if we are retrying, we really need to get the packet out and get our timeout updated 
             ipmi_session.wait_for_rsp(timeout=0) #take a convenient opportunity to drain the socket queue if applicable
             while ipmi_session.pending > ipmi_session.maxpending:
                 ipmi_session.wait_for_rsp()
@@ -663,7 +698,7 @@ class ipmi_session:
                 return {'success': True }
             callback({'success': True })
             return
-        self.noretry=1 #risk open sessions if logout request gets dropped, logout is not idempotent so this is the better bet
+        self.noretry=True #risk open sessions if logout request gets dropped, logout is not idempotent so this is the better bet
         self.raw_command(command=0x3c,netfn=6,data=unpack("4B",pack("I",self.sessionid)),callback=callback,callback_args=callback_args)
         self.logged=0
         if callback is None:
