@@ -24,6 +24,14 @@ boot_devices = {
     6: 'setup',
     0: 'default'
 }
+
+power_states = {
+    "off": 0,
+    "on": 1,
+    "reset": 3,
+    "softoff": 5,
+    "boot": -1, #not a valid direct boot state, but here for convenience of 'in' statement
+}
     
 class ipmi_command:
     def __init__(self,bmc,userid,password,kg=None):
@@ -41,6 +49,63 @@ class ipmi_command:
             return self.lastresponse
         return True
         
+    '''
+    powerstate argument is one of:
+    on - request system turn on, do nothing if already on
+    off - rudely turn system power off, regardless of OS/firmware state, do nothing if off
+    reset - request immediate system reset without regard for OS/firmware state, do nothing if off
+    boot - if target is on, reset, if target is off, turn on
+    softoff - request graceful shutdown from OS, no guarantee that system will turn off.
+    '''
+    def set_power(self,powerstate,callback=None,callback_args=None,wait=False):
+        self.commandcallback=callback
+        self.commandcallbackargs=callback_args
+        if powerstate not in power_states:
+            _raiseorcall(self.commandcallback,{'error': "Unknown power state %s requested"%powerstate},self.commandcallbackargs)
+        self.newpowerstate=powerstate
+        self.wait_for_power=wait
+        self.ipmi_session.raw_command(netfn=0,command=1,callback=self._set_power_with_chassis_info)
+        return self._waitifsync()
+    def _set_power_with_chassis_info(self,response):
+        if 'error' in response:
+            _raiseorcall(self.commandcallback,response,self.commandcallbackargs)
+            return
+        self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
+        if self.newpowerstate=='boot':
+            self.newpowerstate = 'on' if self.powerstate=='off' else 'reset'
+        self.ipmi_session.raw_command(netfn=0,command=2,data=[power_states[self.newpowerstate]],callback=self._power_set)
+
+    def _power_set(self,response):
+        if 'error' in response:
+            _raiseorcall(self.commandcallback,response,self.commandcallbackargs)
+            return
+        self.lastresponse={'pendingpowerstate': self.newpowerstate}
+        if self.wait_for_power and self.newpowerstate in ('on','off','softoff'):
+            if self.newpowerstate=='softoff':
+                self.waitpowerstate='off'
+            else:
+                self.waitpowerstate=self.newpowerstate
+            self.ipmi_session.raw_command(netfn=0,command=1,callback=self._power_wait)
+        else:
+            self.requestpending=False
+            if self.commandcallback:
+                call_with_optional_args(self.commandcallback,self.lastresponse,self.commandcallbackargs)
+
+    def _power_wait(self,response):
+        if 'error' in response:
+            _raiseorcall(self.commandcallback,response,self.commandcallbackargs)
+            return
+        self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
+        if self.powerstate==self.waitpowerstate:
+            self.requestpending=False
+            self.lastresponse={'powerstate': self.powerstate}
+            if self.commandcallback:
+                call_with_optional_args(self.commandcallback,self.lastresponse,self.commandcallbackargs)
+            return
+        self.ipmi_session.raw_command(netfn=0,command=1,callback=self._power_wait)
+            
+
+
     def set_bootdev(self,bootdev,callback=None,callback_args=None,persist=None,uefiboot=None):
         self.commandcallback=callback
         self.commandcallbackargs=callback_args
@@ -111,10 +176,8 @@ class ipmi_command:
             _raiseorcall(self.commandcallback,response,self.commandcallbackargs)
             return
         assert(response['command'] == 1 and response['netfn'] == 1)
-        if response['data'][0]&1:
-            self.lastresponse={'powerstate': 'on'}
-        else:
-            self.lastresponse={'powerstate': 'off'}
+        self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
+        self.lastresponse={'powerstate': self.powerstate}
         if self.commandcallback:
             call_with_optional_args(self.commandcallback,self.lastresponse,self.commandcallbackargs)
         
@@ -123,6 +186,7 @@ if __name__ == "__main__":
     import os
     ipmicmd = ipmi_command(bmc=sys.argv[1],userid=sys.argv[2],password=os.environ['IPMIPASS'])
     print ipmicmd.get_power()
+    print ipmicmd.set_power('on',wait=True)
     print ipmicmd.get_bootdev()
     print ipmicmd.set_bootdev('network')
     print ipmicmd.get_bootdev()
