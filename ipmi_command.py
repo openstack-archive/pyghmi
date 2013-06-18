@@ -1,3 +1,7 @@
+# Copyright 2013 IBM Corp.
+"""
+@author: Jarrod Johnson
+"""
 from ipmi_session import ipmi_session, call_with_optional_args
 def _raiseorcall(callback,response,args=None):
     if callback is None:
@@ -33,10 +37,30 @@ power_states = {
     "boot": -1, #not a valid direct boot state, but here for convenience of 'in' statement
 }
     
-class ipmi_command:
+class ipmi_command(object):
+    """
+    Send IPMI commands to BMCs.
+
+    Args:
+        * bmc (str): hostname or ip address of the BMC
+        * userid (str): username to use to connec
+        * password (str): password to connect to the BMC
+        * kg (str): Optional parameter to use if BMC has a particular Kg configured
+    """
     def __init__(self,bmc,userid,password,kg=None):
+        """
+        Establish a new IPMI session.
+        """
+        #TODO: accept tuples and lists of each parameter for mass operations without pushing the async complexities up the stack
         self.ipmi_session=ipmi_session(bmc=bmc,userid=userid,password=password,kg=kg)
     def get_bootdev(self,callback=None,callback_args=None):
+        """
+        Get current boot device override information.
+
+        Args:
+            * callback (function): optional callback if async behavior desired
+            * callback_args (tuple): optional arguments to callback 
+        """
         self.commandcallback=callback
         self.commandcallbackargs=callback_args
         self.ipmi_session.raw_command(netfn=0,command=9,data=(5,0,0),callback=self._got_bootdev)
@@ -106,7 +130,20 @@ class ipmi_command:
             
 
 
-    def set_bootdev(self,bootdev,callback=None,callback_args=None,persist=None,uefiboot=None):
+    def set_bootdev(self,bootdev,callback=None,callback_args=None,persist=False,uefiboot=False):
+        """
+        Set boot device to use on next reboot
+
+        Args:
+            * bootdev (str): One of 'pxe', 'hd', 'dvd', 'setup', 'default'
+            * callback (function): Optional callback for async operation
+            * callback_args (tuple): Optional arguments for callback (probably needless if callback is an instance method of an object)
+            * persist (bool): If set, system firmware may persist the boot device request across multiple resets
+            * uefiboot (bool): If set, request explicitly UEFI style boot.
+        Example:
+            ipmicmd.set_bootdev("pxe")
+        """
+
         self.commandcallback=callback
         self.commandcallbackargs=callback_args
         if bootdev not in boot_devices:
@@ -140,6 +177,19 @@ class ipmi_command:
         self.ipmi_session.raw_command(netfn=0,command=8,data=data,callback=self.commandcallback,callback_args=self.commandcallbackargs)
         
     def raw_command(self,netfn,command,data=(),callback=None,callback_args=None):
+        """
+        Send raw ipmi information to BMC
+
+        Args:
+            * netfn (int): Net function number
+            * command (int): Command 
+            * data (tuple): Tuple of data bytes to submit
+            * callback (function): Optional callback for asynchronous mode.
+            * callback_args (tuple): Optional arguments should callback be in use *and* require more data
+
+        Example:
+            ipmicmd.raw_command(netfn=0,command=4,data=(5))
+        """
         response=self.ipmi_session.raw_command(netfn=0,command=1,callback=callback,callback_args=callback_args)
         if response: #this means there was no callback
             if 'error' in response:
@@ -166,6 +216,20 @@ class ipmi_command:
             call_with_optional_args(self.commandcallback,self.lastresponse,self.commandcallbackargs)
         
     def get_power(self,callback=None,callback_args=None):
+        """
+        Get current power state of the BMC device
+
+        Args:
+            * callback (function): optional callback to request asynchronous behavior
+            * callback_args (tuple): optional arguments for callback
+        
+        Returns:
+            If no callback provided, a dict with 'powerstate' member.
+            Otherwise, returns true and the dict is passed as an argument to the provided callback.
+
+        Example:
+            ipmicmd.get_power()
+        """
         self.commandcallback=callback
         self.commandcallbackargs=callback_args
         self.ipmi_session.raw_command(netfn=0,command=1,callback=self._got_power)

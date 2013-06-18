@@ -11,6 +11,11 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+.. automodule:: ipmi_command
+
+.. autoclass:: ipmi_command
+    :members:
+
 Indices and tables
 ==================
 
