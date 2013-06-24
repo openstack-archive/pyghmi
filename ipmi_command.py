@@ -1,6 +1,6 @@
 # Copyright 2013 IBM Corp.
 """
-@author: Jarrod Johnson
+@author: Jarrod Johnson <jbjohnso@us.ibm.com>
 """
 from ipmi_session import ipmi_session, call_with_optional_args
 def _raiseorcall(callback,response,args=None):

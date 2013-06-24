@@ -1,4 +1,7 @@
 # Copyright 2013 IBM Corp.
+"""
+@author: Jarrod Johnson <jbjohnso@us.ibm.com>
+"""
 
 
 payload_types = {

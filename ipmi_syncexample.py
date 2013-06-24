@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+# Copyright 2013 IBM Corp.
+"""
+@author: Jarrod Johnson <jbjohnso@us.ibm.com>
+"""
 from ipmi_command import ipmi_command
 import os
 import sys

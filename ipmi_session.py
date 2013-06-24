@@ -1,4 +1,7 @@
 # Copyright 2013 IBM Corp.
+"""
+@author: Jarrod Johnson <jbjohnso@us.ibm.com>
+"""
 # This represents the low layer message framing portion of IPMI
 import os
 import select
