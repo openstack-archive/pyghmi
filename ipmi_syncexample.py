@@ -16,9 +16,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
-from ipmi_command import ipmi_command
+
 import os
 import sys
+
+from ipmi_command import ipmi_command
 password=os.environ['IPMIPASSWORD']
 os.environ['IPMIPASSWORD']=""
 if (len(sys.argv) < 3):

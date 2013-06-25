@@ -16,18 +16,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 # This represents the low layer message framing portion of IPMI
-import os
-import select
-from Crypto.Hash import HMAC, SHA
-from Crypto.Cipher import AES
-import socket
 import atexit
 from collections import deque
-from time import time
 from hashlib import md5
-from struct import pack, unpack
-from ipmi_constants import payload_types, ipmi_completion_codes, command_completion_codes, payload_types, rmcp_codes
+import os
 from random import random
+import select
+import socket
+
+from struct import pack, unpack
+from time import time
+from Crypto.Cipher import AES
+from Crypto.Hash import HMAC, SHA
+
+from ipmi_constants import payload_types, ipmi_completion_codes, command_completion_codes, payload_types, rmcp_codes
 
 initialtimeout = 0.5 #minimum timeout for first packet to retry in any given session.  This will be randomized to stagger out retries in case of congestion
 
