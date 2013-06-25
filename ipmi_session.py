@@ -104,7 +104,7 @@ class ipmi_session:
         cls.maxpending=curmax/1000 #pessimistically assume 1 kilobyte messages, way larger than almost all ipmi datagrams
         #for faster performance, sysadmins may want to examine and tune /proc/sys/net/core/rmem_max up.  This allows the module to request more,
         #but does not increase buffers for applications that do less creative things
-        #TODO: perhaps spread sessions across a socket pool when rmem_max is small, still get ~65/socket, but avoid long queues that might happen with
+        #TODO(jbjohnso): perhaps spread sessions across a socket pool when rmem_max is small, still get ~65/socket, but avoid long queues that might happen with
         #low rmem_max and putting thousands of nodes in line
     '''
     This function handles the synchronous caller case in liue of a client provided callback
@@ -139,7 +139,7 @@ class ipmi_session:
                 ipmi_session.wait_for_rsp()
     def _initsession(self):
         self.localsid=2017673555 #this number can be whatever we want.  I picked 'xCAT' minus 1 so that a hexdump of packet would show xCAT
-        self.privlevel=4 #for the moment, assume admin access TODO: make flexible
+        self.privlevel=4 #for the moment, assume admin access TODO(jbjohnso): make flexible
         self.confalgo=0
         self.aeskey=None
         self.integrityalgo=0
@@ -225,9 +225,9 @@ class ipmi_session:
         if (self.ipmiversion == 2.0):
             message.append(payload_type)
             if (baretype == 2):
-                raise Exception("TODO: OEM Payloads")
+                raise Exception("TODO(jbjohnso): OEM Payloads")
             elif (baretype == 1):
-                raise Exception("TODO: SOL Payload")
+                raise Exception("TODO(jbjohnso): SOL Payload")
             elif baretype not in payload_types.values():
                 raise Exception("Unrecognized payload type %d"%baretype)
             message += unpack("!4B",pack("<I",self.sessionid))
@@ -261,7 +261,7 @@ class ipmi_session:
                 message.append(psize&0xff)
                 message.append(psize>>8);
                 message += list(payload)
-            if self.integrityalgo: #see table 13-8, RMCP+ packet format TODO: SHA256 which is now allowed
+            if self.integrityalgo: #see table 13-8, RMCP+ packet format TODO(jbjohnso): SHA256 which is now allowed
                 neededpad=(len(message)-2)%4
                 if neededpad:
                     neededpad = 4-neededpad
@@ -329,7 +329,7 @@ class ipmi_session:
     This sends the activate session payload.  We pick '1' as the requested sequence number without perturbing our real sequence number
     '''
     def _activate_session(self,data):
-        rqdata = [2,4]+list(data)+[1,0,0,0]; #TODO: this always requests admin level, this could be toned down, but maybe 2.0 is the answer
+        rqdata = [2,4]+list(data)+[1,0,0,0]; #TODO(jbjohnso): this always requests admin level, this could be toned down, but maybe 2.0 is the answer
         self.ipmicallback=self._activated_session
         self._send_ipmi_net_payload(netfn=0x6,command=0x3a,data=rqdata)
 
@@ -524,12 +524,12 @@ class ipmi_session:
             call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
             return -9
         self.allowedpriv=data[2]
-        #TODO: check privelege level allowed?  admin was xCAT requirement, but 
+        #TODO(jbjohnso): check privelege level allowed?  admin was xCAT requirement, but 
         localsid=unpack("<I",pack("4B",*data[4:8]))[0]
         if self.localsid != localsid: #whatever this is, it isn't for the current session id in question
             return -9
         self.pendingsessionid=unpack("<I",pack("4B",*data[8:12]))[0]
-        #TODO: currently, we take it for granted that the responder accepted our integrity/auth/confidentiality proposal
+        #TODO(jbjohnso): currently, we take it for granted that the responder accepted our integrity/auth/confidentiality proposal
         self._send_rakp1()
     def _send_rakp1(self):
         self.rmcptag+=1
@@ -632,7 +632,7 @@ class ipmi_session:
     Internal function to parse IPMI nugget once extracted from its framing
     '''
     def _parse_ipmi_payload(self,payload):
-        #For now, skip the checksums since we are in LAN only, TODO: if implementing other channels, add checksum checks here
+        #For now, skip the checksums since we are in LAN only, TODO(jbjohnso): if implementing other channels, add checksum checks here
         if not (payload[4] == self.seqlun and payload[1]>>2 == self.expectednetfn and payload[5] == self.expectedcmd):
             return -1 #this payload is not a match for our outstanding ipmi packet
         if hasattr(self,'hasretried') and self.hasretried:

@@ -64,7 +64,7 @@ class ipmi_command(object):
         """
         Establish a new IPMI session.
         """
-        #TODO: accept tuples and lists of each parameter for mass operations without pushing the async complexities up the stack
+        #TODO(jbjohnso): accept tuples and lists of each parameter for mass operations without pushing the async complexities up the stack
         self.ipmi_session=ipmi_session(bmc=bmc,userid=userid,password=password,kg=kg)
     def get_bootdev(self,callback=None,callback_args=None):
         """
