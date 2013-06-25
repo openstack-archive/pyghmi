@@ -47,36 +47,56 @@ power_states = {
     "on": 1,
     "reset": 3,
     "softoff": 5,
+    "shutdown": 5,
     "boot": -1, #not a valid direct boot state, but here for convenience of 'in' statement
 }
     
 class ipmi_command(object):
-    """
-    Send IPMI commands to BMCs.
+    """Send IPMI commands to BMCs.
+    
+    This object represents a persistent session to an IPMI device (bmc) and 
+    allows the caller to reuse a single session to issue multiple commands.
+    This class can be used in a synchronous (wait for answer and return) or 
+    asynchronous fashion (return immediately and provide responses by 
+    callbacks).  Synchronous mode is the default behavior.
 
-    Args:
-        * bmc (str): hostname or ip address of the BMC
-        * userid (str): username to use to connec
-        * password (str): password to connect to the BMC
-        * kg (str): Optional parameter to use if BMC has a particular Kg configured
+    For asynchronous mode, simply pass in a callback function.  It is 
+    recommended to pass in an instance method to callback and ignore the 
+    callback_args parameter. However, callback_args can optionally be populated 
+    if desired.
+
+    :param bmc: hostname or ip address of the BMC
+    :param userid: username to use to connect
+    :param password: password to connect to the BMC
+    :param kg: Optional parameter to use if BMC has a particular Kg configured
     """
+
     def __init__(self,bmc,userid,password,kg=None):
-        """
-        Establish a new IPMI session.
-        """
         #TODO(jbjohnso): accept tuples and lists of each parameter for mass operations without pushing the async complexities up the stack
-        self.ipmi_session=ipmi_session(bmc=bmc,userid=userid,password=password,kg=kg)
-    def get_bootdev(self,callback=None,callback_args=None):
-        """
-        Get current boot device override information.
+        self.ipmi_session=ipmi_session(bmc=bmc,
+                                       userid=userid,
+                                       password=password,
+                                       kg=kg)
 
-        Args:
-            * callback (function): optional callback if async behavior desired
-            * callback_args (tuple): optional arguments to callback 
+    def get_bootdev(self,callback=None,callback_args=None):
+        """Get current boot device override information.
+
+        Provides the current requested boot device.  Be aware that not all IPMI
+        devices support this.  Even in BMCs that claim to, occasionally the BIOS
+        or UEFI fail to honor it. This is usually only applicable to the next 
+        reboot.
+    
+        :param callback: optional callback
+        :param callback_args: optional arguments to callback 
+        :returns: dict or True -- If callback is not provided, the response
+                                  will be provided in the return
         """
         self.commandcallback=callback
         self.commandcallbackargs=callback_args
-        self.ipmi_session.raw_command(netfn=0,command=9,data=(5,0,0),callback=self._got_bootdev)
+        self.ipmi_session.raw_command(netfn=0,
+                                      command=9,
+                                      data=(5,0,0),
+                                      callback=self._got_bootdev)
         return self._waitifsync()
     def _waitifsync(self):
         self.requestpending=True
@@ -86,15 +106,22 @@ class ipmi_command(object):
             return self.lastresponse
         return True
         
-    '''
-    powerstate argument is one of:
-    on - request system turn on, do nothing if already on
-    off - rudely turn system power off, regardless of OS/firmware state, do nothing if off
-    reset - request immediate system reset without regard for OS/firmware state, do nothing if off
-    boot - if target is on, reset, if target is off, turn on
-    softoff - request graceful shutdown from OS, no guarantee that system will turn off.
-    '''
-    def set_power(self,powerstate,callback=None,callback_args=None,wait=False):
+    def set_power(self,powerstate,wait=False,callback=None,callback_args=None):
+        """Request power state change
+
+        :param powerstate:
+                            * on -- Request system turn on
+                            * off -- Request system turn off without waiting for                              OS to shutdown
+                            * shutdown -- Have system request OS proper shutdown
+                            * reset -- Request system reset without waiting for
+                              OS
+                            * boot -- If system is off, then 'on', else 'reset'
+        :param wait: If True, do not return or callback until system actually
+                     completes requested state change
+        :param callback: optional callback
+        :param callback_args: optional arguments to callback 
+        :returns: dict or True -- If callback is not provided, the response
+        """
         self.commandcallback=callback
         self.commandcallbackargs=callback_args
         if powerstate not in power_states:
@@ -117,8 +144,8 @@ class ipmi_command(object):
             _raiseorcall(self.commandcallback,response,self.commandcallbackargs)
             return
         self.lastresponse={'pendingpowerstate': self.newpowerstate}
-        if self.wait_for_power and self.newpowerstate in ('on','off','softoff'):
-            if self.newpowerstate=='softoff':
+        if self.wait_for_power and self.newpowerstate in ('on','off','shutdown','softoff'):
+            if self.newpowerstate in ('softoff','shutdown'):
                 self.waitpowerstate='off'
             else:
                 self.waitpowerstate=self.newpowerstate
@@ -143,18 +170,30 @@ class ipmi_command(object):
             
 
 
-    def set_bootdev(self,bootdev,callback=None,callback_args=None,persist=False,uefiboot=False):
-        """
-        Set boot device to use on next reboot
+    def set_bootdev(self,
+                    bootdev,
+                    persist=False,
+                    uefiboot=False,
+                    callback=None,
+                    callback_args=None):
+        """Set boot device to use on next reboot
 
-        Args:
-            * bootdev (str): One of 'pxe', 'hd', 'dvd', 'setup', 'default'
-            * callback (function): Optional callback for async operation
-            * callback_args (tuple): Optional arguments for callback (probably needless if callback is an instance method of an object)
-            * persist (bool): If set, system firmware may persist the boot device request across multiple resets
-            * uefiboot (bool): If set, request explicitly UEFI style boot.
-        Example:
-            ipmicmd.set_bootdev("pxe")
+        :param bootdev:
+                        *net -- Request network boot
+                        *hd -- Boot from hard drive
+                        *optical -- boot from CD or DVD drive
+                        *setup -- Boot into setup utility
+                        *default -- remove any IPMI directed boot device request
+        :param persist: If true, ask that system firmware use this device beyond
+                        next boot.  Be aware many systems do not honor this
+        :param uefiboot: If true, request UEFI boot explicitly.  Strictly
+                         speaking, the spec sugests that if not set, the system
+                         should BIOS boot and offers no "don't care" option.
+                         In practice, this flag not being set does not preclude
+                         UEFI boot on any system I've encountered.
+        :param callback: optional callback
+        :param callback_args: optional arguments to callback 
+        :returns: dict or True -- If callback is not provided, the response
         """
 
         self.commandcallback=callback
@@ -190,18 +229,19 @@ class ipmi_command(object):
         self.ipmi_session.raw_command(netfn=0,command=8,data=data,callback=self.commandcallback,callback_args=self.commandcallbackargs)
         
     def raw_command(self,netfn,command,data=(),callback=None,callback_args=None):
-        """
-        Send raw ipmi information to BMC
+        """Send raw ipmi command to BMC
 
-        Args:
-            * netfn (int): Net function number
-            * command (int): Command 
-            * data (tuple): Tuple of data bytes to submit
-            * callback (function): Optional callback for asynchronous mode.
-            * callback_args (tuple): Optional arguments should callback be in use *and* require more data
+        This allows arbitrary IPMI bytes to be issued.  This is commonly used
+        for certain vendor specific commands.
 
-        Example:
-            ipmicmd.raw_command(netfn=0,command=4,data=(5))
+        Example: ipmicmd.raw_command(netfn=0,command=4,data=(5))
+
+        :param netfn: Net function number
+        :param command: Command value
+        :param data: Command data as a tuple or list
+        :param callback: optional callback
+        :param callback_args: optional arguments to callback 
+        :returns: dict or True -- If callback is not provided, the response
         """
         response=self.ipmi_session.raw_command(netfn=0,command=1,callback=callback,callback_args=callback_args)
         if response: #this means there was no callback
