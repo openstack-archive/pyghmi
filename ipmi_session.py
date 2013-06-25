@@ -69,7 +69,8 @@ def get_ipmi_error(response,suffix=""):
     netfn = response['netfn']
     if code == 0:
         return False
-    if (netfn,command) in command_completion_codes and code in command_completion_codes[(netfn,command)]:
+    if ((netfn,command) in command_completion_codes and 
+       code in command_completion_codes[(netfn,command)]):
         return command_completion_codes[(netfn,command)][code]+suffix
     elif code in ipmi_completion_codes:
         return ipmi_completion_codes[code]+suffix
@@ -90,15 +91,19 @@ class ipmi_session:
     @classmethod
     def _createsocket(cls):
         atexit.register(cls._cleanup)
-        cls.socket = socket.socket(socket.AF_INET6,socket.SOCK_DGRAM) #INET6 can do IPv4 if you are nice to it
-        try: #we will try to fixup our receive buffer size if we are smaller than allowed.  
+        cls.socket = socket.socket(socket.AF_INET6,socket.SOCK_DGRAM) #INET6 
+                                    #can do IPv4 if you are nice to it
+        try: #we will try to fixup our receive buffer size if we are smaller 
+             #than allowed.  
             maxmf = open("/proc/sys/net/core/rmem_max")
             rmemmax = int(maxmf.read())
             rmemmax = rmemmax/2
             curmax=cls.socket.getsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF)
             curmax = curmax/2
             if (rmemmax > curmax):
-                cls.socket.setsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF,rmemmax)
+                cls.socket.setsockopt(socket.SOL_SOCKET,
+                                     socket.SO_RCVBUF,
+                                     rmemmax)
         except:
             pass
         curmax=cls.socket.getsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF)
@@ -155,7 +160,7 @@ class ipmi_session:
             while not self.logged:
                 ipmi_session.wait_for_rsp()
     def _initsession(self):
-        self.localsid=2017673555 #this number can be whatever we want.  I picked 
+        self.localsid=2017673555 #this number can be whatever we want.  I picked
                                  #'xCAT' minus 1 so that a hexdump of packet 
                                  # would show xCAT
         self.privlevel=4 #for the moment, assume admin access 
@@ -195,7 +200,8 @@ class ipmi_session:
         return csum
 
     '''
-        This function generates the core ipmi payload that would be applicable for any channel (including KCS)
+        This function generates the core ipmi payload that would be applicable 
+        for any channel (including KCS)
     '''
     def _make_ipmi_payload(self,netfn,command,data=()):
         self.expectedcmd=command
@@ -276,44 +282,57 @@ class ipmi_session:
                 message += self._ipmi15authcode(payload)
             message.append(len(payload))
             message += payload
-            totlen=34+len(message) #Guessing the ipmi spec means the whole packet ande assume no tag in old 1.5 world
+            totlen=34+len(message) #Guessing the ipmi spec means the whole 
+                                   #packet and assume no tag in old 1.5 world
             if (totlen in (56,84,112,128,156)):
                 message.append(0) #Legacy pad as mandated by ipmi spec
         elif self.ipmiversion == 2.0:
             psize = len(payload)
             if self.confalgo:
-                pad = (psize+1)%16 #pad has to account for one byte field as in the _aespad function
+                pad = (psize+1)%16 #pad has to account for one byte field as in
+                                   #the _aespad function
                 if pad: #if no pad needed, then we take no more action
                     pad = 16-pad
-                newpsize=psize+pad+17 #new payload size grew according to pad size, plus pad length, plus 16 byte IV (Table 13-20)
+                newpsize=psize+pad+17 #new payload size grew according to pad 
+                                      #size, plus pad length, plus 16 byte IV 
+                                      #(Table 13-20)
                 message.append(newpsize&0xff)
                 message.append(newpsize>>8);
                 iv=os.urandom(16) 
                 message += list(unpack("16B",iv))
                 payloadtocrypt=_aespad(payload)
                 crypter = AES.new(self.aeskey,AES.MODE_CBC,iv)
-                crypted = crypter.encrypt(pack("%dB"%len(payloadtocrypt),*payloadtocrypt))
+                crypted = crypter.encrypt(pack("%dB"%len(payloadtocrypt),
+                                               *payloadtocrypt))
                 crypted = list(unpack("%dB"%len(crypted),crypted))
                 message += crypted
             else: #no confidetiality algorithm
                 message.append(psize&0xff)
                 message.append(psize>>8);
                 message += list(payload)
-            if self.integrityalgo: #see table 13-8, RMCP+ packet format TODO(jbjohnso): SHA256 which is now allowed
+            if self.integrityalgo: #see table 13-8, 
+                                   #RMCP+ packet format 
+                                   #TODO(jbjohnso): SHA256 which is now allowed
                 neededpad=(len(message)-2)%4
                 if neededpad:
                     neededpad = 4-neededpad
                 message += [0xff]*neededpad
                 message.append(neededpad)
-                message.append(7) #reserved, 7 is the required value for the specification followed
+                message.append(7) #reserved, 7 is the required value for the 
+                                  #specification followed
                 integdata = message[4:]
-                authcode = HMAC.new(self.k1,pack("%dB"%len(integdata),*integdata),SHA).digest()[:12] #SHA1-96 per RFC2404 truncates to 96 bits
+                authcode = HMAC.new(self.k1,
+                                    pack("%dB"%len(integdata),
+                                         *integdata),
+                                    SHA).digest()[:12] #SHA1-96 
+                                        #per RFC2404 truncates to 96 bits
                 message += unpack("12B",authcode)
         self.netpacket = pack("!%dB"%len(message),*message)
         self._xmit_packet()
 
     def _ipmi15authcode(self,payload,checkremotecode=False):
-        if self.authtype == 0: #Only for things prior to auth in ipmi 1.5, not like 2.0 cipher suite 0
+        if self.authtype == 0: #Only for things prior to auth in ipmi 1.5, not 
+                               #like 2.0 cipher suite 0
             return ()
         password = self.password
         padneeded = 16 - len(password)
@@ -335,16 +354,21 @@ class ipmi_session:
         if 'error' in response:
             call_with_optional_args(self.onlogon,response,self.onlogonargs)
             return
-        if response['code'] == 0xcc and self.ipmi15only is not None: #tried ipmi 2.0 against a 1.5 which should work, but some bmcs thought 'reserved' meant 'must be zero'
+        if response['code'] == 0xcc and self.ipmi15only is not None: 
+            #tried ipmi 2.0 against a 1.5 which should work, but some bmcs 
+            #thought 'reserved' meant 'must be zero'
             self.ipmi15only=1
             return self._get_channel_auth_cap()
-        errstr = get_ipmi_error(response,suffix=" while trying to get channel authentication capabalities")
+        mysuffix=" while trying to get channel authentication capabalities")
+        errstr = get_ipmi_error(response,suffix=mysuffix)
         if errstr:
-            call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
+            call_with_optional_args(self.onlogon,
+                                    {'error': errstr},
+                                    self.onlogonargs)
             return
         data = response['data']
         self.currentchannel=data[0]
-        if data[1] & 0b10000000 and data[3] & 0b10: #those two bits together indicate ipmi 2.0 support
+        if data[1] & 0b10000000 and data[3] & 0b10: #ipmi 2.0 support
             self.ipmiversion=2.0
         if self.ipmiversion == 1.5:
             if not (data[1] & 0b100):
@@ -367,7 +391,8 @@ class ipmi_session:
     This sends the activate session payload.  We pick '1' as the requested sequence number without perturbing our real sequence number
     '''
     def _activate_session(self,data):
-        rqdata = [2,4]+list(data)+[1,0,0,0]; #TODO(jbjohnso): this always requests admin level, this could be toned down, but maybe 2.0 is the answer
+        rqdata = [2,4]+list(data)+[1,0,0,0]; 
+                 #TODO(jbjohnso): this always requests admin level (1.5)
         self.ipmicallback=self._activated_session
         self._send_ipmi_net_payload(netfn=0x6,command=0x3a,data=rqdata)
 
@@ -485,11 +510,14 @@ class ipmi_session:
                 return -5 # remote sequence number is too low, reject it
             self.remsequencenumber=remsequencenumber
             if ord(data[4]) != self.authtype:
-                return -2 #BMC responded with mismatch authtype, for the sake of mutual authentication reject it. If this causes legitimate issues, it's the vendor's fault
+                return -2 #BMC responded with mismatch authtype, for the sake of
+                          #mutual authentication reject it. If this causes 
+                          #legitimate issues, it's the vendor's fault
             remsessid = unpack("<I",data[9:13])[0] 
             if remsessid != self.sessionid:
                 return -1 #does not match our session id, drop it
-            #now we need a mutable representation of the packet, rather than copying pieces of the packet over and over
+            #now we need a mutable representation of the packet, rather than 
+            #copying pieces of the packet over and over
             rsp=list(unpack("!%dB"%len(data),data))
             authcode=False
             if data[4] == '\x02': # we have an authcode in this ipmi 1.5 packet...
@@ -497,8 +525,10 @@ class ipmi_session:
                 del rsp[13:29] #this is why we needed a mutable representation
             payload=list(rsp[14:14+rsp[13]])
             if authcode:
-                expectedauthcode=self._ipmi15authcode(payload,checkremotecode=True)
-                expectedauthcode=pack("%dB"%len(expectedauthcode),*expectedauthcode)
+                expectedauthcode=self._ipmi15authcode(payload,
+                                                      checkremotecode=True)
+                expectedauthcode=pack("%dB"%len(expectedauthcode),
+                                      *expectedauthcode)
                 if expectedauthcode != authcode:
                     return
             self._parse_ipmi_payload(payload)
@@ -638,9 +668,12 @@ class ipmi_session:
         if self.sessioncontext != "EXPECTINGRAKP4" or data[0] != self.rmcptag:
             return -9
         if data[1] != 0:
-            if data[1] == 2 and self.logontries: #if we retried RAKP3 because RAKP4 got dropped, BMC can consider it done and we must restart
+            if data[1] == 2 and self.logontries: #if we retried RAKP3 because 
+               #RAKP4 got dropped, BMC can consider it done and we must restart
                 self._relog()
-            if data[1] == 15 and self.logontries: #ignore 15 value if we are retrying.  xCAT did but I can't recall why exactly
+            if data[1] == 15 and self.logontries: #ignore 15 value if we are 
+                    #retrying.  xCAT did but I can't recall why exactly
+                    #TODO(jbjohnso) jog my memory to update the comment
                 return
             if data[1] in rmcp_codes:
                 errstr=rmcp_codes[data[1]]
@@ -670,19 +703,24 @@ class ipmi_session:
     Internal function to parse IPMI nugget once extracted from its framing
     '''
     def _parse_ipmi_payload(self,payload):
-        #For now, skip the checksums since we are in LAN only, TODO(jbjohnso): if implementing other channels, add checksum checks here
-        if (payload[4] != self.seqlun or payload[1]>>2 != self.expectednetfn or payload[5] != self.expectedcmd):
-            return -1 #this payload is not a match for our outstanding ipmi packet
+        #For now, skip the checksums since we are in LAN only, 
+        #TODO(jbjohnso): if implementing other channels, add checksum checks 
+        #here
+        if (payload[4] != self.seqlun or payload[1]>>2 != self.expectednetfn or
+            payload[5] != self.expectedcmd):
+            return -1 #this payload is not a match for our outstanding packet
         if hasattr(self,'hasretried') and self.hasretried:
             self.hasretried=0
-            self.tabooseq[(self.expectednetfn,self.expectedcmd,self.seqlun)]=16 # try to skip it for at most 16 cycles of overflow
+            self.tabooseq[(self.expectednetfn,self.expectedcmd,self.seqlun)]=16
+             #try to skip it for at most 16 cycles of overflow
         #We want to now remember that we do not have an expected packet
         self.expectednetfn=0x1ff #bigger than one byte means it can never match
         self.expectedcmd=0x1ff
         self.seqlun += 4 #prepare seqlun for next transmit
         self.seqlun &= 0xff #when overflowing, wrap around
         del ipmi_session.waiting_sessions[self]
-        self.lastpayload=None #render retry mechanism utterly incapable of doing anything, though it shouldn't matter
+        self.lastpayload=None #render retry mechanism utterly incapable of doing
+                              #anything, though it shouldn't matter
         self.last_payload_type=None
         response={}
         response['netfn'] =  payload[1]>>2
@@ -693,7 +731,9 @@ class ipmi_session:
         del payload[0:2]
         response['data']=payload
         self.timeout=initialtimeout+(0.5*random())
-        call_with_optional_args(self.ipmicallback,response,self.ipmicallbackargs)
+        call_with_optional_args(self.ipmicallback,
+                                response,
+                                self.ipmicallbackargs)
 
     def _timedout(self):
         if not self.lastpayload:
@@ -704,30 +744,41 @@ class ipmi_session:
             return
         if self.timeout > 5:
             response={'error': 'timeout'}
-            call_with_optional_args(self.ipmicallback,response,self.ipmicallbackargs)
+            call_with_optional_args(self.ipmicallback,
+                                    response,
+                                    self.ipmicallbackargs)
             self.nowait=False
             return
         elif self.sessioncontext == 'FAILED':
             self.nowait=False
             return
         if self.sessioncontext == 'OPENSESSION':
-            #In this case, we want to craft a new session request to have unambiguous session id regardless of how packet was dropped or delayed
-            #in this case, it's safe to just redo the request
+            #In this case, we want to craft a new session request to have 
+            #unambiguous session id regardless of how packet was dropped or 
+            #delayed in this case, it's safe to just redo the request
             self._open_rmcpplus_request()
         elif self.sessioncontext == 'EXPECTINGRAKP2' or self.sessioncontext == 'EXPECTINGRAKP4':
-            #If we can't be sure which RAKP was dropped or that RAKP3/4 was just delayed, the most reliable thing to do is
-            #rewind and start over
+            #If we can't be sure which RAKP was dropped or that RAKP3/4 was just
+            #delayed, the most reliable thing to do is rewind and start over
             #bmcs do not take kindly to receiving RAKP1 or RAKP3 twice
             self._relog()
-        else: #in IPMI case, the only recourse is to act as if the packet is idempotent.  SOL has more sophisticated retry handling
-            #the biggest risks are reset sp, which is often fruitless to retry and chassis reset, which sometimes will shoot itself systematically
-            #in the head in a shared port case making replies impossible
-            self.hasretried=1 #remember so that we can track taboo  combinations of sequence number, netfn, and lun due to ambiguity on the wire
+        else: #in IPMI case, the only recourse is to act as if the packet is 
+              #idempotent.  SOL has more sophisticated retry handling
+             #the biggest risks are reset sp, which is often fruitless to retry
+             #and chassis reset, which sometimes will shoot itself 
+             #systematically in the head in a shared port case making replies 
+             #impossible
+            self.hasretried=1 #remember so that we can track taboo  combinations
+                              #of sequence number, netfn, and lun due to 
+                              #ambiguity on the wire
             self._pack_payload()
         self.nowait=False
     def _xmit_packet(self):
-        if not self.nowait: #if we are retrying, we really need to get the packet out and get our timeout updated 
-            ipmi_session.wait_for_rsp(timeout=0) #take a convenient opportunity to drain the socket queue if applicable
+        if not self.nowait: #if we are retrying, we really need to get the 
+                            #packet out and get our timeout updated 
+            ipmi_session.wait_for_rsp(timeout=0) #take a convenient opportunity
+                                                 #to drain the socket queue if 
+                                                 #applicable
             while ipmi_session.pending > ipmi_session.maxpending:
                 ipmi_session.wait_for_rsp()
         ipmi_session.waiting_sessions[self]={}
@@ -736,15 +787,20 @@ class ipmi_session:
         ipmi_session.pending+=1
         if self.sockaddr:
             ipmi_session.socket.sendto(self.netpacket,self.sockaddr)
-        else: #he have not yet picked a working sockaddr for this connection, try all the candidates that getaddrinfo provides
-            for res in socket.getaddrinfo(self.bmc,self.port,0,socket.SOCK_DGRAM):
+        else: #he have not yet picked a working sockaddr for this connection, 
+              #try all the candidates that getaddrinfo provides
+            for res in socket.getaddrinfo(self.bmc,
+                                          self.port,
+                                          0,
+                                          socket.SOCK_DGRAM):
                 sockaddr = res[4]
                 if (res[0] == socket.AF_INET): #convert the sockaddr to AF_INET6
                     newhost='::ffff:'+sockaddr[0]
                     sockaddr = (newhost,sockaddr[1],0,0)
                 ipmi_session.bmc_handlers[sockaddr]=self
                 ipmi_session.socket.sendto(self.netpacket,sockaddr)
-        if self.sequencenumber: #seq number of zero will be left alone as it is special, otherwise increment
+        if self.sequencenumber: #seq number of zero will be left alone as it is
+                                #special, otherwise increment
             self.sequencenumber += 1
     def logout(self,callback=None,callback_args=None):
         if not self.logged:
@@ -752,8 +808,13 @@ class ipmi_session:
                 return {'success': True }
             callback({'success': True })
             return
-        self.noretry=True #risk open sessions if logout request gets dropped, logout is not idempotent so this is the better bet
-        self.raw_command(command=0x3c,netfn=6,data=unpack("4B",pack("I",self.sessionid)),callback=callback,callback_args=callback_args)
+        self.noretry=True #risk open sessions if logout request gets dropped, 
+                          #logout is not idempotent so this is the better bet
+        self.raw_command(command=0x3c,
+                         netfn=6,
+                         data=unpack("4B",pack("I",self.sessionid)),
+                         callback=callback,
+                         callback_args=callback_args)
         self.logged=0
         if callback is None:
             return {'success': True }
