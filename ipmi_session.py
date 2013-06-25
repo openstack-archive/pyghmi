@@ -61,6 +61,8 @@ def call_with_optional_args(callback,*args):
         if arg is not None:
             newargs.append(arg)
     callback(*newargs)
+
+
 def get_ipmi_error(response,suffix=""):
     if 'error' in response:
         return response['error']+suffix
@@ -372,23 +374,30 @@ class ipmi_session:
             self.ipmiversion=2.0
         if self.ipmiversion == 1.5:
             if not (data[1] & 0b100):
-                call_with_optional_args(self.onlogon,{'error': "MD5 is required but not enabled or available on target BMC"},self.onlogonargs)
+                call_with_optional_args(self.onlogon,
+                    {'error': 
+                    "MD5 is required but not enabled/available on target BMC"},
+                    self.onlogonargs)
                 return
             self._get_session_challenge()
         elif self.ipmiversion == 2.0:
             self._open_rmcpplus_request()
         
     def _got_session_challenge(self,response):
-        errstr=get_ipmi_error(response,suffix=" while getting session challenge")
+        errstr=get_ipmi_error(response,
+                              suffix=" while getting session challenge")
         if errstr:
-            call_with_optional_args(self.onlogon,{'error':errstr},self.onlogonargs)
+            call_with_optional_args(self.onlogon,
+                                    {'error':errstr},
+                                    self.onlogonargs)
             return
         data = response['data']
         self.sessionid=unpack("<I",pack("4B",*data[0:4]))[0]
         self.authtype=2 
         self._activate_session(data[4:])
     '''
-    This sends the activate session payload.  We pick '1' as the requested sequence number without perturbing our real sequence number
+    This sends the activate session payload.  We pick '1' as the requested 
+    sequence number without perturbing our real sequence number
     '''
     def _activate_session(self,data):
         rqdata = [2,4]+list(data)+[1,0,0,0]; 
@@ -399,7 +408,9 @@ class ipmi_session:
     def _activated_session(self,response):
         errstr = get_ipmi_error(response)
         if errstr:
-            call_with_optional_args(self.onlogon,{'error':errstr},self.onlogonargs)
+            call_with_optional_args(self.onlogon,
+                                    {'error':errstr},
+                                    self.onlogonargs)
             return
         data=response['data']
         self.sessionid=unpack("<I",pack("4B",*data[1:5]))[0]
@@ -407,11 +418,17 @@ class ipmi_session:
         self._req_priv_level()
     def _req_priv_level(self):
         self.ipmicallback=self._got_priv_level
-        self._send_ipmi_net_payload(netfn=0x6,command=0x3b,data=[self.privlevel])
+        self._send_ipmi_net_payload(netfn=0x6,
+                                    command=0x3b,
+                                    data=[self.privlevel])
     def _got_priv_level(self,response):
-        errstr=get_ipmi_error(response,suffix=" while requesting privelege level %d for %s"%(self.privlevel,self.userid))
+        mysuffix=" while requesting privelege level %d for %s"%(
+                 self.privlevel,self.userid)
+        errstr=get_ipmi_error(response,suffix=mysuffix)
         if errstr:
-            call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
+            call_with_optional_args(self.onlogon,
+                                    {'error': errstr},
+                                    self.onlogonargs)
             return
         self.logged=1
         call_with_optional_args(self.onlogon,{'success':True},self.onlogonargs)
@@ -428,7 +445,8 @@ class ipmi_session:
 
     def _open_rmcpplus_request(self):
         self.authtype=6
-        self.localsid+=1 #have unique local session ids to ignore aborted login attempts from the past
+        self.localsid+=1 #have unique local session ids to ignore aborted login 
+                         #attempts from the past
         self.rmcptag+=1
         data = [
             self.rmcptag,
@@ -443,13 +461,18 @@ class ipmi_session:
             #2,0,0,8,0,0,0,0, #no privacy confalgo
         ]
         self.sessioncontext='OPENSESSION';
-        self._pack_payload(payload=data,payload_type=payload_types['rmcpplusopenreq'])
+        self._pack_payload(payload=data,
+                           payload_type=payload_types['rmcpplusopenreq'])
     def _get_channel_auth_cap(self):
         self.ipmicallback=self._got_channel_auth_cap
         if (self.ipmi15only):
-            self._send_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x0e,self.privlevel])
+            self._send_ipmi_net_payload(netfn=0x6,
+                                        command=0x38,
+                                        data=[0x0e,self.privlevel])
         else:
-            self._send_ipmi_net_payload(netfn=0x6,command=0x38,data=[0x8e,self.privlevel])
+            self._send_ipmi_net_payload(netfn=0x6,
+                                        command=0x38,
+                                        data=[0x8e,self.privlevel])
     def login(self):
         self.logontries=5
         self._initsession()
@@ -469,21 +492,27 @@ class ipmi_session:
         if timeout is None:
             return len(cls.waiting_sessions)
         if cls.poller.poll(timeout*1000):
-            while cls.poller.poll(0): #if the somewhat lengthy queue processing takes long enough for packets to come in, be eager
+            while cls.poller.poll(0): #if the somewhat lengthy queue processing
+                        #takes long enough for packets to come in, be eager
                 pktqueue=deque([])
-                while cls.poller.poll(0): #looks rendundant, but want to queue and process packets to keep things of RCVBUF
+                while cls.poller.poll(0): #looks rendundant, but want to queue 
+                              #and process packets to keep things off RCVBUF
                     rdata=cls.socket.recvfrom(3000)
                     pktqueue.append(rdata)
                 while len(pktqueue):
                     (data,sockaddr)=pktqueue.popleft()
                     cls._route_ipmiresponse(sockaddr,data)
-                    while cls.poller.poll(0): #seems ridiculous, but between every single callback, check for packets again
+                    while cls.poller.poll(0): #seems ridiculous, but between 
+                        #every single callback, check for packets again
                         rdata=cls.socket.recvfrom(3000)
                         pktqueue.append(rdata)
         sessionstodel=[]
         for session,parms in cls.waiting_sessions.iteritems():
-            if parms['timeout'] < curtime: #timeout has expired, time to give up on it and trigger timeout response in the respective session
-                sessionstodel.append(session) #defer deletion until after loop as to avoid confusing the for loop
+            if parms['timeout'] < curtime: #timeout has expired, time to give up
+                                           #on it and trigger timeout response 
+                                           #in the respective session
+                sessionstodel.append(session) #defer deletion until after loop 
+                                              #to avoid confusing the for loop
         for session in sessionstodel:
             cls.pending -= 1
             del cls.waiting_sessions[session]
@@ -491,22 +520,27 @@ class ipmi_session:
         return len(cls.waiting_sessions)
     @classmethod
     def _route_ipmiresponse(cls,sockaddr,data):
-        if not (data[0] == '\x06' and data[2:4] == '\xff\x07'): #packed data is not ipmi
+        if not (data[0] == '\x06' and data[2:4] == '\xff\x07'): #not valid ipmi
             return
         try:
-            cls.bmc_handlers[sockaddr]._handle_ipmi_packet(data,sockaddr=sockaddr)
+            cls.bmc_handlers[sockaddr]._handle_ipmi_packet(data,
+                                                           sockaddr=sockaddr)
             cls.pending-=1
         except KeyError:
             pass
     def _handle_ipmi_packet(self,data,sockaddr=None):
         if self.sockaddr is None and sockaddr is not None:
             self.sockaddr=sockaddr
-        elif self.sockaddr is not None and sockaddr is not None and self.sockaddr != sockaddr:
-            return #here, we might have sent an ipv4 and ipv6 packet to kick things off
-                   #ignore the second reply since we have one satisfactory answer
+        elif (self.sockaddr is not None and 
+              sockaddr is not None and 
+              self.sockaddr != sockaddr):
+            return #here, we might have sent an ipv4 and ipv6 packet to kick 
+                   #things off ignore the second reply since we have one 
+                   #satisfactory answer
         if data[4] in ('\x00','\x02'): #This is an ipmi 1.5 paylod
             remsequencenumber = unpack('<I',data[5:9])[0]
-            if hasattr(self,'remsequencenumber') and remsequencenumber < self.remsequencenumber:
+            if (hasattr(self,'remsequencenumber') and 
+                remsequencenumber < self.remsequencenumber):
                 return -5 # remote sequence number is too low, reject it
             self.remsequencenumber=remsequencenumber
             if ord(data[4]) != self.authtype:
@@ -569,7 +603,9 @@ class ipmi_session:
             if sid != self.localsid: #session id mismatch, drop it
                 return
             remseqnumber=unpack("<I",rawdata[10:14])[0]
-            if hasattr(self,'remseqnumber') and (remseqnumber < self.remseqnumber) and (self.remseqnumber != 0xffffffff): 
+            if (hasattr(self,'remseqnumber') and 
+                (remseqnumber < self.remseqnumber) and 
+                (self.remseqnumber != 0xffffffff)): 
                 return
             self.remseqnumber=remseqnumber
             psize=data[14]+(data[15]<<8)
@@ -577,7 +613,8 @@ class ipmi_session:
             if encrypted:
                 iv = rawdata[16:32]
                 decrypter = AES.new(self.aeskey,AES.MODE_CBC,iv)
-                decrypted = decrypter.decrypt(pack("%dB"%len(payload[16:]),*payload[16:]))
+                decrypted = decrypter.decrypt(pack("%dB"%len(payload[16:]),
+                                                   *payload[16:]))
                 payload = unpack("%dB"%len(decrypted),decrypted)
                 padsize = payload[-1]+1
                 payload = list(payload[:-padsize])
@@ -593,7 +630,9 @@ class ipmi_session:
                 errstr=rmcp_codes[data[1]]
             else:
                 errstr="Unrecognized RMCP code %d"%data[1]
-            call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
+            call_with_optional_args(self.onlogon,
+                                    {'error': errstr},
+                                    self.onlogonargs)
             return -9
         self.allowedpriv=data[2]
         #TODO(jbjohnso): enable lower priv access (e.g. operator/user)
@@ -695,7 +734,9 @@ class ipmi_session:
                 errstr=rmcp_codes[data[1]]
             else:
                 errstr="Unrecognized RMCP code %d"%data[1]
-            call_with_optional_args(self.onlogon,{'error': errstr+" reported in RAKP4"},self.onlogonargs)
+            call_with_optional_args(self.onlogon,
+                                    {'error': errstr+" reported in RAKP4"},
+                                    self.onlogonargs)
             return -9
         localsid=unpack("<I",pack("4B",*data[4:8]))[0]
         if localsid != self.localsid: #ignore if wrong session id indicated
@@ -706,7 +747,10 @@ class ipmi_session:
         expectedauthcode = HMAC.new(self.sik,hmacdata,SHA).digest()[:12]
         authcode=pack("%dB"%len(data[8:]),*data[8:])
         if authcode != expectedauthcode:
-            call_with_optional_args(self.onlogon,{'error': "Invalid RAKP4 integrity code (wrong Kg?)"},self.onlogonargs)
+            call_with_optional_args(self.onlogon,
+                                    {'error': 
+                                    "Invalid RAKP4 integrity code (wrong Kg?)"},
+                                    self.onlogonargs)
             return
         self.sessionid=self.pendingsessionid
         self.integrityalgo='sha1'
@@ -773,7 +817,8 @@ class ipmi_session:
             #unambiguous session id regardless of how packet was dropped or 
             #delayed in this case, it's safe to just redo the request
             self._open_rmcpplus_request()
-        elif self.sessioncontext == 'EXPECTINGRAKP2' or self.sessioncontext == 'EXPECTINGRAKP4':
+        elif (self.sessioncontext == 'EXPECTINGRAKP2' or 
+             self.sessioncontext == 'EXPECTINGRAKP4'):
             #If we can't be sure which RAKP was dropped or that RAKP3/4 was just
             #delayed, the most reliable thing to do is rewind and start over
             #bmcs do not take kindly to receiving RAKP1 or RAKP3 twice
@@ -839,6 +884,8 @@ class ipmi_session:
 
 if __name__ == "__main__":
     import sys
-    ipmis = ipmi_session(bmc=sys.argv[1],userid=sys.argv[2],password=os.environ['IPMIPASS'])
+    ipmis = ipmi_session(bmc=sys.argv[1],
+                         userid=sys.argv[2],
+                         password=os.environ['IPMIPASS'])
     print ipmis.raw_command(command=2,data=[1],netfn=0)
     print get_ipmi_error({'command':8,'code':128,'netfn':1})
