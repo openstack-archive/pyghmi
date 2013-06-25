@@ -210,8 +210,8 @@ class ipmi_session:
                                    #we are always the requestor for now
         seqincrement=7 #IPMI spec forbids gaps bigger then 7 in seq number.  
                        #Risk the taboo rather than violate the rules
-        while (netfn,command,self.seqlun) in self.tabooseq and 
-               self.tabooseq[(netfn,command,self.seqlun)] and seqincrement:
+        while ((netfn,command,self.seqlun) in self.tabooseq and 
+               self.tabooseq[(netfn,command,self.seqlun)] and seqincrement):
             self.tabooseq[(self.expectednetfn,command,self.seqlun)]-=1 
                      #Allow taboo to eventually expire after a few rounds
             self.seqlun += 4 #the last two bits are lun, so add 4 to add 1
@@ -359,7 +359,7 @@ class ipmi_session:
             #thought 'reserved' meant 'must be zero'
             self.ipmi15only=1
             return self._get_channel_auth_cap()
-        mysuffix=" while trying to get channel authentication capabalities")
+        mysuffix=" while trying to get channel authentication capabalities"
         errstr = get_ipmi_error(response,suffix=mysuffix)
         if errstr:
             call_with_optional_args(self.onlogon,
@@ -541,9 +541,10 @@ class ipmi_session:
 
 
     def _handle_ipmi2_packet(self,rawdata):
-        data = list(unpack("%dB"%len(rawdata),rawdata)) #we need mutable array of bytes
+        data = list(unpack("%dB"%len(rawdata),rawdata)) #now need mutable array
         ptype = data[5]&0b00111111
-        #the first 16 bytes are header information as can be seen in 13-8 that we will toss out
+        #the first 16 bytes are header information as can be seen in 13-8 that 
+        #we will toss out
         if ptype == 0x11: #rmcp+ response
             return self._got_rmcp_response(data[16:])
         elif ptype == 0x13:
@@ -551,8 +552,11 @@ class ipmi_session:
         elif ptype == 0x15:
             return self._got_rakp4(data[16:])
         elif ptype == 0: #good old ipmi payload
-            #If I'm endorsing a shared secret scheme, then at the very least it needs to do mutual assurance
-            if not (data[5]&0b01000000): #This would be the line that might trip up some crappy, insecure BMC implementation
+            #If I'm endorsing a shared secret scheme, then at the very least it
+            #needs to do mutual assurance
+            if not (data[5]&0b01000000): #This would be the line that might 
+                                         #trip up some insecure BMC 
+                                         #implementation
                 return
             encrypted=0
             if data[5]&0b10000000:
@@ -581,9 +585,9 @@ class ipmi_session:
     def _got_rmcp_response(self,data):
         #see RMCP+ open session response table
         if not (self.sessioncontext and self.sessioncontext != "Established"):
-            return -9; #ignore payload as we are not in a state for the response to make sense
+            return -9; #ignore payload as we are not in a state valid it
         if data[0] != self.rmcptag:
-            return -9 #use rmcp tag to track and reject stale responses so that the state doesn't go odd
+            return -9 #use rmcp tag to track and reject stale responses
         if data[1] !=0: #response code...
             if data[1] in rmcp_codes:
                 errstr=rmcp_codes[data[1]]
@@ -592,12 +596,13 @@ class ipmi_session:
             call_with_optional_args(self.onlogon,{'error': errstr},self.onlogonargs)
             return -9
         self.allowedpriv=data[2]
-        #TODO(jbjohnso): check privelege level allowed?  admin was xCAT requirement, but 
+        #TODO(jbjohnso): enable lower priv access (e.g. operator/user)
         localsid=unpack("<I",pack("4B",*data[4:8]))[0]
-        if self.localsid != localsid: #whatever this is, it isn't for the current session id in question
+        if self.localsid != localsid:
             return -9
         self.pendingsessionid=unpack("<I",pack("4B",*data[8:12]))[0]
-        #TODO(jbjohnso): currently, we take it for granted that the responder accepted our integrity/auth/confidentiality proposal
+        #TODO(jbjohnso): currently, we take it for granted that the responder 
+        #accepted our integrity/auth/confidentiality proposal
         self._send_rakp1()
     def _send_rakp1(self):
         self.rmcptag+=1
@@ -613,21 +618,26 @@ class ipmi_session:
         self._pack_payload(payload=payload,payload_type=payload_types['rakp1'])
     def _got_rakp2(self,data):
         if not (self.sessioncontext in ('EXPECTINGRAKP2','EXPECTINGRAKP4')):
-            return -9 #if we are not expecting rakp2, ignore. In a retry scenario, replying from stale RAKP2 after sending RAKP3 seems to be best
+            return -9 #if we are not expecting rakp2, ignore. In a retry 
+                      #scenario, replying from stale RAKP2 after sending 
+                      #RAKP3 seems to be best
         if data[0] != self.rmcptag: #ignore mismatched tags for retry logic
             return -9
         if data[1] != 0: #if not successful, consider next move
-            if data[1] == 2: #invalid sessionid 99% of the time means a retry scenario invalidated an in-flight transaction
+            if data[1] == 2: #invalid sessionid 99% of the time means a retry 
+                             #scenario invalidated an in-flight transaction
                 return
             if data[1] in rmcp_codes:
                 errstr=rmcp_codes[data[1]]
             else:
                 errstr="Unrecognized RMCP code %d"%data[1]
-            call_with_optional_args(self.onlogon,{'error': errstr+" in RAKP2"},self.onlogonargs)
+            call_with_optional_args(self.onlogon,
+                                    {'error': errstr+" in RAKP2"},
+                                    self.onlogonargs)
             return -9
         localsid=unpack("<I",pack("4B",*data[4:8]))[0]
         if localsid != self.localsid:
-            return -9 #if it isn't the session we are trying to negotiate, ignore it
+            return -9 #discard mismatch in the session identifier
         self.remoterandombytes = pack("16B",*data[8:24])
         self.remoteguid=pack("16B",*data[24:40])
         userlen=len(self.userid)
@@ -639,10 +649,16 @@ class ipmi_session:
         givenhash = pack("%dB"%len(data[40:]),*data[40:])
         if givenhash != expectedhash:
             self.sessioncontext="FAILED"
-            call_with_optional_args(self.onlogon,{'error': "Incorrect password provided"},self.onlogonargs)
+            call_with_optional_args(self.onlogon,
+                                    {'error': "Incorrect password provided"},
+                                    self.onlogonargs)
             return -9
-        #We have now validated that the BMC and client agree on password, time to store the keys
-        self.sik=HMAC.new(self.kg,self.randombytes+self.remoterandombytes+pack("2B",self.privlevel,userlen)+self.userid,SHA).digest()
+        #We have now validated that the BMC and client agree on password, time 
+        #to store the keys
+        self.sik=HMAC.new(self.kg,
+                          self.randombytes+self.remoterandombytes+
+                            pack("2B",self.privlevel,userlen)+
+                            self.userid,SHA).digest()
         self.k1=HMAC.new(self.sik,'\x01'*20,SHA).digest()
         self.k2=HMAC.new(self.sik,'\x02'*20,SHA).digest()
         self.aeskey=self.k2[0:16]
