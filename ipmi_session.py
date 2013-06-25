@@ -31,13 +31,17 @@ from Crypto.Hash import HMAC, SHA
 
 from ipmi_constants import payload_types, ipmi_completion_codes, command_completion_codes, payload_types, rmcp_codes
 
-initialtimeout = 0.5 #minimum timeout for first packet to retry in any given session.  This will be randomized to stagger out retries in case of congestion
+initialtimeout = 0.5 #minimum timeout for first packet to retry in any given 
+                     #session.  This will be randomized to stagger out retries 
+                     #in case of congestion
 
-def _aespad(data): # ipmi demands a certain pad scheme, per table 13-20 AES-CBC encrypted payload fields
+def _aespad(data): # ipmi demands a certain pad scheme, per table 13-20 AES-CBC 
+                   # encrypted payload fields
     newdata=list(data)
     currlen=len(data)+1 #need to count the pad length field as well
     neededpad=currlen%16
-    if neededpad: #if it happens to be zero, hurray, but otherwise invert the sense of the padding
+    if neededpad: #if it happens to be zero, hurray, but otherwise invert the 
+                  #sense of the padding
         neededpad = 16-neededpad
     padval=1
     while padval <= neededpad:
@@ -77,9 +81,8 @@ class ipmi_session:
     bmc_handlers={}
     waiting_sessions={}
     peeraddr_to_nodes={}
-    '''
-    Upon exit of python, make sure we play nice with BMCs by assuring closed sessions for all that we tracked
-    '''
+    #Upon exit of python, make sure we play nice with BMCs by assuring closed 
+    #sessions for all that we tracked
     @classmethod
     def _cleanup(cls):
         for session in cls.bmc_handlers.itervalues():
@@ -101,21 +104,33 @@ class ipmi_session:
         curmax=cls.socket.getsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF)
         cls.poller.register(cls.socket,select.POLLIN)
         curmax = curmax/2
-        #we throttle such that we never have no more outstanding packets than our receive buffer should be able to handle
+        #we throttle such that we never have no more outstanding packets than 
+        #our receive buffer should be able to handle
         cls.pending=0
-        cls.maxpending=curmax/1000 #pessimistically assume 1 kilobyte messages, way larger than almost all ipmi datagrams
-        #for faster performance, sysadmins may want to examine and tune /proc/sys/net/core/rmem_max up.  This allows the module to request more,
-        #but does not increase buffers for applications that do less creative things
-        #TODO(jbjohnso): perhaps spread sessions across a socket pool when rmem_max is small, still get ~65/socket, but avoid long queues that might happen with
-        #low rmem_max and putting thousands of nodes in line
+        cls.maxpending=curmax/1000 #pessimistically assume 1 kilobyte messages,                                    #way larger than almost all ipmi datagrams
+        #for faster performance, sysadmins may want to examine and tune 
+        #/proc/sys/net/core/rmem_max up.  This allows the module to request 
+        #more, but does not increase buffers for applications that do less 
+        #creative things
+        #TODO(jbjohnso): perhaps spread sessions across a socket pool when 
+        #rmem_max is small, still get ~65/socket, but avoid long queues that 
+        #might happen with low rmem_max and putting thousands of nodes in line
     '''
-    This function handles the synchronous caller case in liue of a client provided callback
+    This function handles the synchronous caller case in liue of a client 
+    provided callback
     '''
     def _sync_login(self,response):
         if 'error' in response:
             raise Exception(response['error'])
 
-    def __init__(self,bmc,userid,password,port=623,kg=None,onlogon=None,onlogonargs=None):
+    def __init__(self,
+                 bmc,
+                 userid,
+                 password,
+                 port=623,
+                 kg=None,
+                 onlogon=None,
+                 onlogonargs=None):
         self.bmc=bmc
         self.userid=userid
         self.password=password
@@ -140,8 +155,11 @@ class ipmi_session:
             while not self.logged:
                 ipmi_session.wait_for_rsp()
     def _initsession(self):
-        self.localsid=2017673555 #this number can be whatever we want.  I picked 'xCAT' minus 1 so that a hexdump of packet would show xCAT
-        self.privlevel=4 #for the moment, assume admin access TODO(jbjohnso): make flexible
+        self.localsid=2017673555 #this number can be whatever we want.  I picked 
+                                 #'xCAT' minus 1 so that a hexdump of packet 
+                                 # would show xCAT
+        self.privlevel=4 #for the moment, assume admin access 
+                         #TODO(jbjohnso): make flexible
         self.confalgo=0
         self.aeskey=None
         self.integrityalgo=0
@@ -156,12 +174,19 @@ class ipmi_session:
         self.ipmiversion=1.5
         self.timeout=initialtimeout+(0.5*random())
         self.seqlun=0
-        self.rqaddr=0x81 #per IPMI table 5-4, software ids in the ipmi spec may be 0x81 through 0x8d.  We'll stick with 0x81 for now, do not forsee a reason to adjust
+        self.rqaddr=0x81 #per IPMI table 5-4, software ids in the ipmi spec may
+                         #be 0x81 through 0x8d.  We'll stick with 0x81 for now,
+                         #do not forsee a reason to adjust
         self.logged=0
-        self.sockaddr=None #when we confirm a working sockaddr, put it here to skip getaddrinfo
-        self.tabooseq={} #this tracks netfn,command,seqlun combinations that were retried so that 
-                         #we don't loop around and reuse the same request data and cause potential ambiguity in return
-        self.ipmi15only=0 #default to supporting ipmi 2.0.  Strictly by spec, this should gracefully be backwards compat, but some 1.5 implementations checked reserved bits
+        self.sockaddr=None #when we confirm a working sockaddr, put it here to 
+                           #skip getaddrinfo
+        self.tabooseq={} #this tracks netfn,command,seqlun combinations that 
+                         #were retried so that we don't loop around and reuse 
+                         #the same request data and cause potential ambiguity 
+                         #in return
+        self.ipmi15only=0 #default to supporting ipmi 2.0.  Strictly by spec, 
+                          #this should gracefully be backwards compat, but some 
+                          #1.5 implementations checked reserved bits
     def _checksum(self,*data): #Two's complement over the data
         csum=sum(data)
         csum=csum^0xff
@@ -174,15 +199,21 @@ class ipmi_session:
     '''
     def _make_ipmi_payload(self,netfn,command,data=()):
         self.expectedcmd=command
-        self.expectednetfn=netfn+1 #in ipmi, the response netfn is always one higher than the request payload, we assume we are always the
-                                   #requestor for now
-        seqincrement=7 #IPMI spec forbids gaps bigger then 7 in seq number.  Risk the taboo rather than violate the rules
-        while (netfn,command,self.seqlun) in self.tabooseq and self.tabooseq[(netfn,command,self.seqlun)] and seqincrement:
-            self.tabooseq[(self.expectednetfn,command,self.seqlun)]-=1 #Allow taboo to eventually expire after a few rounds
+        self.expectednetfn=netfn+1 #in ipmi, the response netfn is always one 
+                                   #higher than the request payload, we assume 
+                                   #we are always the requestor for now
+        seqincrement=7 #IPMI spec forbids gaps bigger then 7 in seq number.  
+                       #Risk the taboo rather than violate the rules
+        while (netfn,command,self.seqlun) in self.tabooseq and 
+               self.tabooseq[(netfn,command,self.seqlun)] and seqincrement:
+            self.tabooseq[(self.expectednetfn,command,self.seqlun)]-=1 
+                     #Allow taboo to eventually expire after a few rounds
             self.seqlun += 4 #the last two bits are lun, so add 4 to add 1
             self.seqlun &= 0xff #we only have one byte, wrap when exceeded
             seqincrement-=1
-        header=[0x20,netfn<<2] #figure 13-4, first two bytes are rsaddr and netfn, rsaddr is always 0x20 since we are addressing BMC
+        header=[0x20,netfn<<2] #figure 13-4, first two bytes are rsaddr and 
+                               #netfn, rsaddr is always 0x20 since we are 
+                               #addressing BMC
         reqbody=[self.rqaddr,self.seqlun,command]+list(data)
         headsum=self._checksum(*header)
         bodysum=self._checksum(*reqbody)
@@ -194,7 +225,12 @@ class ipmi_session:
         if errorstr:
             response['error']=errorstr
         self.lastresponse=response
-    def raw_command(self,netfn,command,data=[],callback=None,callback_args=None):
+    def raw_command(self,
+                    netfn,
+                    command,
+                    data=[],
+                    callback=None,
+                    callback_args=None):
         self.ipmicallbackargs=callback_args
         if callback is None:
             self.lastresponse=None
