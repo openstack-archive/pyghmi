@@ -72,7 +72,8 @@ class ipmi_command(object):
     """
 
     def __init__(self,bmc,userid,password,kg=None):
-        #TODO(jbjohnso): accept tuples and lists of each parameter for mass operations without pushing the async complexities up the stack
+        #TODO(jbjohnso): accept tuples and lists of each parameter for mass 
+        #operations without pushing the async complexities up the stack
         self.ipmi_session=ipmi_session(bmc=bmc,
                                        userid=userid,
                                        password=password,
@@ -98,6 +99,7 @@ class ipmi_command(object):
                                       data=(5,0,0),
                                       callback=self._got_bootdev)
         return self._waitifsync()
+
     def _waitifsync(self):
         self.requestpending=True
         if self.commandcallback is None:
@@ -125,11 +127,18 @@ class ipmi_command(object):
         self.commandcallback=callback
         self.commandcallbackargs=callback_args
         if powerstate not in power_states:
-            _raiseorcall(self.commandcallback,{'error': "Unknown power state %s requested"%powerstate},self.commandcallbackargs)
+            _raiseorcall(self.commandcallback,
+                         {'error': 
+                          "Unknown power state %s requested"%powerstate},
+                         self.commandcallbackargs)
         self.newpowerstate=powerstate
         self.wait_for_power=wait
-        self.ipmi_session.raw_command(netfn=0,command=1,callback=self._set_power_with_chassis_info)
+        self.ipmi_session.raw_command(netfn=0,
+                                      command=1,
+                                      callback=self._set_power_with_chassis_info
+                                     )
         return self._waitifsync()
+
     def _set_power_with_chassis_info(self,response):
         if 'error' in response:
             _raiseorcall(self.commandcallback,response,self.commandcallbackargs)
@@ -137,23 +146,31 @@ class ipmi_command(object):
         self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
         if self.newpowerstate=='boot':
             self.newpowerstate = 'on' if self.powerstate=='off' else 'reset'
-        self.ipmi_session.raw_command(netfn=0,command=2,data=[power_states[self.newpowerstate]],callback=self._power_set)
+        self.ipmi_session.raw_command(netfn=0,
+                                      command=2,
+                                      data=[power_states[self.newpowerstate]],
+                                      callback=self._power_set)
 
     def _power_set(self,response):
         if 'error' in response:
             _raiseorcall(self.commandcallback,response,self.commandcallbackargs)
             return
         self.lastresponse={'pendingpowerstate': self.newpowerstate}
-        if self.wait_for_power and self.newpowerstate in ('on','off','shutdown','softoff'):
+        if (self.wait_for_power and 
+           self.newpowerstate in ('on','off','shutdown','softoff')):
             if self.newpowerstate in ('softoff','shutdown'):
                 self.waitpowerstate='off'
             else:
                 self.waitpowerstate=self.newpowerstate
-            self.ipmi_session.raw_command(netfn=0,command=1,callback=self._power_wait)
+            self.ipmi_session.raw_command(netfn=0,
+                                          command=1,
+                                          callback=self._power_wait)
         else:
             self.requestpending=False
             if self.commandcallback:
-                call_with_optional_args(self.commandcallback,self.lastresponse,self.commandcallbackargs)
+                call_with_optional_args(self.commandcallback,
+                                        self.lastresponse,
+                                        self.commandcallbackargs)
 
     def _power_wait(self,response):
         if 'error' in response:
@@ -164,11 +181,13 @@ class ipmi_command(object):
             self.requestpending=False
             self.lastresponse={'powerstate': self.powerstate}
             if self.commandcallback:
-                call_with_optional_args(self.commandcallback,self.lastresponse,self.commandcallbackargs)
+                call_with_optional_args(self.commandcallback,
+                                        self.lastresponse,
+                                        self.commandcallbackargs)
             return
-        self.ipmi_session.raw_command(netfn=0,command=1,callback=self._power_wait)
-            
-
+        self.ipmi_session.raw_command(netfn=0,
+                                      command=1,
+                                      callback=self._power_wait)
 
     def set_bootdev(self,
                     bootdev,
@@ -199,14 +218,19 @@ class ipmi_command(object):
         self.commandcallback=callback
         self.commandcallbackargs=callback_args
         if bootdev not in boot_devices:
-            _raiseorcall(self.commandcallback,{'error': "Unknown bootdevice %s requested"%bootdev},self.commandcallbackargs)
+            _raiseorcall(self.commandcallback,
+                        {'error': "Unknown bootdevice %s requested"%bootdev},
+                        self.commandcallbackargs)
         self.bootdev=boot_devices[bootdev]
         self.persistboot=persist
         self.uefiboot=uefiboot
-        #first, we disable timer by way of set system boot options, then move on to set chassis capabilities
+        #first, we disable timer by way of set system boot options, 
+        #then move on to set chassis capabilities
         self.requestpending=True
         #Set System Boot Options is netfn=0, command=8, data 
-        self.ipmi_session.raw_command(netfn=0,command=8,data=(3,8),callback=self._bootdev_timer_disabled)
+        self.ipmi_session.raw_command(netfn=0,
+                                      command=8,data=(3,8),
+                                      callback=self._bootdev_timer_disabled)
         if callback is None:
             while self.requestpending:
                 ipmi_session.wait_for_rsp()
@@ -219,16 +243,25 @@ class ipmi_command(object):
             _raiseorcall(self.commandcallback,response,self.commandcallbackargs)
             return
         bootflags=0x80
-        if self.uefiboot: #frustrating, there is no 'default', and this is generally not honored...
+        if self.uefiboot:
             bootflags = bootflags | 1<<5
-        if self.persistboot: #another flag that is oft silently ignored
+        if self.persistboot:
             bootflags = bootflags | 1<<6
         if self.bootdev==0:
             bootflags=0
         data=(5,bootflags,self.bootdev,0,0,0)
-        self.ipmi_session.raw_command(netfn=0,command=8,data=data,callback=self.commandcallback,callback_args=self.commandcallbackargs)
+        self.ipmi_session.raw_command(netfn=0,
+                                      command=8,
+                                      data=data,
+                                      callback=self.commandcallback,
+                                      callback_args=self.commandcallbackargs)
         
-    def raw_command(self,netfn,command,data=(),callback=None,callback_args=None):
+    def raw_command(self,
+                    netfn,
+                    command,
+                    data=(),
+                    callback=None,
+                    callback_args=None):
         """Send raw ipmi command to BMC
 
         This allows arbitrary IPMI bytes to be issued.  This is commonly used
@@ -243,7 +276,10 @@ class ipmi_command(object):
         :param callback_args: optional arguments to callback 
         :returns: dict or True -- If callback is not provided, the response
         """
-        response=self.ipmi_session.raw_command(netfn=0,command=1,callback=callback,callback_args=callback_args)
+        response=self.ipmi_session.raw_command(netfn=0,
+                                               command=1,
+                                               callback=callback,
+                                               callback_args=callback_args)
         if response: #this means there was no callback
             if 'error' in response:
                 raise Exception(response['error'])
@@ -254,11 +290,16 @@ class ipmi_command(object):
         if 'error' in response:
             _raiseorcall(self.commandcallback,response,self.commandcallbackargs)
             return
-        #this should only be invoked for get system boot option complying to ipmi spec and targeting the 'boot flags' parameter
-        assert (response['command'] == 9 and response['netfn'] == 1 and response['data'][0]==1 and (response['data'][1]&0b1111111)==5)
-        if (response['data'][1] & 0b10000000 or not response['data'][2] & 0b10000000):
+        #this should only be invoked for get system boot option complying to 
+        #ipmi spec and targeting the 'boot flags' parameter
+        assert (response['command'] == 9 and 
+                response['netfn'] == 1 and 
+                response['data'][0]==1 and 
+                (response['data'][1]&0b1111111)==5)
+        if (response['data'][1] & 0b10000000 or 
+            not response['data'][2] & 0b10000000):
             self.lastresponse={ 'bootdev': 'default' }
-        else: #will consult data2 of the boot flags parameter for the data for now
+        else: #will consult data2 of the boot flags parameter for the data
             bootnum = (response['data'][3] & 0b111100) >> 2
             bootdev = boot_devices[bootnum]
             if (bootdev):
@@ -266,27 +307,28 @@ class ipmi_command(object):
             else:
                 self.lastresponse={'bootdev': bootnum}
         if self.commandcallback:
-            call_with_optional_args(self.commandcallback,self.lastresponse,self.commandcallbackargs)
+            call_with_optional_args(self.commandcallback,
+                                    self.lastresponse,
+                                    self.commandcallbackargs)
         
     def get_power(self,callback=None,callback_args=None):
         """
-        Get current power state of the BMC device
+        Get current power state of the managed system
 
-        Args:
-            * callback (function): optional callback to request asynchronous behavior
-            * callback_args (tuple): optional arguments for callback
-        
-        Returns:
-            If no callback provided, a dict with 'powerstate' member.
-            Otherwise, returns true and the dict is passed as an argument to the provided callback.
+        The response, if successful, should contain 'powerstate' key and 
+        either 'on' or 'off' to indicate current state.
 
-        Example:
-            ipmicmd.get_power()
+        :param callback: optional callback
+        :param callback_args: optional arguments to callback 
+        :returns: dict or True -- If callback is not provided, the response
         """
         self.commandcallback=callback
         self.commandcallbackargs=callback_args
-        self.ipmi_session.raw_command(netfn=0,command=1,callback=self._got_power)
+        self.ipmi_session.raw_command(netfn=0,
+                                      command=1,
+                                      callback=self._got_power)
         return self._waitifsync()
+
     def _got_power(self,response):
         self.requestpending=False
         if 'error' in response:
@@ -296,12 +338,16 @@ class ipmi_command(object):
         self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
         self.lastresponse={'powerstate': self.powerstate}
         if self.commandcallback:
-            call_with_optional_args(self.commandcallback,self.lastresponse,self.commandcallbackargs)
+            call_with_optional_args(self.commandcallback,
+                                    self.lastresponse,
+                                    self.commandcallbackargs)
         
 if __name__ == "__main__":
     import sys
     import os
-    ipmicmd = ipmi_command(bmc=sys.argv[1],userid=sys.argv[2],password=os.environ['IPMIPASS'])
+    ipmicmd = ipmi_command(bmc=sys.argv[1],
+                           userid=sys.argv[2],
+                           password=os.environ['IPMIPASS'])
     print ipmicmd.get_power()
     print ipmicmd.set_power('on',wait=True)
     print ipmicmd.get_bootdev()
