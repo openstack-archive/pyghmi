@@ -633,7 +633,7 @@ class ipmi_session:
     '''
     def _parse_ipmi_payload(self,payload):
         #For now, skip the checksums since we are in LAN only, TODO(jbjohnso): if implementing other channels, add checksum checks here
-        if not (payload[4] == self.seqlun and payload[1]>>2 == self.expectednetfn and payload[5] == self.expectedcmd):
+        if (payload[4] != self.seqlun or payload[1]>>2 != self.expectednetfn or payload[5] != self.expectedcmd):
             return -1 #this payload is not a match for our outstanding ipmi packet
         if hasattr(self,'hasretried') and self.hasretried:
             self.hasretried=0
