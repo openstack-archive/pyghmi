@@ -23,7 +23,7 @@ understand how the ipmi_command class workes.
 import os
 import sys
 
-from ipmi_command import ipmi_command
+from ipmi.command import Command
 password=os.environ['IPMIPASSWORD']
 os.environ['IPMIPASSWORD']=""
 if (len(sys.argv) < 3):
@@ -36,7 +36,7 @@ command=sys.argv[3]
 arg=None
 if len(sys.argv)==5:
     arg=sys.argv[4]
-ipmicmd = ipmi_command(bmc=bmc,userid=userid,password=password)
+ipmicmd = Command(bmc=bmc,userid=userid,password=password)
 if command == 'power':
     if arg:
         print ipmicmd.set_power(arg,wait=True)

@@ -15,7 +15,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
-from ipmi_session import ipmi_session, call_with_optional_args
+from ipmi.session import Session, call_with_optional_args
 def _raiseorcall(callback,response,args=None):
     if callback is None:
         if 'error' in response:
@@ -51,7 +51,7 @@ power_states = {
     "boot": -1, #not a valid direct boot state, but here for convenience of 'in' statement
 }
     
-class ipmi_command(object):
+class Command(object):
     """Send IPMI commands to BMCs.
     
     This object represents a persistent session to an IPMI device (bmc) and 
@@ -74,7 +74,7 @@ class ipmi_command(object):
     def __init__(self,bmc,userid,password,kg=None):
         #TODO(jbjohnso): accept tuples and lists of each parameter for mass 
         #operations without pushing the async complexities up the stack
-        self.ipmi_session=ipmi_session(bmc=bmc,
+        self.ipmi_session=Session(bmc=bmc,
                                        userid=userid,
                                        password=password,
                                        kg=kg)
@@ -104,7 +104,7 @@ class ipmi_command(object):
         self.requestpending=True
         if self.commandcallback is None:
             while self.requestpending:
-                ipmi_session.wait_for_rsp()
+                Session.wait_for_rsp()
             return self.lastresponse
         return True
         
@@ -233,7 +233,7 @@ class ipmi_command(object):
                                       callback=self._bootdev_timer_disabled)
         if callback is None:
             while self.requestpending:
-                ipmi_session.wait_for_rsp()
+                Session.wait_for_rsp()
             return self.lastresponse
 
     def _bootdev_timer_disabled(self,response):

@@ -29,7 +29,7 @@ from time import time
 from Crypto.Cipher import AES
 from Crypto.Hash import HMAC, SHA
 
-from ipmi_constants import payload_types, ipmi_completion_codes, command_completion_codes, payload_types, rmcp_codes
+from ipmi.constants import payload_types, ipmi_completion_codes, command_completion_codes, payload_types, rmcp_codes
 
 initialtimeout = 0.5 #minimum timeout for first packet to retry in any given 
                      #session.  This will be randomized to stagger out retries 
@@ -79,7 +79,7 @@ def get_ipmi_error(response,suffix=""):
     else:
         return "Unknown code "+code+" encountered"
 
-class ipmi_session:
+class Session:
     poller=select.poll()
     bmc_handlers={}
     waiting_sessions={}
@@ -155,12 +155,12 @@ class ipmi_session:
         else:
             self.async=True
             self.onlogon=onlogon
-        if not hasattr(ipmi_session,'socket'):
+        if not hasattr(Session,'socket'):
             self._createsocket()
         self.login()
         if not self.async:
             while not self.logged:
-                ipmi_session.wait_for_rsp()
+                Session.wait_for_rsp()
     def _initsession(self):
         self.localsid=2017673555 #this number can be whatever we want.  I picked
                                  #'xCAT' minus 1 so that a hexdump of packet 
@@ -248,7 +248,7 @@ class ipmi_session:
         self._send_ipmi_net_payload(netfn,command,data)
         if callback is None:
             while self.lastresponse is None:
-                ipmi_session.wait_for_rsp()
+                Session.wait_for_rsp()
             return self.lastresponse
     def _send_ipmi_net_payload(self,netfn,command,data):
         ipmipayload=self._make_ipmi_payload(netfn,command,data)
@@ -778,7 +778,7 @@ class ipmi_session:
         self.expectedcmd=0x1ff
         self.seqlun += 4 #prepare seqlun for next transmit
         self.seqlun &= 0xff #when overflowing, wrap around
-        del ipmi_session.waiting_sessions[self]
+        del Session.waiting_sessions[self]
         self.lastpayload=None #render retry mechanism utterly incapable of doing
                               #anything, though it shouldn't matter
         self.last_payload_type=None
@@ -837,17 +837,17 @@ class ipmi_session:
     def _xmit_packet(self):
         if not self.nowait: #if we are retrying, we really need to get the 
                             #packet out and get our timeout updated 
-            ipmi_session.wait_for_rsp(timeout=0) #take a convenient opportunity
+            Session.wait_for_rsp(timeout=0) #take a convenient opportunity
                                                  #to drain the socket queue if 
                                                  #applicable
-            while ipmi_session.pending > ipmi_session.maxpending:
-                ipmi_session.wait_for_rsp()
-        ipmi_session.waiting_sessions[self]={}
-        ipmi_session.waiting_sessions[self]['ipmisession']=self
-        ipmi_session.waiting_sessions[self]['timeout']=self.timeout+time()
-        ipmi_session.pending+=1
+            while Session.pending > Session.maxpending:
+                Session.wait_for_rsp()
+        Session.waiting_sessions[self]={}
+        Session.waiting_sessions[self]['ipmisession']=self
+        Session.waiting_sessions[self]['timeout']=self.timeout+time()
+        Session.pending+=1
         if self.sockaddr:
-            ipmi_session.socket.sendto(self.netpacket,self.sockaddr)
+            Session.socket.sendto(self.netpacket,self.sockaddr)
         else: #he have not yet picked a working sockaddr for this connection, 
               #try all the candidates that getaddrinfo provides
             for res in socket.getaddrinfo(self.bmc,
@@ -858,8 +858,8 @@ class ipmi_session:
                 if (res[0] == socket.AF_INET): #convert the sockaddr to AF_INET6
                     newhost='::ffff:'+sockaddr[0]
                     sockaddr = (newhost,sockaddr[1],0,0)
-                ipmi_session.bmc_handlers[sockaddr]=self
-                ipmi_session.socket.sendto(self.netpacket,sockaddr)
+                Session.bmc_handlers[sockaddr]=self
+                Session.socket.sendto(self.netpacket,sockaddr)
         if self.sequencenumber: #seq number of zero will be left alone as it is
                                 #special, otherwise increment
             self.sequencenumber += 1
@@ -884,7 +884,7 @@ class ipmi_session:
 
 if __name__ == "__main__":
     import sys
-    ipmis = ipmi_session(bmc=sys.argv[1],
+    ipmis = Session(bmc=sys.argv[1],
                          userid=sys.argv[2],
                          password=os.environ['IPMIPASS'])
     print ipmis.raw_command(command=2,data=[1],netfn=0)
