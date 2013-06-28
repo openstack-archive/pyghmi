@@ -15,7 +15,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
-from ipmi.session import Session, call_with_optional_args
+from ipmi.private.session import Session, call_with_optional_args
 def _raiseorcall(callback,response,args=None):
     if callback is None:
         if 'error' in response:

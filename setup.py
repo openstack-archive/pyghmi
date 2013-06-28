@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='python-ipmi',
-      version='0.1.9',
+      version='0.1.10',
       description='Python IPMI implementation',
       author='Jarrod Johnson',
       author_email='jbjohnso@us.ibm.com',

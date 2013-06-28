@@ -29,7 +29,7 @@ from time import time
 from Crypto.Cipher import AES
 from Crypto.Hash import HMAC, SHA
 
-from ipmi.constants import payload_types, ipmi_completion_codes, command_completion_codes, payload_types, rmcp_codes
+from ipmi.private.constants import payload_types, ipmi_completion_codes, command_completion_codes, payload_types, rmcp_codes
 
 initialtimeout = 0.5 #minimum timeout for first packet to retry in any given 
                      #session.  This will be randomized to stagger out retries 
