@@ -8,6 +8,6 @@ setup(name='python-ipmi',
       author='Jarrod Johnson',
       author_email='jbjohnso@us.ibm.com',
       url='http://xcat.sf.net/',
-      requires=['pycrypto'],
+      install_requires=['pycrypto'],
       packages=['ipmi'],
      )
