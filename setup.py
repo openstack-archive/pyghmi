@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup
 
 setup(name='python-ipmi',
-      version='0.1.8',
+      version='0.1.9',
       description='Python IPMI implementation',
       author='Jarrod Johnson',
       author_email='jbjohnso@us.ibm.com',
