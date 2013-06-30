@@ -1,0 +1,5 @@
+AUTHORS
+ChangeLog
+dist/
+python_ipmi.egg-info/
+.tox
