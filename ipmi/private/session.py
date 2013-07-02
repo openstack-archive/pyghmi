@@ -905,7 +905,7 @@ class Session:
                 Session.wait_for_rsp()
         Session.waiting_sessions[self] = {}
         Session.waiting_sessions[self]['ipmisession'] = self
-        Session.waiting_sessions[self]['timeout'] = self.timeout + time()
+        Session.waiting_sessions[self]['timeout'] = self.timeout + time.time()
         Session.pending += 1
         if self.sockaddr:
             Session.socket.sendto(self.netpacket, self.sockaddr)
