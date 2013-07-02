@@ -1,25 +1,23 @@
-"""
-@author: Jarrod Johnson <jbjohnso@us.ibm.com>
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-Copyright 2013 IBM Corporation
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-"""
+# Copyright 2013 IBM Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 payload_types = {
     'ipmi': 0x0,
-    'sol' : 0x1,
+    'sol': 0x1,
     'rmcpplusopenreq': 0x10,
     'rmcpplusopenresponse': 0x11,
     'rakp1': 0x12,
@@ -29,50 +27,51 @@ payload_types = {
 }
 
 rmcp_codes = {
-    1: 'Insufficient resources to create new session (wait for existing sessions to timeout)',
-    2: 'Invalid Session ID',
-    3: 'Invalid payload type',
-    4: 'Invalid authentication algorithm',
-    5: 'Invalid integrity algorithm',
-    6: 'No matching integrity payload',
-    7: 'No matching integrity payload',
-    8: 'Inactive Session ID',
-    9: 'Invalid role',
-    0xa: 'Unauthorized role or privilege level requested',
-    0xb: 'Insufficient resources tocreate a session at the requested role',
-    0xc: 'Invalid username length',
-    0xd: 'Unauthorized name',
-    0xe: 'Unauthorized GUID',
-    0xf: 'Invalid integrity check value',
-    0x10: 'Invalid confidentiality algorithm',
-    0x11: 'No Cipher suite match with proposed security algorithms',
-    0x12: 'Illegal or unrecognized parameter',
+    1: ("Insufficient resources to create new session (wait for existing "
+        "sessions to timeout)"),
+    2: "Invalid Session ID",
+    3: "Invalid payload type",
+    4: "Invalid authentication algorithm",
+    5: "Invalid integrity algorithm",
+    6: "No matching integrity payload",
+    7: "No matching integrity payload",
+    8: "Inactive Session ID",
+    9: "Invalid role",
+    0xa: "Unauthorized role or privilege level requested",
+    0xb: "Insufficient resources tocreate a session at the requested role",
+    0xc: "Invalid username length",
+    0xd: "Unauthorized name",
+    0xe: "Unauthorized GUID",
+    0xf: "Invalid integrity check value",
+    0x10: "Invalid confidentiality algorithm",
+    0x11: "No Cipher suite match with proposed security algorithms",
+    0x12: "Illegal or unrecognized parameter",
 }
 
 command_completion_codes = {
-    (7,0x39): {
+    (7, 0x39): {
         0x81: "Invalid user name",
         0x82: "Null user disabled",
     },
-    (7,0x3a): {
+    (7, 0x3a): {
         0x81: "No available login slots",
         0x82: "No available login slots for requested user",
         0x83: "No slot available with requested privilege level",
         0x84: "Session sequence number out of range",
         0x85: "Invalid session ID",
-        0x86: "Requested privilege level exceeds requested user permissions on this channel",
+        0x86: ("Requested privilege level exceeds requested user permissions "
+               "on this channel"),
     },
-    (7,0x3b): { #Set session privilege level
+    (7, 0x3b): {  # Set session privilege level
         0x80: "User is not allowed requested priveleg level",
         0x81: "Requested privilege level is not allowed over this channel",
         0x82: "Cannot disable user level authentication",
     },
-    (1,8): { #set system boot options
+    (1, 8): {  # set system boot options
         0x80: "Parameter not supported",
         0x81: "Attempt to set set 'set in progress' when not 'set complete'",
         0x82: "Attempt to write read-only parameter",
     }
-    
 }
 
 ipmi_completion_codes = {
@@ -102,4 +101,3 @@ ipmi_completion_codes = {
     0xd6: "Cannot execute command because subfunction disabled or unavailable",
     0xff: "Unspecified",
 }
-
