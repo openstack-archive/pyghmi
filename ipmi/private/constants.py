@@ -48,6 +48,15 @@ rmcp_codes = {
     0x12: "Illegal or unrecognized parameter",
 }
 
+netfn_codes = {
+    "chassis": 0x0,
+    "bridge": 0x2,
+    "sensorevent": 0x4,
+    "application": 0x6,
+    "firmware": 0x8,
+    "storage": 0xa,
+    "transport 0xc": 0xc,
+}
 command_completion_codes = {
     (7, 0x39): {
         0x81: "Invalid user name",
@@ -75,7 +84,7 @@ command_completion_codes = {
 }
 
 ipmi_completion_codes = {
-    0x0: "Success",
+    0x00: "Success",
     0xc0: "Node Busy",
     0xc1: "Invalid command",
     0xc2: "Invalid command for given LUN",
