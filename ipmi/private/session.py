@@ -289,9 +289,9 @@ class Session:
             payload_type |= 0b01000000
         if self.confalgo:
             payload_type |= 0b10000000
-        self._pack_payload(payload=ipmipayload, payload_type=payload_type)
+        self.send_payload(payload=ipmipayload, payload_type=payload_type)
 
-    def _pack_payload(self, payload=None, payload_type=None):
+    def send_payload(self, payload=None, payload_type=None):
         if payload is None:
             payload = self.lastpayload
         if payload_type is None:
@@ -502,7 +502,7 @@ class Session:
             # 2,0,0,8,0,0,0,0, #no privacy confalgo
         ]
         self.sessioncontext = 'OPENSESSION'
-        self._pack_payload(payload=data,
+        self.send_payload(payload=data,
                            payload_type=constants.payload_types['rmcpplusopenreq'])
 
     def _get_channel_auth_cap(self):
@@ -704,7 +704,7 @@ class Session:
             [userlen] +\
             list(struct.unpack("%dB" % userlen, self.userid))
         self.sessioncontext = "EXPECTINGRAKP2"
-        self._pack_payload(
+        self.send_payload(
             payload=payload, payload_type=constants.payload_types['rakp1'])
 
     def _got_rakp2(self, data):
@@ -767,7 +767,7 @@ class Session:
             self.userid
         authcode = HMAC.new(self.password, hmacdata, SHA).digest()
         payload += list(struct.unpack("%dB" % len(authcode), authcode))
-        self._pack_payload(
+        self.send_payload(
             payload=payload, payload_type=constants.payload_types['rakp3'])
 
     def _relog(self):
@@ -892,7 +892,7 @@ class Session:
             self.hasretried = 1  # remember so that we can track taboo  combinations
                               # of sequence number, netfn, and lun due to
                               # ambiguity on the wire
-            self._pack_payload()
+            self.send_payload()
         self.nowait = False
 
     def _xmit_packet(self):
