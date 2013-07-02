@@ -92,7 +92,28 @@ def get_ipmi_error(response, suffix=""):
 
 
 class Session:
+    """A class to manage common IPMI session logistics
+
+    Almost all developers should not worry about this class and instead be looking
+    toward ipmi.Command and ipmi.Console.
+
+    For those that do have to worry, the main interesting thing is that the event loop
+    can go one of two ways.  Either a larger manager can query using class methods
+    the soonest timeout deadline and the filehandles to poll and assume responsibility
+    for the polling, or it can register filehandles to be watched.  This is primarily
+    of interest to Console class, which may have an input filehandle to watch and
+    can pass it to Session.
+
+    :param bmc: hostname or ip address of the BMC
+    :param userid: username to use to connect
+    :param password: password to connect to the BMC
+    :param kg: optional parameter if BMC requires Kg be set
+    :param port: UDP port to communicate with, pretty much always 623
+    :param onlogon: callback to receive notification of login completion
+    """
     poller = select.poll()
+    ipmipoller = select.poll()
+    _external_handlers = {}
     bmc_handlers = {}
     waiting_sessions = {}
     peeraddr_to_nodes = {}
@@ -126,6 +147,7 @@ class Session:
 
         curmax = cls.socket.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
         cls.poller.register(cls.socket, select.POLLIN)
+        cls.ipmipoller.register(cls.socket, select.POLLIN)
         curmax = curmax / 2
         # we throttle such that we never have no more outstanding packets than
         # our receive buffer should be able to handle
@@ -222,6 +244,8 @@ class Session:
         #                 this should gracefully be backwards compat, but some
         #                 1.5 implementations checked reserved bits
         self.ipmi15only = 0
+        self.sol_handler = None
+        # NOTE(jbjohnso): This is the callback handler for any SOL payload
 
     def _checksum(self, *data):  # Two's complement over the data
         csum = sum(data)
@@ -523,6 +547,14 @@ class Session:
 
     @classmethod
     def wait_for_rsp(cls, timeout=None):
+        """IPMI Session Event loop iteration
+
+        This watches for any activity on IPMI handles and handles registered
+        by register_handle_callback
+
+        :param timeout: Maximum time to wait for data to come across.  If 
+                        unspecified, will autodetect based on earliest timeout
+        """
         curtime = time.time()
         for session, parms in cls.waiting_sessions.iteritems():
             if timeout == 0:
@@ -536,20 +568,26 @@ class Session:
         if timeout is None:
             return len(cls.waiting_sessions)
         if cls.poller.poll(timeout * 1000):
-            while cls.poller.poll(0):  # if the somewhat lengthy queue processing
+            while cls.ipmipoller.poll(0):  # if the somewhat lengthy queue processing
                         # takes long enough for packets to come in, be eager
                 pktqueue = collections.deque([])
-                while cls.poller.poll(0):  # looks rendundant, but want to queue
-                              # and process packets to keep things off RCVBUF
+                while cls.ipmipoller.poll(0):  # looks rendundant, but want to 
+                              #queue and process packets to keep things off 
+                              #RCVBUF
                     rdata = cls.socket.recvfrom(3000)
                     pktqueue.append(rdata)
                 while len(pktqueue):
                     (data, sockaddr) = pktqueue.popleft()
                     cls._route_ipmiresponse(sockaddr, data)
-                    while cls.poller.poll(0):  # seems ridiculous, but between
+                    while cls.ipmipoller.poll(0):  # seems ridiculous, but between
                         # every single callback, check for packets again
                         rdata = cls.socket.recvfrom(3000)
                         pktqueue.append(rdata)
+            for handlepair in cls.poller.poll(0):
+                myhandle = handlepair[0]
+                if myhandle != cls.socket.fileno():
+                    myfile = cls._external_handlers[myhandle][1]
+                    cls._external_handlers[myhandle][0](my)
         sessionstodel = []
         for session, parms in cls.waiting_sessions.iteritems():
             if parms['timeout'] < curtime:  # timeout has expired, time to give up
@@ -563,6 +601,21 @@ class Session:
             del cls.waiting_sessions[session]
             session._timedout()
         return len(cls.waiting_sessions)
+
+    @classmethod
+    def register_handle_callback(cls, handle, callback):
+        """Add a handle to be watched by Session's event loop
+
+        In the event that an application would like IPMI Session event loop
+        to drive things while adding their own filehandle to watch for events,
+        this class method will register that.
+
+        :param handle: filehandle too watch for input
+        :param callback: function to call when input detected on the handle. 
+                         will receive the handle as an argument
+        """
+        cls._external_handlers[handle.fileno()]=(callback,handle)
+        cls.poller.register(handle, select.POLLIN)
 
     @classmethod
     def _route_ipmiresponse(cls, sockaddr, data):
@@ -631,7 +684,7 @@ class Session:
             return self._got_rakp2(data[16:])
         elif ptype == 0x15:
             return self._got_rakp4(data[16:])
-        elif ptype == 0:  # good old ipmi payload
+        elif ptype == 0 or ptype == 1:  # good old ipmi payload or sol
             # If I'm endorsing a shared secret scheme, then at the very least it
             # needs to do mutual assurance
             if not (data[5] & 0b01000000):  # This would be the line that might
@@ -665,7 +718,11 @@ class Session:
                 payload = struct.unpack("%dB" % len(decrypted), decrypted)
                 padsize = payload[-1] + 1
                 payload = list(payload[:-padsize])
-            self._parse_ipmi_payload(payload)
+            if ptype == 0:
+                self._parse_ipmi_payload(payload)
+            elif ptype == 1: #There should be no other option
+                if self.sol_handler:
+                    self.sol_handler(payload)
 
     def _got_rmcp_response(self, data):
         # see RMCP+ open session response table
