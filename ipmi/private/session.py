@@ -92,6 +92,25 @@ def get_ipmi_error(response, suffix=""):
 
 
 class Session:
+    """A class to manage common IPMI session logistics
+
+    Almost all developers should not worry about this class and instead be looking
+    toward ipmi.Command and ipmi.Console.
+
+    For those that do have to worry, the main interesting thing is that the event loop
+    can go one of two ways.  Either a larger manager can query using class methods
+    the soonest timeout deadline and the filehandles to poll and assume responsibility
+    for the polling, or it can register filehandles to be watched.  This is primarily
+    of interest to Console class, which may have an input filehandle to watch and
+    can pass it to Session.
+
+    :param bmc: hostname or ip address of the BMC
+    :param userid: username to use to connect
+    :param password: password to connect to the BMC
+    :param kg: optional parameter if BMC requires Kg be set
+    :param port: UDP port to communicate with, pretty much always 623
+    :param onlogon: callback to receive notification of login completion
+    """
     poller = select.poll()
     bmc_handlers = {}
     waiting_sessions = {}
@@ -222,6 +241,8 @@ class Session:
         #                 this should gracefully be backwards compat, but some
         #                 1.5 implementations checked reserved bits
         self.ipmi15only = 0
+        self.sol_handler = None
+        # NOTE(jbjohnso): This is the callback handler for any SOL payload
 
     def _checksum(self, *data):  # Two's complement over the data
         csum = sum(data)
@@ -631,7 +652,7 @@ class Session:
             return self._got_rakp2(data[16:])
         elif ptype == 0x15:
             return self._got_rakp4(data[16:])
-        elif ptype == 0:  # good old ipmi payload
+        elif ptype == 0 or ptype == 1:  # good old ipmi payload or sol
             # If I'm endorsing a shared secret scheme, then at the very least it
             # needs to do mutual assurance
             if not (data[5] & 0b01000000):  # This would be the line that might
@@ -665,7 +686,11 @@ class Session:
                 payload = struct.unpack("%dB" % len(decrypted), decrypted)
                 padsize = payload[-1] + 1
                 payload = list(payload[:-padsize])
-            self._parse_ipmi_payload(payload)
+            if ptype == 0:
+                self._parse_ipmi_payload(payload)
+            elif ptype == 1: #There should be no other option
+                if self.sol_handler:
+                    self.sol_handler(payload)
 
     def _got_rmcp_response(self, data):
         # see RMCP+ open session response table
