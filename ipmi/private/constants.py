@@ -55,7 +55,7 @@ netfn_codes = {
     "application": 0x6,
     "firmware": 0x8,
     "storage": 0xa,
-    "transport 0xc": 0xc,
+    "transport": 0xc,
 }
 command_completion_codes = {
     (7, 0x39): {
