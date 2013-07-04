@@ -1,0 +1,8 @@
+Verified+2: Jenkins
+Approved+1: Devananda van der Veen <devananda.vdv@gmail.com>
+Code-Review+2: Devananda van der Veen <devananda.vdv@gmail.com>
+Submitted-by: Jenkins
+Submitted-at: Thu, 04 Jul 2013 16:56:11 +0000
+Reviewed-on: https://review.openstack.org/35334
+Project: stackforge/python-ipmi
+Branch: refs/heads/master
