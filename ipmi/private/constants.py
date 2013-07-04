@@ -38,7 +38,7 @@ rmcp_codes = {
     8: "Inactive Session ID",
     9: "Invalid role",
     0xa: "Unauthorized role or privilege level requested",
-    0xb: "Insufficient resources tocreate a session at the requested role",
+    0xb: "Insufficient resources to create a session at the requested role",
     0xc: "Invalid username length",
     0xd: "Unauthorized name",
     0xe: "Unauthorized GUID",
@@ -63,7 +63,7 @@ command_completion_codes = {
                "on this channel"),
     },
     (7, 0x3b): {  # Set session privilege level
-        0x80: "User is not allowed requested priveleg level",
+        0x80: "User is not allowed requested privilege level",
         0x81: "Requested privilege level is not allowed over this channel",
         0x82: "Cannot disable user level authentication",
     },
