@@ -117,6 +117,7 @@ class Session:
     _external_handlers = {}
     bmc_handlers = {}
     waiting_sessions = {}
+    keepalive_sessions = {}
     peeraddr_to_nodes = {}
     # Upon exit of python, make sure we play nice with BMCs by assuring closed
     # sessions for all that we tracked
@@ -408,6 +409,11 @@ class Session:
                                         # per RFC2404 truncates to 96 bits
                 message += struct.unpack("12B", authcode)
         self.netpacket = struct.pack("!%dB" % len(message), *message)
+        #advance idle timer since we don't need keepalive while slinging packets
+        #out naturally
+        if self in Session.keepalive_sessions:
+            Session.keepalive_sessions[self]['timeout'] = time.time() + 25 + \
+                                                      (random.random() * 4.9)
         self._xmit_packet(retry)
 
     def _ipmi15authcode(self, payload, checkremotecode=False):
@@ -515,6 +521,10 @@ class Session:
                                     self.onlogonargs)
             return
         self.logged = 1
+        Session.keepalive_sessions[self] = {}
+        Session.keepalive_sessions[self]['ipmisession'] = self
+        Session.keepalive_sessions[self]['timeout'] = time.time() + 25 + \
+                                                      (random.random() * 4.9)
         call_with_optional_args(
             self.onlogon, {'success': True}, self.onlogonargs)
 
@@ -572,35 +582,52 @@ class Session:
         This watches for any activity on IPMI handles and handles registered
         by register_handle_callback
 
-        :param timeout: Maximum time to wait for data to come across.  If 
+        :param timeout: Maximum time to wait for data to come across.  If
                         unspecified, will autodetect based on earliest timeout
         """
         curtime = time.time()
-        for session, parms in cls.waiting_sessions.iteritems():
-            if timeout == 0:
-                break
-            if parms['timeout'] <= curtime:
-                timeout = 0  # exit after one guaranteed pass
-                continue
-            if timeout is not None and timeout < parms['timeout'] - curtime:
-                continue  # timeout is smaller than the current session needs
-            timeout = parms['timeout'] - curtime  # set new timeout value
+        # There ar a number of parties that each has their own timeout
+        # The caller can specify a deadline in timeout argument
+        # each session with active outbound payload has callback to
+        # handle retry/timout error
+        # each session that is 'alive' wants to send a keepalive ever so often.
+        # We want to make sure the most strict request is honored, and block for
+        # no more time than that, so that whatever part(ies) need to service in
+        # a deadline, will be honored
+        if timeout != 0:
+            for session, parms in cls.waiting_sessions.iteritems():
+                if parms['timeout'] <= curtime:
+                    timeout = 0  # exit after one guaranteed pass
+                    break
+                if timeout is not None and timeout < parms['timeout'] - curtime:
+                    continue  # timeout is smaller than the current session needs
+                timeout = parms['timeout'] - curtime  # set new timeout value
+            for session, parms in cls.keepalive_sessions.iteritems():
+                if parms['timeout'] <= curtime:
+                    timeout = 0
+                    break
+                if timeout is not None and timeout < parms['timeout'] - curtime:
+                    continue
+                timeout = parms['timeout'] - curtime
+        # If the loop above found no sessions wanting *and* the caller had no
+        # timeout in mind, exit function. In this case there is no way a session
+        # could be waiting so we can always return 0
         if timeout is None:
-            return len(cls.waiting_sessions)
+            return 0
         if cls.poller.poll(timeout * 1000):
-            while cls.ipmipoller.poll(0):  # if the somewhat lengthy queue 
-                        # processing takes long enough for packets to come in, 
+            while cls.ipmipoller.poll(0):  # if the somewhat lengthy queue
+                        # processing takes long enough for packets to come in,
                         # be eager
                 pktqueue = collections.deque([])
-                while cls.ipmipoller.poll(0):  # looks rendundant, but want to 
-                              #queue and process packets to keep things off 
+                while cls.ipmipoller.poll(0):  # looks rendundant, but want to
+                              #queue and process packets to keep things off
                               #RCVBUF
                     rdata = cls.socket.recvfrom(3000)
                     pktqueue.append(rdata)
                 while len(pktqueue):
                     (data, sockaddr) = pktqueue.popleft()
                     cls._route_ipmiresponse(sockaddr, data)
-                    while cls.ipmipoller.poll(0):  # seems ridiculous, but 
+                    while cls.ipmipoller.poll(0):  # seems ridiculous, but
                         # between every single callback, check for packets again
                         rdata = cls.socket.recvfrom(3000)
                         pktqueue.append(rdata)
@@ -610,6 +637,11 @@ class Session:
                     myfile = cls._external_handlers[myhandle][1]
                     cls._external_handlers[myhandle][0](myfile)
         sessionstodel = []
+        for session, parms in cls.keepalive_sessions.iteritems():
+            if parms['timeout'] < curtime:
+                cls.keepalive_sessions[session]['timeout'] = 25 + \
+                                                        (random.random() * 4.9)
+                session._keepalive()
         for session, parms in cls.waiting_sessions.iteritems():
             if parms['timeout'] < curtime: # timeout has expired, time to 
                                            # give up # on it and trigger timeout
@@ -624,6 +656,11 @@ class Session:
             cls.waiting_sessions.pop(session,None)
             session._timedout()
         return len(cls.waiting_sessions)
+
+    def _keepalive(self):
+        """Performs a keepalive to avoid idle disconnect
+        """
+        self.raw_command(netfn=6, command=1)
 
     @classmethod
     def register_handle_callback(cls, handle, callback):

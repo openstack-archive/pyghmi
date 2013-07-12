@@ -33,7 +33,7 @@ class Console(object):
     :param userid: username to use to connect
     :param password: password to connect to the BMC
     :param iohandler: Either a function to call with bytes, a filehandle to
-                      use for input and output, or a tuple of (input, output) 
+                      use for input and output, or a tuple of (input, output)
                       handles
     :param kg: optional parameter for BMCs configured to require it
     """
@@ -49,6 +49,7 @@ class Console(object):
             self.console_in = iohandler
         elif type(iohander) == types.FunctionType:
             self.console_out = None
+            self.console_in = None
             self.out_handler = iohandler
         else:
             raise(Exception('No IO handler provided'))
