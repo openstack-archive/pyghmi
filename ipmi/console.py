@@ -50,6 +50,7 @@ class Console(object):
             self.console_in = iohandler
         elif type(iohander) == types.FunctionType:
             self.console_out = None
+            self.console_in = None
             self.out_handler = iohandler
         else:
             raise(Exception('No IO handler provided'))
