@@ -81,17 +81,17 @@ class Command(object):
         # TODO(jbjohnso): accept tuples and lists of each parameter for mass
         # operations without pushing the async complexities up the stack
         self.ipmi_session = session.Session(bmc=bmc,
-                                    userid=userid,
-                                    password=password,
-                                    kg=kg)
+                                            userid=userid,
+                                            password=password,
+                                            kg=kg)
 
     def get_bootdev(self, callback=None, callback_args=None):
         """Get current boot device override information.
 
         Provides the current requested boot device.  Be aware that not all IPMI
-        devices support this.  Even in BMCs that claim to, occasionally the BIOS
-        or UEFI fail to honor it. This is usually only applicable to the next
-        reboot.
+        devices support this.  Even in BMCs that claim to, occasionally the
+        BIOS or UEFI fail to honor it. This is usually only applicable to the
+        next reboot.
 
         :param callback: optional callback
         :param callback_args: optional arguments to callback
@@ -114,13 +114,16 @@ class Command(object):
             return self.lastresponse
         return True
 
-    def set_power(self, powerstate, wait=False, callback=None, callback_args=None):
+    def set_power(self, powerstate, wait=False, callback=None,
+                  callback_args=None):
         """Request power state change
 
         :param powerstate:
                             * on -- Request system turn on
-                            * off -- Request system turn off without waiting for                              OS to shutdown
-                            * shutdown -- Have system request OS proper shutdown
+                            * off -- Request system turn off without waiting
+                                     for OS to shutdown
+                            * shutdown -- Have system request OS proper
+                                          shutdown
                             * reset -- Request system reset without waiting for
                               OS
                             * boot -- If system is off, then 'on', else 'reset'
@@ -141,11 +144,11 @@ class Command(object):
         self.wait_for_power = wait
         self.ipmi_session.raw_command(netfn=0,
                                       command=1,
-                                      callback=self._set_power_with_chassis_info
+                                      callback=self._set_power_with_chassisinfo
                                       )
         return self._waitifsync()
 
-    def _set_power_with_chassis_info(self, response):
+    def _set_power_with_chassisinfo(self, response):
         if 'error' in response:
             _raiseorcall(
                 self.commandcallback, response, self.commandcallbackargs)
@@ -177,8 +180,8 @@ class Command(object):
             self.requestpending = False
             if self.commandcallback:
                 session.call_with_optional_args(self.commandcallback,
-                                        self.lastresponse,
-                                        self.commandcallbackargs)
+                                                self.lastresponse,
+                                                self.commandcallbackargs)
 
     def _power_wait(self, response):
         if 'error' in response:
@@ -191,8 +194,8 @@ class Command(object):
             self.lastresponse = {'powerstate': self.powerstate}
             if self.commandcallback:
                 session.call_with_optional_args(self.commandcallback,
-                                        self.lastresponse,
-                                        self.commandcallbackargs)
+                                                self.lastresponse,
+                                                self.commandcallbackargs)
             return
         self.ipmi_session.raw_command(netfn=0,
                                       command=1,
@@ -211,9 +214,11 @@ class Command(object):
                         *hd -- Boot from hard drive
                         *optical -- boot from CD or DVD drive
                         *setup -- Boot into setup utility
-                        *default -- remove any IPMI directed boot device request
-        :param persist: If true, ask that system firmware use this device beyond
-                        next boot.  Be aware many systems do not honor this
+                        *default -- remove any IPMI directed boot device
+                                    request
+        :param persist: If true, ask that system firmware use this device
+                        beyond next boot.  Be aware many systems do not honor
+                        this
         :param uefiboot: If true, request UEFI boot explicitly.  Strictly
                          speaking, the spec sugests that if not set, the system
                          should BIOS boot and offers no "don't care" option.
@@ -321,8 +326,8 @@ class Command(object):
                 self.lastresponse = {'bootdev': bootnum}
         if self.commandcallback:
             session.call_with_optional_args(self.commandcallback,
-                                    self.lastresponse,
-                                    self.commandcallbackargs)
+                                            self.lastresponse,
+                                            self.commandcallbackargs)
 
     def get_power(self, callback=None, callback_args=None):
         """Get current power state of the managed system
@@ -352,5 +357,5 @@ class Command(object):
         self.lastresponse = {'powerstate': self.powerstate}
         if self.commandcallback:
             session.call_with_optional_args(self.commandcallback,
-                                    self.lastresponse,
-                                    self.commandcallbackargs)
+                                            self.lastresponse,
+                                            self.commandcallbackargs)
