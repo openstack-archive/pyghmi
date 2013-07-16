@@ -20,16 +20,14 @@ limitations under the License.
 """
 import os
 import sys
-import fcntl
-
-import tty
 import termios
+import tty
 
 from ipmi import console
 
 tcattr = termios.tcgetattr(sys.stdin)
 newtcattr = tcattr
-#TODO: allow ctrl-c and crtl-z to go to remote console, add our own exit handler
+#TODO: add our exit handler
 newtcattr[-1][termios.VINTR] = 0
 newtcattr[-1][termios.VSUSP] = 0
 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, newtcattr)
