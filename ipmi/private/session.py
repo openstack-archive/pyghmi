@@ -305,16 +305,16 @@ class Session:
         else:
             self.ipmicallback = callback
         self._send_ipmi_net_payload(netfn, command, data, retry=retry)
-        if retry: #in retry case, let the retry timers auto-indicate wait time
-            timeout=None
-        else: #if not retry, give it a second before surrending
-            timeout=1
+        if retry:  # in retry case, let the retry timers indicate wait time
+            timeout = None
+        else:  # if not retry, give it a second before surrending
+            timeout = 1
         #In the synchronous case, wrap the event loop in this call
         #The event loop is shared amongst python-ipmi session instances
         #within a process.  In this way, synchronous usage of the interface
         #plays well with asynchronous use.  In fact, this produces the behavior
         #of only the constructor *really* needing a callback.  From then on,
-        #synchronous usage of the class acts in a greenthread manner governed by
+        #synchronous usage of the class acts in a greenthread style governed by
         #order of data on the network
         if callback is None:
             while self.lastresponse is None:
@@ -332,10 +332,10 @@ class Session:
                              #we already have a packet outgoing, make this
                              # a pending payload
                              # this way a simplistic BMC won't get confused
-                             # and we also avoid having to do a more complicated
+                             # and we also avoid having to do more complicated
                              # retry mechanism where each payload is
                              # retried separately
-            self.pendingpayloads.append((payload,payload_type,retry))
+            self.pendingpayloads.append((payload, payload_type, retry))
             return
         if payload_type is None:
             payload_type = self.last_payload_type
@@ -389,8 +389,8 @@ class Session:
                 payloadtocrypt = _aespad(payload)
                 crypter = AES.new(self.aeskey, AES.MODE_CBC, iv)
                 crypted = crypter.encrypt(struct.pack("%dB" %
-                                                    len(payloadtocrypt),
-                                               *payloadtocrypt))
+                                                      len(payloadtocrypt),
+                                          *payloadtocrypt))
                 crypted = list(struct.unpack("%dB" % len(crypted), crypted))
                 message += crypted
             else:  # no confidetiality algorithm
@@ -411,7 +411,7 @@ class Session:
                 integdata = message[4:]
                 authcode = HMAC.new(self.k1,
                                     struct.pack("%dB" % len(integdata),
-                                         *integdata),
+                                                *integdata),
                                     SHA).digest()[:12]  # SHA1-96
                                         # per RFC2404 truncates to 96 bits
                 message += struct.unpack("12B", authcode)
@@ -424,8 +424,8 @@ class Session:
         self._xmit_packet(retry)
 
     def _ipmi15authcode(self, payload, checkremotecode=False):
-        if self.authtype == 0:  # Only for things prior to auth in ipmi 1.5, not
-                               # like 2.0 cipher suite 0
+        if self.authtype == 0:  # Only for things before auth in ipmi 1.5, not
+                                # like 2.0 cipher suite 0
             return ()
         password = self.password
         padneeded = 16 - len(password)
@@ -435,14 +435,14 @@ class Session:
         passdata = struct.unpack("16B", password)
         if checkremotecode:
             seqbytes = struct.unpack("!4B",
-                                 struct.pack("<I", self.remsequencenumber))
+                                     struct.pack("<I", self.remsequencenumber))
         else:
             seqbytes = struct.unpack("!4B",
-                                 struct.pack("<I", self.sequencenumber))
+                                     struct.pack("<I", self.sequencenumber))
         sessdata = struct.unpack("!4B", struct.pack("<I", self.sessionid))
         bodydata = passdata + sessdata + tuple(payload) + seqbytes + passdata
         dgst = hashlib.md5(
-                   struct.pack("%dB" % len(bodydata), *bodydata)).digest()
+            struct.pack("%dB" % len(bodydata), *bodydata)).digest()
         hashdata = struct.unpack("!%dB" % len(dgst), dgst)
         return hashdata
 
@@ -468,10 +468,11 @@ class Session:
             self.ipmiversion = 2.0
         if self.ipmiversion == 1.5:
             if not (data[1] & 0b100):
-                call_with_optional_args(self.onlogon,
-                     {'error':
-                     "MD5 is required but not enabled/available on target BMC"},
-                     self.onlogonargs)
+                call_with_optional_args(
+                    self.onlogon,
+                    {'error':
+                     "MD5 required but not enabled/available on target BMC"},
+                    self.onlogonargs)
                 return
             self._get_session_challenge()
         elif self.ipmiversion == 2.0:
@@ -509,7 +510,8 @@ class Session:
             return
         data = response['data']
         self.sessionid = struct.unpack("<I", struct.pack("4B", *data[1:5]))[0]
-        self.sequencenumber = struct.unpack("<I", struct.pack("4B", *data[5:9]))[0]
+        self.sequencenumber = struct.unpack("<I",
+                                            struct.pack("4B", *data[5:9]))[0]
         self._req_priv_level()
 
     def _req_priv_level(self):
@@ -547,7 +549,7 @@ class Session:
 
     def _open_rmcpplus_request(self):
         self.authtype = 6
-        self.localsid += 1  # have unique local session ids to ignore aborted 
+        self.localsid += 1  # have unique local session ids to ignore aborted
                             # login attempts from the past
         self.rmcptag += 1
         data = [
@@ -563,8 +565,9 @@ class Session:
             #2,0,0,8,0,0,0,0, #no privacy confalgo
         ]
         self.sessioncontext = 'OPENSESSION'
-        self.send_payload(payload=data,
-                      payload_type=constants.payload_types['rmcpplusopenreq'])
+        self.send_payload(
+            payload=data,
+            payload_type=constants.payload_types['rmcpplusopenreq'])
 
     def _get_channel_auth_cap(self):
         self.ipmicallback = self._got_channel_auth_cap
@@ -643,7 +646,7 @@ class Session:
                     (data, sockaddr) = pktqueue.popleft()
                     cls._route_ipmiresponse(sockaddr, data)
                     while cls.ipmipoller.poll(0):  # seems ridiculous, but
-                        # between every single callback, check for packets again
+                        # between every callback, check for packets again
                         rdata = cls.socket.recvfrom(3000)
                         pktqueue.append(rdata)
             for handlepair in cls.poller.poll(0):
@@ -658,17 +661,17 @@ class Session:
                                                         (random.random() * 4.9)
                 session._keepalive()
         for session, parms in cls.waiting_sessions.iteritems():
-            if parms['timeout'] < curtime: # timeout has expired, time to 
-                                           # give up # on it and trigger timeout
-                                           # response # in the respective 
-                                           # session
+            if parms['timeout'] < curtime:  # timeout has expired, time to
+                                            # give up on it and trigger timeout
+                                            # response in the respective
+                                            # session
                 sessionstodel.append(
                     session)  # defer deletion until after loop
                                               # to avoid confusing the for loop
         for session in sessionstodel:
             cls.pending -= 1
             session.lastpayload = None
-            cls.waiting_sessions.pop(session,None)
+            cls.waiting_sessions.pop(session, None)
             session._timedout()
         return len(cls.waiting_sessions)
 
@@ -686,10 +689,10 @@ class Session:
         this class method will register that.
 
         :param handle: filehandle too watch for input
-        :param callback: function to call when input detected on the handle. 
+        :param callback: function to call when input detected on the handle.
                          will receive the handle as an argument
         """
-        cls._external_handlers[handle.fileno()]=(callback,handle)
+        cls._external_handlers[handle.fileno()] = (callback, handle)
         cls.poller.register(handle, select.POLLIN)
 
     @classmethod
@@ -729,7 +732,7 @@ class Session:
             # copying pieces of the packet over and over
             rsp = list(struct.unpack("!%dB" % len(data), data))
             authcode = False
-            if data[4] == '\x02':  # we have an authcode in this ipmi 1.5 packet
+            if data[4] == '\x02':  # we have authcode in this ipmi 1.5 packet
                 authcode = data[13:29]
                 del rsp[13:29]
                     # this is why we needed a mutable representation
@@ -738,7 +741,7 @@ class Session:
                 expectedauthcode = self._ipmi15authcode(payload,
                                                         checkremotecode=True)
                 expectedauthcode = struct.pack("%dB" % len(expectedauthcode),
-                                        *expectedauthcode)
+                                               *expectedauthcode)
                 if expectedauthcode != authcode:
                     return
             self._parse_ipmi_payload(payload)
@@ -760,7 +763,7 @@ class Session:
         elif ptype == 0x15:
             return self._got_rakp4(data[16:])
         elif ptype == 0 or ptype == 1:  # good old ipmi payload or sol
-            # If I'm endorsing a shared secret scheme, then at the very least it
+            # If endorsing a shared secret scheme, then at the very least it
             # needs to do mutual assurance
             if not (data[5] & 0b01000000):  # This would be the line that might
                                          # trip up some insecure BMC
@@ -789,22 +792,22 @@ class Session:
                 iv = rawdata[16:32]
                 decrypter = AES.new(self.aeskey, AES.MODE_CBC, iv)
                 decrypted = decrypter.decrypt(
-                                       struct.pack("%dB" % len(payload[16:]),
-                                       *payload[16:]))
+                    struct.pack("%dB" % len(payload[16:]),
+                                *payload[16:]))
                 payload = struct.unpack("%dB" % len(decrypted), decrypted)
                 padsize = payload[-1] + 1
                 payload = list(payload[:-padsize])
             if ptype == 0:
                 self._parse_ipmi_payload(payload)
-            elif ptype == 1: #There should be no other option
-                #note that we assume the SOL payload is good enough to avoid
+            elif ptype == 1:  # There should be no other option
+                # note that we assume the SOL payload is good enough to avoid
                 # retry SOL logic is sufficiently different, we just
                 # defer that call to the sol handler, it can re submit if it
                 # is unhappy
-                if self.last_payload_type == 1: #but only if SOL was last sent
+                if self.last_payload_type == 1:  # but only if SOL was last tx
                     self.lastpayload = None
                     self.last_payload_type = None
-                    Session.waiting_sessions.pop(self,None)
+                    Session.waiting_sessions.pop(self, None)
                 if self.sol_handler:
                     self.sol_handler(payload)
 
@@ -829,8 +832,8 @@ class Session:
         localsid = struct.unpack("<I", struct.pack("4B", *data[4:8]))[0]
         if self.localsid != localsid:
             return -9
-        self.pendingsessionid = struct.unpack("<I",
-                                     struct.pack("4B", *data[8:12]))[0]
+        self.pendingsessionid = struct.unpack(
+            "<I", struct.pack("4B", *data[8:12]))[0]
         # TODO(jbjohnso): currently, we take it for granted that the responder
         # accepted our integrity/auth/confidentiality proposal
         self.lastpayload = None
@@ -841,11 +844,12 @@ class Session:
         self.randombytes = os.urandom(16)
         userlen = len(self.userid)
         payload = [self.rmcptag, 0, 0, 0] + \
-          list(struct.unpack("4B", struct.pack("<I", self.pendingsessionid))) +\
-          list(struct.unpack("16B", self.randombytes)) +\
-          [self.privlevel, 0, 0] +\
-          [userlen] +\
-          list(struct.unpack("%dB" % userlen, self.userid))
+            list(struct.unpack("4B",
+                 struct.pack("<I", self.pendingsessionid))) +\
+            list(struct.unpack("16B", self.randombytes)) +\
+            [self.privlevel, 0, 0] +\
+            [userlen] +\
+            list(struct.unpack("%dB" % userlen, self.userid))
         self.sessioncontext = "EXPECTINGRAKP2"
         self.send_payload(
             payload=payload, payload_type=constants.payload_types['rakp1'])
@@ -948,10 +952,11 @@ class Session:
         expectedauthcode = HMAC.new(self.sik, hmacdata, SHA).digest()[:12]
         authcode = struct.pack("%dB" % len(data[8:]), *data[8:])
         if authcode != expectedauthcode:
-            call_with_optional_args(self.onlogon,
-                                    {'error':
-                                    "Invalid RAKP4 integrity code (wrong Kg?)"},
-                                    self.onlogonargs)
+            call_with_optional_args(
+                self.onlogon,
+                {'error':
+                 "Invalid RAKP4 integrity code (wrong Kg?)"},
+                self.onlogonargs)
             return
         self.sessionid = self.pendingsessionid
         self.integrityalgo = 'sha1'
@@ -970,9 +975,9 @@ class Session:
         # TODO(jbjohnso): if implementing other channels, add checksum checks
         # here
         if (payload[4] != self.seqlun or
-            payload[1] >> 2 != self.expectednetfn or
-            payload[5] != self.expectedcmd):
-            return -1  # this payload is not a match for our outstanding packet
+                payload[1] >> 2 != self.expectednetfn or
+                payload[5] != self.expectedcmd):
+            return -1  # payload is not a match for our last packet
         if hasattr(self, 'hasretried') and self.hasretried:
             self.hasretried = 0
             self.tabooseq[
@@ -984,7 +989,7 @@ class Session:
         self.expectedcmd = 0x1ff
         self.seqlun += 4  # prepare seqlun for next transmit
         self.seqlun &= 0xff  # when overflowing, wrap around
-        Session.waiting_sessions.pop(self,None)
+        Session.waiting_sessions.pop(self, None)
         self.lastpayload = None  # render retry mechanism utterly incapable of
                             #doing anything, though it shouldn't matter
         self.last_payload_type = None
@@ -1003,7 +1008,7 @@ class Session:
                 self.pendingpayloads.popleft()
             self.send_payload(payload=nextpayload,
                               payload_type=nextpayloadtype,
-                              retry=nextretry)
+                              retry=retry)
         call_with_optional_args(self.ipmicallback,
                                 response,
                                 self.ipmicallbackargs)
@@ -1036,7 +1041,7 @@ class Session:
             self._relog()
         else:  # in IPMI case, the only recourse is to act as if the packet is
               # idempotent.  SOL has more sophisticated retry handling
-             # the biggest risks are reset sp, which is often fruitless to retry
+             # the biggest risks are reset sp which is often fruitless to retry
              # and chassis reset, which sometimes will shoot itself
              # systematically in the head in a shared port case making replies
              # impossible
@@ -1059,7 +1064,7 @@ class Session:
             Session.waiting_sessions[self] = {}
             Session.waiting_sessions[self]['ipmisession'] = self
             Session.waiting_sessions[self]['timeout'] = self.timeout + \
-                                                        time.time()
+                time.time()
             Session.pending += 1
         if self.sockaddr:
             Session.socket.sendto(self.netpacket, self.sockaddr)
@@ -1070,7 +1075,7 @@ class Session:
                                           0,
                                           socket.SOCK_DGRAM):
                 sockaddr = res[4]
-                if (res[0] == socket.AF_INET):  #convert the sockaddr AF_INET6
+                if (res[0] == socket.AF_INET):  # convert the sockaddr AF_INET6
                     newhost = '::ffff:' + sockaddr[0]
                     sockaddr = (newhost, sockaddr[1], 0, 0)
                 Session.bmc_handlers[sockaddr] = self
@@ -1088,7 +1093,7 @@ class Session:
         self.raw_command(command=0x3c,
                          netfn=6,
                          data=struct.unpack("4B",
-                           struct.pack("I", self.sessionid)),
+                                            struct.pack("I", self.sessionid)),
                          retry=False,
                          callback=callback,
                          callback_args=callback_args)

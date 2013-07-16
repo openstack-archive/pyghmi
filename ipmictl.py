@@ -38,12 +38,12 @@ if len(sys.argv) >= 5:
     args = sys.argv[4:]
 ipmicmd = Command(bmc=bmc, userid=userid, password=password)
 if command == 'power':
-    if args[0]:
+    if args:
         print ipmicmd.set_power(args[0], wait=True)
     else:
         print ipmicmd.get_power()
 elif command == 'bootdev':
-    if args[0]:
+    if args:
         print ipmicmd.set_bootdev(args[0])
     else:
         print ipmicmd.get_bootdev()

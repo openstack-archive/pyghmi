@@ -19,9 +19,11 @@
 import fcntl
 import os
 import struct
+import types
 
 from ipmi.private import session
 from ipmi.private import constants
+
 
 class Console(object):
     """IPMI SOL class.
@@ -42,13 +44,13 @@ class Console(object):
     def __init__(self, bmc, userid, password,
                  iohandler=None,
                  force=False, kg=None):
-        if type(iohandler) == tuple: #two file handles
+        if type(iohandler) == tuple:  # two file handles
             self.console_in = iohandler[0]
             self.console_out = iohandler[1]
-        elif type(iohandler) == file: # one full duplex file handle
+        elif type(iohandler) == file:  # one full duplex file handle
             self.console_out = iohandler
             self.console_in = iohandler
-        elif type(iohander) == types.FunctionType:
+        elif isinstance(iohandler, types.FunctionType):
             self.console_out = None
             self.console_in = None
             self.out_handler = iohandler
@@ -63,15 +65,14 @@ class Console(object):
         self.ackedcount = 0
         self.ackedseq = 0
         self.retriedpayload = 0
-        self.pendingoutput=""
-        self.awaitingack=False
+        self.pendingoutput = ""
+        self.awaitingack = False
         self.force_session = force
         self.ipmi_session = session.Session(bmc=bmc,
-                                    userid=userid,
-                                    password=password,
-                                    kg=kg,
-                                    onlogon=self._got_session
-                                    )
+                                            userid=userid,
+                                            password=password,
+                                            kg=kg,
+                                            onlogon=self._got_session)
 
     def _got_session(self, response):
         """Private function to navigate SOL payload activation
@@ -108,11 +109,11 @@ class Console(object):
         if response['code']:
             if response['code'] in constants.ipmi_completion_codes:
                 self._print_data(
-                       constants.ipmi_completion_codes[response['code']])
+                    constants.ipmi_completion_codes[response['code']])
                 return
             elif response['code'] == 0x80:
                 if self.force_session and not self.retriedpayload:
-                    self.retriedpayload=1
+                    self.retriedpayload = 1
                     self.ipmi_session.raw_command(netfn=0x6, command=0x49,
                                                   data=(1, 1, 0, 0, 0, 0),
                                                   callback=self._got_session)
@@ -125,8 +126,8 @@ class Console(object):
                 return
             else:
                 self._print_data(
-                   'SOL encountered Unrecognized error code %d\n' %
-                      response['code'])
+                    'SOL encountered Unrecognized error code %d\n' %
+                    response['code'])
                 return
         #data[0:3] is reserved except for the test mode, which we don't use
         data = response['data']
@@ -138,12 +139,12 @@ class Console(object):
             raise Exception("TODO(jbjohnso): support atypical SOL port number")
         #ignore data[10:11] for now, the vlan detail, shouldn't matter to this
         #code anyway...
-        self.ipmi_session.sol_handler=self._got_sol_payload
+        self.ipmi_session.sol_handler = self._got_sol_payload
         if self.console_in is not None:
             self.ipmi_session.register_handle_callback(self.console_in,
                                                        self._got_cons_input)
 
-    def _got_cons_input(self,handle):
+    def _got_cons_input(self, handle):
         """Callback for handle events detected by ipmi session
         """
         self.pendingoutput += handle.read()
@@ -156,19 +157,19 @@ class Console(object):
         if self.myseq == 0:
             self.myseq = 1
         payload = struct.pack("BBBB",
-                        self.myseq,
-                        self.ackedseq,
-                        self.ackedseq,
-                        self.sendbreak)
+                              self.myseq,
+                              self.ackedseq,
+                              self.ackedseq,
+                              self.sendbreak)
         payload += self.pendingoutput
         self.lasttextsize = len(self.pendingoutput)
         self.pendingoutput = ""
         self.awaitingack = True
         payload = struct.unpack("%dB" % len(payload), payload)
-        self.lastpayload=payload
+        self.lastpayload = payload
         self.ipmi_session.send_payload(payload, payload_type=1)
 
-    def _print_data(self,data):
+    def _print_data(self, data):
         """Convey received data back to caller in the format of their choice.
 
         Caller may elect to provide this class filehandle(s) or else give a
@@ -178,7 +179,7 @@ class Console(object):
         if self.console_out is not None:
             self.console_out.write(data)
             self.console_out.flush()
-        elif self.out_handler: #callback style..
+        elif self.out_handler:  # callback style..
             self.out_handler(data)
 
     def _got_sol_payload(self, payload):
@@ -197,41 +198,41 @@ class Console(object):
         #no reason would be treated the same, new payload with partial data
         remdata = ""
         remdatalen = 0
-        if newseq != 0: #this packet at least has some data to send to us..
+        if newseq != 0:  # this packet at least has some data to send to us..
             if len(payload) > 4:
-                remdatalen = len(payload[4:]) #store remote data len before dupe
+                remdatalen = len(payload[4:])  # store remote len before dupe
                     #retry logic, we must ack *this* many even if it is
                     #a retry packet with new partial data
                 remdata = struct.pack("%dB" % remdatalen, *payload[4:])
-            if newseq == self.remseq: #it is a retry, but could have new data..
+            if newseq == self.remseq:  # it is a retry, but could have new data
                 if remdatalen > self.lastsize:
                     remdata = remdata[4 + self.lastsize:]
-                else: # no new data...
+                else:  # no new data...
                     remdata = ""
-            else: #TODO(jbjohnso) what if remote sequence number is wrong??
+            else:  # TODO(jbjohnso) what if remote sequence number is wrong??
                 self.remseq = newseq
-            self.lastsize=remdatalen
+            self.lastsize = remdatalen
             self._print_data(remdata)
             ackpayload = (0, self.remseq, remdatalen, 0)
             #Why not put pending data into the ack? because it's rare
             #and might be hard to decide what to do in the context of
             #retry situation
             self.ipmi_session.send_payload(ackpayload,
-                                          payload_type=1, retry=False)
-        if self.myseq != 0 and ackseq == self.myseq: #the bmc has something to
-                                                     #say about our last xmit
-            self.awaitingack=False
-            if nacked > 0: #the BMC was in some way unhappy
+                                           payload_type=1, retry=False)
+        if self.myseq != 0 and ackseq == self.myseq:  # the bmc has something
+                                                      # to say about last xmit
+            self.awaitingack = False
+            if nacked > 0:  # the BMC was in some way unhappy
                 if poweredoff:
                     self._print_data("Remote system is powered down\n")
                 if deactivated:
                     self._print_data("Remote IPMI console disconnected\n")
-                else: #retry all or part of packet, but in a new form
-                    #also add pending output for efficiency and ease
+                else:  # retry all or part of packet, but in a new form
+                    # also add pending output for efficiency and ease
                     newtext = self.lastpayload[4 + ackcount:]
                     self.pendingoutput = newtext + self.pendingoutput
                     self._sendpendingoutput()
-        elif self.awaitingack: #session has marked us as happy, but we are not
+        elif self.awaitingack:  # session marked us as happy, but we are not
                 #this does mean that we will occasionally retry a packet
                 #sooner than retry suggests, but that's no big deal
             self.ipmi_session.send_payload(payload=self.lastpayload,
@@ -247,7 +248,7 @@ class Console(object):
         """
         #wait_for_rsp promises to return a false value when no sessions are
         #alive anymore
-        #TODO(jbjohnso): wait_for_rsp is not returning a true value from our own
+        #TODO(jbjohnso): wait_for_rsp is not returning a true value for our own
         #session
         while (1):
             session.Session.wait_for_rsp(timeout=600)
