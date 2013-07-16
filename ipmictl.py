@@ -33,17 +33,22 @@ if (len(sys.argv) < 3):
 bmc = sys.argv[1]
 userid = sys.argv[2]
 command = sys.argv[3]
-arg = None
-if len(sys.argv) == 5:
-    arg = sys.argv[4]
+args = None
+if len(sys.argv) >= 5:
+    args = sys.argv[4:]
 ipmicmd = Command(bmc=bmc, userid=userid, password=password)
 if command == 'power':
-    if arg:
-        print ipmicmd.set_power(arg, wait=True)
+    if args[0]:
+        print ipmicmd.set_power(args[0], wait=True)
     else:
         print ipmicmd.get_power()
 elif command == 'bootdev':
-    if arg:
-        print ipmicmd.set_bootdev(arg)
+    if args[0]:
+        print ipmicmd.set_bootdev(args[0])
     else:
         print ipmicmd.get_bootdev()
+elif command == 'raw':
+    netfn = args[0]
+    command = args[1]
+    data = args[2:]
+    print ipmicmd.raw_command(netfn=netfn, command=command, data=data)
