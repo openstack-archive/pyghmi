@@ -37,6 +37,20 @@ initialtimeout = 0.5  # minimum timeout for first packet to retry in any given
                      # in case of congestion
 
 
+def _monotonic_time():
+    """
+    Provides a monotonic timer
+    """
+    # Python does not provide one until 3.3, so we make due.
+    # for most OSes, os.times()[4] works well.
+    # for microsoft, GetTickCount64
+    if (os.name == "posix"):
+        return os.times()[4]
+    else:  # last resort, non monotonic time
+        return time.time()
+    #TODO(jbjohnso): Windows variant
+
+
 def _aespad(data):
     """ipmi demands a certain pad scheme,
     per table 13-20 AES-CBC encrypted payload fields.
@@ -419,8 +433,8 @@ class Session:
         #advance idle timer since we don't need keepalive while sending packets
         #out naturally
         if self in Session.keepalive_sessions:
-            Session.keepalive_sessions[self]['timeout'] = time.time() + 25 + \
-                (random.random() * 4.9)
+            Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
+                25 + (random.random() * 4.9)
         self._xmit_packet(retry)
 
     def _ipmi15authcode(self, payload, checkremotecode=False):
@@ -532,8 +546,8 @@ class Session:
         self.logged = 1
         Session.keepalive_sessions[self] = {}
         Session.keepalive_sessions[self]['ipmisession'] = self
-        Session.keepalive_sessions[self]['timeout'] = time.time() + 25 + \
-            (random.random() * 4.9)
+        Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
+            25 + (random.random() * 4.9)
         call_with_optional_args(
             self.onlogon, {'success': True}, self.onlogonargs)
 
@@ -603,7 +617,7 @@ class Session:
         #Instance C gets to go ahead of Instance A, because
         #Instance C can get work done, but instance A cannot
 
-        curtime = time.time()
+        curtime = _monotonic_time()
         # There ar a number of parties that each has their own timeout
         # The caller can specify a deadline in timeout argument
         # each session with active outbound payload has callback to
@@ -1066,7 +1080,7 @@ class Session:
             Session.waiting_sessions[self] = {}
             Session.waiting_sessions[self]['ipmisession'] = self
             Session.waiting_sessions[self]['timeout'] = self.timeout + \
-                time.time()
+                _monotonic_time()
             Session.pending += 1
         if self.sockaddr:
             Session.socket.sendto(self.netpacket, self.sockaddr)
