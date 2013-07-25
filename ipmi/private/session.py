@@ -194,8 +194,7 @@ class Session:
                  password,
                  port=623,
                  kg=None,
-                 onlogon=None,
-                 onlogonargs=None):
+                 onlogon=None):
         self.lastpayload = None
         self.bmc = bmc
         self.userid = userid
@@ -207,7 +206,6 @@ class Session:
         else:
             self.kg = password
         self.port = port
-        self.onlogonargs = onlogonargs
         if (onlogon is None):
             self.async = False
             self.onlogon = self._sync_login
@@ -464,7 +462,7 @@ class Session:
 
     def _got_channel_auth_cap(self, response):
         if 'error' in response:
-            call_with_optional_args(self.onlogon, response, self.onlogonargs)
+            self.onlogon(response)
             return
         if response['code'] == 0xcc and self.ipmi15only is not None:
             # tried ipmi 2.0 against a 1.5 which should work, but some bmcs
@@ -474,9 +472,7 @@ class Session:
         mysuffix = " while trying to get channel authentication capabalities"
         errstr = get_ipmi_error(response, suffix=mysuffix)
         if errstr:
-            call_with_optional_args(self.onlogon,
-                                    {'error': errstr},
-                                    self.onlogonargs)
+            self.onlogon({'error': errstr})
             return
         data = response['data']
         self.currentchannel = data[0]
@@ -484,11 +480,9 @@ class Session:
             self.ipmiversion = 2.0
         if self.ipmiversion == 1.5:
             if not (data[1] & 0b100):
-                call_with_optional_args(
-                    self.onlogon,
+                self.onlogon(
                     {'error':
-                     "MD5 required but not enabled/available on target BMC"},
-                    self.onlogonargs)
+                     "MD5 required but not enabled/available on target BMC"})
                 return
             self._get_session_challenge()
         elif self.ipmiversion == 2.0:
@@ -498,9 +492,7 @@ class Session:
         errstr = get_ipmi_error(response,
                                 suffix=" while getting session challenge")
         if errstr:
-            call_with_optional_args(self.onlogon,
-                                    {'error': errstr},
-                                    self.onlogonargs)
+            self.onlogon({'error': errstr})
             return
         data = response['data']
         self.sessionid = struct.unpack("<I", struct.pack("4B", *data[0:4]))[0]
@@ -520,9 +512,7 @@ class Session:
     def _activated_session(self, response):
         errstr = get_ipmi_error(response)
         if errstr:
-            call_with_optional_args(self.onlogon,
-                                    {'error': errstr},
-                                    self.onlogonargs)
+            self.onlogon({'error': errstr})
             return
         data = response['data']
         self.sessionid = struct.unpack("<I", struct.pack("4B", *data[1:5]))[0]
@@ -541,17 +531,14 @@ class Session:
             self.privlevel, self.userid)
         errstr = get_ipmi_error(response, suffix=mysuffix)
         if errstr:
-            call_with_optional_args(self.onlogon,
-                                    {'error': errstr},
-                                    self.onlogonargs)
+            self.onlogon({'error': errstr})
             return
         self.logged = 1
         Session.keepalive_sessions[self] = {}
         Session.keepalive_sessions[self]['ipmisession'] = self
         Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
             25 + (random.random() * 4.9)
-        call_with_optional_args(
-            self.onlogon, {'success': True}, self.onlogonargs)
+        self.onlogon({'success': True})
 
     def _get_session_challenge(self):
         reqdata = [2]
@@ -841,9 +828,7 @@ class Session:
                 errstr = constants.rmcp_codes[data[1]]
             else:
                 errstr = "Unrecognized RMCP code %d" % data[1]
-            call_with_optional_args(self.onlogon,
-                                    {'error': errstr},
-                                    self.onlogonargs)
+            self.onlogon({'error': errstr})
             return -9
         self.allowedpriv = data[2]
         # TODO(jbjohnso): enable lower priv access (e.g. operator/user)
@@ -887,9 +872,7 @@ class Session:
                 errstr = constants.rmcp_codes[data[1]]
             else:
                 errstr = "Unrecognized RMCP code %d" % data[1]
-            call_with_optional_args(self.onlogon,
-                                    {'error': errstr + " in RAKP2"},
-                                    self.onlogonargs)
+            self.onlogon({'error': errstr + " in RAKP2"})
             return -9
         localsid = struct.unpack("<I", struct.pack("4B", *data[4:8]))[0]
         if localsid != self.localsid:
@@ -905,9 +888,7 @@ class Session:
         givenhash = struct.pack("%dB" % len(data[40:]), *data[40:])
         if givenhash != expectedhash:
             self.sessioncontext = "FAILED"
-            call_with_optional_args(self.onlogon,
-                                    {'error': "Incorrect password provided"},
-                                    self.onlogonargs)
+            self.onlogon({'error': "Incorrect password provided"})
             return -9
         # We have now validated that the BMC and client agree on password, time
         # to store the keys
@@ -957,9 +938,7 @@ class Session:
                 errstr = constants.rmcp_codes[data[1]]
             else:
                 errstr = "Unrecognized RMCP code %d" % data[1]
-            call_with_optional_args(self.onlogon,
-                                    {'error': errstr + " reported in RAKP4"},
-                                    self.onlogonargs)
+            self.onlogon({'error': errstr + " reported in RAKP4"})
             return -9
         localsid = struct.unpack("<I", struct.pack("4B", *data[4:8]))[0]
         if localsid != self.localsid:  # ignore if wrong session id indicated
@@ -970,11 +949,7 @@ class Session:
         expectedauthcode = HMAC.new(self.sik, hmacdata, SHA).digest()[:12]
         authcode = struct.pack("%dB" % len(data[8:]), *data[8:])
         if authcode != expectedauthcode:
-            call_with_optional_args(
-                self.onlogon,
-                {'error':
-                 "Invalid RAKP4 integrity code (wrong Kg?)"},
-                self.onlogonargs)
+            self.onlogon({'error': "Invalid RAKP4 integrity code (wrong Kg?)"})
             return
         self.sessionid = self.pendingsessionid
         self.integrityalgo = 'sha1'
