@@ -29,7 +29,7 @@ from Crypto.Cipher import AES
 from Crypto.Hash import HMAC
 from Crypto.Hash import SHA
 
-from ipmi.private import constants
+from pyghmi.ipmi.private import constants
 
 
 initialtimeout = 0.5  # minimum timeout for first packet to retry in any given

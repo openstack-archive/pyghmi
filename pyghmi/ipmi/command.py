@@ -15,7 +15,7 @@
 # limitations under the License.
 # This represents the low layer message framing portion of IPMI
 
-from ipmi.private import session
+from pyghmi.ipmi.private import session
 
 
 boot_devices = {

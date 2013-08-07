@@ -24,7 +24,7 @@ import os
 import string
 import sys
 
-from ipmi import command
+from pyghmi.ipmi import command
 password = os.environ['IPMIPASSWORD']
 os.environ['IPMIPASSWORD'] = ""
 if (len(sys.argv) < 3):

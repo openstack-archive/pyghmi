@@ -23,7 +23,7 @@ import sys
 import termios
 import tty
 
-from ipmi import console
+from pyghmi.ipmi import console
 
 tcattr = termios.tcgetattr(sys.stdin)
 newtcattr = tcattr
