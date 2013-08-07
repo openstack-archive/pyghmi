@@ -21,8 +21,8 @@ import os
 import struct
 import types
 
-from ipmi.private import constants
-from ipmi.private import session
+from pyghmi.ipmi.private import constants
+from pyghmi.ipmi.private import session
 
 
 class Console(object):
