@@ -142,7 +142,9 @@ class Command(object):
                               OS
                             * boot -- If system is off, then 'on', else 'reset'
         :param wait: If True, do not return until system actually completes
-                     requested state change
+                     requested state change for 300 seconds.
+                     If a non-zero number, adjust the wait time to the
+                     requested number of seconds
         :returns: dict -- A dict describing the response retrieved
         """
         if powerstate not in power_states:
@@ -159,6 +161,9 @@ class Command(object):
         if 'error' in response:
             return response
         self.lastresponse = {'pendingpowerstate': self.newpowerstate}
+        waitattempts = 300
+        if not isinstance(wait, bool):
+            waitattempts = wait
         if (wait and
            self.newpowerstate in ('on', 'off', 'shutdown', 'softoff')):
             if self.newpowerstate in ('softoff', 'shutdown'):
@@ -166,11 +171,15 @@ class Command(object):
             else:
                 self.waitpowerstate = self.newpowerstate
             currpowerstate = None
-            while currpowerstate != self.waitpowerstate:
-                response = self.ipmi_session.raw_command(netfn=0, command=1)
+            while currpowerstate != self.waitpowerstate and waitattempts > 0:
+                response = self.ipmi_session.raw_command(netfn=0, command=1,
+                                                         delay_xmit=1)
                 if 'error' in response:
                     return response
                 currpowerstate = 'on' if (response['data'][0] & 1) else 'off'
+                waitattempts -= 1
+            if currpowerstate != self.waitpowerstate:
+                raise Exception("System did not accomplish power state change")
             return {'powerstate': currpowerstate}
         else:
             return self.lastresponse
