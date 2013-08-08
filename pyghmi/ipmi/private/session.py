@@ -87,14 +87,11 @@ def call_with_optional_args(callback, *args):
 def get_ipmi_error(response, suffix=""):
     if 'error' in response:
         return response['error'] + suffix
-
     code = response['code']
     if code == 0:
         return False
-
     command = response['command']
     netfn = response['netfn']
-
     if ((netfn, command) in constants.command_completion_codes
             and code in constants.command_completion_codes[(netfn, command)]):
         res = constants.command_completion_codes[(netfn, command)][code]
@@ -103,7 +100,6 @@ def get_ipmi_error(response, suffix=""):
         res = constants.ipmi_completion_codes[code] + suffix
     else:
         res = "Unknown code " + code + " encountered"
-
     return res
 
 
@@ -311,14 +307,16 @@ class Session:
                     data=[],
                     retry=True,
                     callback=None,
-                    callback_args=None):
+                    callback_args=None,
+                    delay_xmit=None):
         self.ipmicallbackargs = callback_args
         if callback is None:
             self.lastresponse = None
             self.ipmicallback = self._generic_callback
         else:
             self.ipmicallback = callback
-        self._send_ipmi_net_payload(netfn, command, data, retry=retry)
+        self._send_ipmi_net_payload(netfn, command, data, retry=retry,
+                                    delay_xmit=delay_xmit)
         if retry:  # in retry case, let the retry timers indicate wait time
             timeout = None
         else:  # if not retry, give it a second before surrending
@@ -335,14 +333,16 @@ class Session:
                 Session.wait_for_rsp(timeout=timeout)
             return self.lastresponse
 
-    def _send_ipmi_net_payload(self, netfn, command, data, retry=True):
+    def _send_ipmi_net_payload(self, netfn, command, data, retry=True,
+                               delay_xmit=None):
         ipmipayload = self._make_ipmi_payload(netfn, command, data)
         payload_type = constants.payload_types['ipmi']
         self.send_payload(payload=ipmipayload, payload_type=payload_type,
-                          retry=retry)
+                          retry=retry, delay_xmit=delay_xmit)
 
-    def send_payload(self, payload=None, payload_type=None, retry=True):
-        if self.lastpayload is not None:
+    def send_payload(self, payload=None, payload_type=None, retry=True,
+                     delay_xmit=None):
+        if payload is not None and self.lastpayload is not None:
                              #we already have a packet outgoing, make this
                              # a pending payload
                              # this way a simplistic BMC won't get confused
@@ -435,9 +435,11 @@ class Session:
         if self in Session.keepalive_sessions:
             Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
                 25 + (random.random() * 4.9)
-        self._xmit_packet(retry)
+        self._xmit_packet(retry, delay_xmit=delay_xmit)
 
     def _ipmi15authcode(self, payload, checkremotecode=False):
+        #checkremotecode is used to verify remote code,
+        #otherwise this function is used to general authcode for local
         if self.authtype == 0:  # Only for things before auth in ipmi 1.5, not
                                 # like 2.0 cipher suite 0
             return ()
@@ -675,7 +677,6 @@ class Session:
                                               # to avoid confusing the for loop
         for session in sessionstodel:
             cls.pending -= 1
-            session.lastpayload = None
             cls.waiting_sessions.pop(session, None)
             session._timedout()
         return len(cls.waiting_sessions)
@@ -1045,7 +1046,7 @@ class Session:
             self.send_payload()
         self.nowait = False
 
-    def _xmit_packet(self, retry=True):
+    def _xmit_packet(self, retry=True, delay_xmit=None):
         if not self.nowait:  # if we are retrying, we really need to get the
                             # packet out and get our timeout updated
             Session.wait_for_rsp(timeout=0)  # take a convenient opportunity
@@ -1053,12 +1054,19 @@ class Session:
                                                  # applicable
             while Session.pending > Session.maxpending:
                 Session.wait_for_rsp()
+        if self.sequencenumber:  # seq number of zero will be left alone, it is
+                                # special, otherwise increment
+            self.sequencenumber += 1
         if retry:
             Session.waiting_sessions[self] = {}
             Session.waiting_sessions[self]['ipmisession'] = self
             Session.waiting_sessions[self]['timeout'] = self.timeout + \
                 _monotonic_time()
             Session.pending += 1
+        if delay_xmit is not None:
+            Session.waiting_sessions[self]['timeout'] = delay_xmit + \
+                _monotonic_time()
+            return #skip transmit, let retry timer do it's thing
         if self.sockaddr:
             Session.socket.sendto(self.netpacket, self.sockaddr)
         else:  # he have not yet picked a working sockaddr for this connection,
@@ -1073,9 +1081,6 @@ class Session:
                     sockaddr = (newhost, sockaddr[1], 0, 0)
                 Session.bmc_handlers[sockaddr] = self
                 Session.socket.sendto(self.netpacket, sockaddr)
-        if self.sequencenumber:  # seq number of zero will be left alone, it is
-                                # special, otherwise increment
-            self.sequencenumber += 1
 
     def logout(self, callback=None, callback_args=None):
         if not self.logged:
