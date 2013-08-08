@@ -165,6 +165,7 @@ class Session:
 
         curmax = cls.socket.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
         cls.poller.register(cls.socket, select.POLLIN)
+        cls.readersockets = [cls.socket]
         cls.ipmipoller.register(cls.socket, select.POLLIN)
         curmax = curmax / 2
         # we throttle such that we never have no more outstanding packets than
@@ -637,7 +638,8 @@ class Session:
         # could be waiting so we can always return 0
         if timeout is None:
             return 0
-        if cls.poller.poll(timeout * 1000):
+        rdylist, _, _ = select.select(cls.readersockets, (), (), timeout)
+        if len(rdylist) > 0:
             while cls.ipmipoller.poll(0):  # if the somewhat lengthy queue
                         # processing takes long enough for packets to come in,
                         # be eager
@@ -698,6 +700,7 @@ class Session:
                          will receive the handle as an argument
         """
         cls._external_handlers[handle.fileno()] = (callback, handle)
+        cls.readersockets += [handle]
         cls.poller.register(handle, select.POLLIN)
 
     @classmethod
