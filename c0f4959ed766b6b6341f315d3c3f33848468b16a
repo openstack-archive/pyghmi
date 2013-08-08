@@ -1,0 +1,8 @@
+Verified+2: Jenkins
+Approved+1: Jarrod Johnson <jbjohnso@us.ibm.com>
+Code-Review+2: Jarrod Johnson <jbjohnso@us.ibm.com>
+Submitted-by: Jenkins
+Submitted-at: Thu, 08 Aug 2013 20:34:38 +0000
+Reviewed-on: https://review.openstack.org/40934
+Project: stackforge/python-ipmi
+Branch: refs/heads/master
