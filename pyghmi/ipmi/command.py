@@ -152,14 +152,16 @@ class Command(object):
         self.newpowerstate = powerstate
         response = self.ipmi_session.raw_command(netfn=0, command=1)
         if 'error' in response:
-            return response
+            raise Exception(response['error'])
         self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
+        if self.powerstate == self.newpowerstate:
+            return {'powerstate': self.powerstate}
         if self.newpowerstate == 'boot':
             self.newpowerstate = 'on' if self.powerstate == 'off' else 'reset'
         response = self.ipmi_session.raw_command(
             netfn=0, command=2, data=[power_states[self.newpowerstate]])
         if 'error' in response:
-            return response
+            raise Exception(response['error'])
         self.lastresponse = {'pendingpowerstate': self.newpowerstate}
         waitattempts = 300
         if not isinstance(wait, bool):
