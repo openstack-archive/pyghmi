@@ -58,8 +58,13 @@ def docommand(result, ipmisession):
         else:
             print ipmisession.get_bootdev()
     elif cmmand == 'raw':
-        print ipmisession.raw_command(netfn=args[0],
-                                      command=args[1], data=args[2:])
+        print repr(map(lambda x: int(x, 16), args[2:]))
+        print repr((int(args[0]),
+                                      int(args[1]),
+                                      map(lambda x: int(x, 16), args[2:])))
+        print ipmisession.raw_command(netfn=int(args[0]),
+                                      command=int(args[1]),
+                                      data=map(lambda x: int(x, 16), args[2:]))
 
 bmcs = string.split(bmc, ",")
 for bmc in bmcs:
