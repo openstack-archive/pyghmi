@@ -256,7 +256,8 @@ class Command(object):
         :param data: Command data as a tuple or list
         :returns: dict -- The response from IPMI device
         """
-        return self.ipmi_session.raw_command(netfn=netfn, command=command)
+        return self.ipmi_session.raw_command(netfn=netfn, command=command,
+                                             data=data)
 
     def get_power(self):
         """Get current power state of the managed system
