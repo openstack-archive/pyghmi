@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# python-ipmi documentation build configuration file, created by
+# pyghmi documentation build configuration file, created by
 # sphinx-quickstart on Tue Jun 18 09:15:24 2013.
 #
 # This file is execfile()d with the current directory set to
@@ -44,7 +44,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'python-ipmi'
+project = u'pyghmi'
 copyright = u'2013, Jarrod Johnson <jbjohnso@us.ibm.com>'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -169,7 +169,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'python-ipmidoc'
+htmlhelp_basename = 'pyghmidoc'
 
 
 # -- Options for LaTeX output -------------------------------------------------
@@ -183,7 +183,7 @@ htmlhelp_basename = 'python-ipmidoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual])
 latex_documents = [
-    ('index', 'python-ipmi.tex', u'python-ipmi Documentation',
+    ('index', 'pyghmi.tex', u'pyghmi Documentation',
      u'Jarrod Johnson \\textless{}jbjohnso@us.ibm.com\\textgreater{}',
      'manual'),
 ]
@@ -217,6 +217,6 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'python-ipmi', u'python-ipmi Documentation',
+    ('index', 'pyghmi', u'pyghmi Documentation',
      [u'Jarrod Johnson <jbjohnso@us.ibm.com>'], 1)
 ]
