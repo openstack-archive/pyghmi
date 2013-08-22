@@ -323,7 +323,7 @@ class Session:
         else:  # if not retry, give it a second before surrending
             timeout = 1
         #In the synchronous case, wrap the event loop in this call
-        #The event loop is shared amongst python-ipmi session instances
+        #The event loop is shared amongst pyghmi session instances
         #within a process.  In this way, synchronous usage of the interface
         #plays well with asynchronous use.  In fact, this produces the behavior
         #of only the constructor *really* needing a callback.  From then on,
