@@ -42,7 +42,7 @@ class Console(object):
 
     #TODO(jbjohnso): still need an exit and a data callin function
     def __init__(self, bmc, userid, password,
-                 iohandler=None,
+                 iohandler=None, port=623,
                  force=False, kg=None):
         if type(iohandler) == tuple:  # two file handles
             self.console_in = iohandler[0]
@@ -71,6 +71,7 @@ class Console(object):
         self.ipmi_session = session.Session(bmc=bmc,
                                             userid=userid,
                                             password=password,
+                                            port=port,
                                             kg=kg,
                                             onlogon=self._got_session)
 

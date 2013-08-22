@@ -71,7 +71,7 @@ class Command(object):
     :param kg: Optional parameter to use if BMC has a particular Kg configured
     """
 
-    def __init__(self, bmc, userid, password, onlogon=None, kg=None):
+    def __init__(self, bmc, userid, password, port=623, onlogon=None, kg=None):
         # TODO(jbjohnso): accept tuples and lists of each parameter for mass
         # operations without pushing the async complexities up the stack
         self.onlogon = onlogon
@@ -81,11 +81,13 @@ class Command(object):
                                                 userid=userid,
                                                 password=password,
                                                 onlogon=self.logged,
+                                                port=port,
                                                 kg=kg)
         else:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,
                                                 password=password,
+                                                port=port,
                                                 kg=kg)
 
     def logged(self, response):
