@@ -1,0 +1,8 @@
+Verified+2: Jenkins
+Approved+1: Jarrod Johnson <jbjohnso@us.ibm.com>
+Code-Review+2: Jarrod Johnson <jbjohnso@us.ibm.com>
+Submitted-by: Jenkins
+Submitted-at: Thu, 22 Aug 2013 19:31:45 +0000
+Reviewed-on: https://review.openstack.org/41991
+Project: stackforge/pyghmi
+Branch: refs/heads/master
