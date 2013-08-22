@@ -151,6 +151,11 @@ class Console(object):
         if not self.awaitingack:
             self._sendpendingoutput()
 
+    def send_data(self, data):
+        self.pendingoutput += data
+        if not self.awaitingack:
+            self._sendpendingoutput()
+
     def _sendpendingoutput(self):
         self.myseq += 1
         self.myseq &= 0xf
