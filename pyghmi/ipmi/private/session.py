@@ -53,6 +53,11 @@ def _monotonic_time():
     #TODO(jbjohnso): Windows variant
 
 
+def _poller(readhandles, timeout=0):
+    rdylist, _, _ = select.select(readhandles, (), (), timeout)
+    return rdylist
+
+
 def _aespad(data):
     """ipmi demands a certain pad scheme,
     per table 13-20 AES-CBC encrypted payload fields.
@@ -124,8 +129,6 @@ class Session:
     :param port: UDP port to communicate with, pretty much always 623
     :param onlogon: callback to receive notification of login completion
     """
-    poller = select.poll()
-    ipmipoller = select.poll()
     _external_handlers = {}
     bmc_handlers = {}
     waiting_sessions = {}
@@ -160,9 +163,7 @@ class Session:
             pass
 
         curmax = cls.socket.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
-        cls.poller.register(cls.socket, select.POLLIN)
         cls.readersockets = [cls.socket]
-        cls.ipmipoller.register(cls.socket, select.POLLIN)
         curmax = curmax / 2
         # we throttle such that we never have no more outstanding packets than
         # our receive buffer should be able to handle
@@ -642,23 +643,23 @@ class Session:
             return 0
         rdylist, _, _ = select.select(cls.readersockets, (), (), timeout)
         if len(rdylist) > 0:
-            while cls.ipmipoller.poll(0):  # if the somewhat lengthy queue
-                        # processing takes long enough for packets to come in,
-                        # be eager
+            while _poller((cls.socket,)):  # if the somewhat lengthy
+                        # queue # processing takes long enough for packets to
+                        # come in, be eager
                 pktqueue = collections.deque([])
-                while cls.ipmipoller.poll(0):  # looks rendundant, but want to
-                              #queue and process packets to keep things off
-                              #RCVBUF
+                while _poller((cls.socket,)):  # looks rendundant, but
+                              # want # to queue and process packets to keep
+                              # things off RCVBUF
                     rdata = cls.socket.recvfrom(3000)
                     pktqueue.append(rdata)
                 while len(pktqueue):
                     (data, sockaddr) = pktqueue.popleft()
                     cls._route_ipmiresponse(sockaddr, data)
-                    while cls.ipmipoller.poll(0):  # seems ridiculous, but
-                        # between every callback, check for packets again
+                    while _poller((cls.socket,)):  # seems ridiculous,
+                         #but between every callback, check for packets again
                         rdata = cls.socket.recvfrom(3000)
                         pktqueue.append(rdata)
-            for handlepair in cls.poller.poll(0):
+            for handlepair in _poller(cls.readersockets):
                 myhandle = handlepair[0]
                 if myhandle != cls.socket.fileno():
                     myfile = cls._external_handlers[myhandle][1]
@@ -702,7 +703,6 @@ class Session:
         """
         cls._external_handlers[handle.fileno()] = (callback, handle)
         cls.readersockets += [handle]
-        cls.poller.register(handle, select.POLLIN)
 
     @classmethod
     def _route_ipmiresponse(cls, sockaddr, data):
