@@ -19,7 +19,6 @@
 import fcntl
 import os
 import struct
-import types
 
 from pyghmi.ipmi.private import constants
 from pyghmi.ipmi.private import session
@@ -50,7 +49,7 @@ class Console(object):
         elif type(iohandler) == file:  # one full duplex file handle
             self.console_out = iohandler
             self.console_in = iohandler
-        elif isinstance(iohandler, types.FunctionType):
+        elif hasattr(iohandler, '__call__'):
             self.console_out = None
             self.console_in = None
             self.out_handler = iohandler
