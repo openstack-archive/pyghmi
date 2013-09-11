@@ -660,7 +660,7 @@ class Session:
                         rdata = cls.socket.recvfrom(3000)
                         pktqueue.append(rdata)
             for handlepair in _poller(cls.readersockets):
-                myhandle = handlepair[0]
+                myhandle = handlepair.fileno()
                 if myhandle != cls.socket.fileno():
                     myfile = cls._external_handlers[myhandle][1]
                     cls._external_handlers[myhandle][0](myfile)
