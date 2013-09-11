@@ -156,6 +156,16 @@ class Console(object):
         if not self.awaitingack:
             self._sendpendingoutput()
 
+    @classmethod
+    def wait_for_rsp(cls, timeout):
+        """Delay for no longer than timeout for next response.
+
+        This acts like a sleep that exits on activity.
+
+        :param timeout: Maximum number of seconds before returning
+        """
+        return session.Session.wait_for_rsp(timeout=timeout)
+
     def _sendpendingoutput(self):
         self.myseq += 1
         self.myseq &= 0xf
