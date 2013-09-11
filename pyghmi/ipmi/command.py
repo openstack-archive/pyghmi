@@ -98,6 +98,16 @@ class Command(object):
         while (session.Session.wait_for_rsp()):
             pass
 
+    @classmethod
+    def wait_for_rsp(cls, timeout):
+        """Delay for no longer than timeout for next response.
+
+        This acts like a sleep that exits on activity.
+
+        :param timeout: Maximum number of seconds before returning
+        """
+        return session.Session.wait_for_rsp(timeout=timeout)
+
     def get_bootdev(self):
         """Get current boot device override information.
 
