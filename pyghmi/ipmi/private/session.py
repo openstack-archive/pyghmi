@@ -104,7 +104,7 @@ def get_ipmi_error(response, suffix=""):
     elif code in constants.ipmi_completion_codes:
         res = constants.ipmi_completion_codes[code] + suffix
     else:
-        res = "Unknown code " + code + " encountered"
+        res = "Unknown code 0x%2x encountered" % code
     return res
 
 
