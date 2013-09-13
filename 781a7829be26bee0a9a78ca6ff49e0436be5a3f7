@@ -1,0 +1,8 @@
+Verified+2: Jenkins
+Approved+1: Devananda van der Veen <devananda.vdv@gmail.com>
+Code-Review+2: Devananda van der Veen <devananda.vdv@gmail.com>
+Submitted-by: Jenkins
+Submitted-at: Fri, 13 Sep 2013 16:34:49 +0000
+Reviewed-on: https://review.openstack.org/46532
+Project: stackforge/pyghmi
+Branch: refs/heads/master
