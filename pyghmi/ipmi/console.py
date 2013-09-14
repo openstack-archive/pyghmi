@@ -245,6 +245,7 @@ class Console(object):
                 else:  # retry all or part of packet, but in a new form
                     # also add pending output for efficiency and ease
                     newtext = self.lastpayload[4 + ackcount:]
+                    newtext = struct.pack("B"*len(newtext), *newtext)
                     self.pendingoutput = newtext + self.pendingoutput
                     self._sendpendingoutput()
         elif self.awaitingack:  # session marked us as happy, but we are not
