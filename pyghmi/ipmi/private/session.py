@@ -660,7 +660,10 @@ class Session:
                         rdata = cls.socket.recvfrom(3000)
                         pktqueue.append(rdata)
             for handlepair in _poller(cls.readersockets):
-                myhandle = handlepair.fileno()
+                if isinstance(handlepair, int):
+                    myhandle = handlepair
+                else:
+                    myhandle = handlepair.fileno()
                 if myhandle != cls.socket.fileno():
                     myfile = cls._external_handlers[myhandle][1]
                     cls._external_handlers[myhandle][0](myfile)
@@ -701,7 +704,10 @@ class Session:
         :param callback: function to call when input detected on the handle.
                          will receive the handle as an argument
         """
-        cls._external_handlers[handle.fileno()] = (callback, handle)
+        if isinstance(handle, int):
+            cls._external_handlers[handle] = (callback, handle)
+        else:
+            cls._external_handlers[handle.fileno()] = (callback, handle)
         cls.readersockets += [handle]
 
     @classmethod
