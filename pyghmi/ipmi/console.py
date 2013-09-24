@@ -41,7 +41,7 @@ class Console(object):
 
     #TODO(jbjohnso): still need an exit and a data callin function
     def __init__(self, bmc, userid, password,
-                 iohandler=None, port=623,
+                 iohandler, port=623,
                  force=False, kg=None):
         if type(iohandler) == tuple:  # two file handles
             self.console_in = iohandler[0]
@@ -53,8 +53,6 @@ class Console(object):
             self.console_out = None
             self.console_in = None
             self.out_handler = iohandler
-        else:
-            raise(Exception('No IO handler provided'))
         if self.console_in is not None:
             fcntl.fcntl(self.console_in.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
         self.remseq = 0
@@ -136,7 +134,8 @@ class Console(object):
         #data[6:7] is the promise of how small packets are going to be, but we
         #don't have any reason to worry about it
         if (data[8] + (data[9] << 8)) != 623:
-            raise Exception("TODO(jbjohnso): support atypical SOL port number")
+            #TODO(jbjohnso): support atypical SOL port number
+            raise NotImplementedError("Non-standard SOL Port Number")
         #ignore data[10:11] for now, the vlan detail, shouldn't matter to this
         #code anyway...
         self.ipmi_session.sol_handler = self._got_sol_payload
