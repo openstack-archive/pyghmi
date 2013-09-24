@@ -15,6 +15,8 @@
 # limitations under the License.
 # This represents the low layer message framing portion of IPMI
 
+from pyghmi.exceptions import IpmiException
+from pyghmi.exceptions import UsageError
 from pyghmi.ipmi.private import session
 
 
@@ -160,11 +162,11 @@ class Command(object):
         :returns: dict -- A dict describing the response retrieved
         """
         if powerstate not in power_states:
-            raise Exception("Unknown power state %s requested" % powerstate)
+            raise UsageError("Unknown power state %s requested" % powerstate)
         self.newpowerstate = powerstate
         response = self.ipmi_session.raw_command(netfn=0, command=1)
         if 'error' in response:
-            raise Exception(response['error'])
+            raise IpmiException(response['error'])
         self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
         if self.powerstate == self.newpowerstate:
             return {'powerstate': self.powerstate}
@@ -173,7 +175,7 @@ class Command(object):
         response = self.ipmi_session.raw_command(
             netfn=0, command=2, data=[power_states[self.newpowerstate]])
         if 'error' in response:
-            raise Exception(response['error'])
+            raise IpmiException(response['error'])
         self.lastresponse = {'pendingpowerstate': self.newpowerstate}
         waitattempts = 300
         if not isinstance(wait, bool):
@@ -193,7 +195,8 @@ class Command(object):
                 currpowerstate = 'on' if (response['data'][0] & 1) else 'off'
                 waitattempts -= 1
             if currpowerstate != self.waitpowerstate:
-                raise Exception("System did not accomplish power state change")
+                raise IpmiException(
+                    "System did not accomplish power state change")
             return {'powerstate': currpowerstate}
         else:
             return self.lastresponse
@@ -281,8 +284,7 @@ class Command(object):
         """
         response = self.ipmi_session.raw_command(netfn=0, command=1)
         if 'error' in response:
-            raise Exception(response['error'])
-            return
+            raise IpmiException(response['error'])
         assert(response['command'] == 1 and response['netfn'] == 1)
         self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
         return {'powerstate': self.powerstate}

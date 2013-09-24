@@ -29,6 +29,8 @@ from Crypto.Cipher import AES
 from Crypto.Hash import HMAC
 from Crypto.Hash import SHA
 
+from pyghmi.exceptions import IpmiException
+from pyghmi.exceptions import UsageError
 from pyghmi.ipmi.private import constants
 
 
@@ -184,7 +186,7 @@ class Session:
         a client-provided callback.
         """
         if 'error' in response:
-            raise Exception(response['error'])
+            raise IpmiException(response['error'])
 
     def __init__(self,
                  bmc,
@@ -370,9 +372,10 @@ class Session:
         if (self.ipmiversion == 2.0):
             message.append(payload_type)
             if (baretype == 2):
-                raise Exception("TODO(jbjohnso): OEM Payloads")
+                #TODO(jbjohnso): OEM payload types
+                raise NotImplementedError("OEM Payloads")
             elif baretype not in constants.payload_types.values():
-                raise Exception("Unrecognized payload type %d" % baretype)
+                raise UsageError("Unrecognized payload type %d" % baretype)
             message += struct.unpack("!4B", struct.pack("<I", self.sessionid))
         message += struct.unpack("!4B", struct.pack("<I", self.sequencenumber))
         if (self.ipmiversion == 1.5):
@@ -448,7 +451,7 @@ class Session:
         password = self.password
         padneeded = 16 - len(password)
         if padneeded < 0:
-            raise Exception("Password is too long for ipmi 1.5")
+            raise IpmiException("Password is too long for ipmi 1.5")
         password += '\x00' * padneeded
         passdata = struct.unpack("16B", password)
         if checkremotecode:
@@ -547,7 +550,8 @@ class Session:
     def _get_session_challenge(self):
         reqdata = [2]
         if len(self.userid) > 16:
-            raise Exception("Username too long for IPMI, must not exceed 16")
+            raise IpmiException(
+                "Username too long for IPMI, must not exceed 16")
         padneeded = 16 - len(self.userid)
         userid = self.userid + ('\x00' * padneeded)
         reqdata += struct.unpack("!16B", userid)
