@@ -49,6 +49,10 @@ power_states = {
 }
 
 
+class IpmiCommandException(Exception):
+    pass
+
+
 class Command(object):
     """Send IPMI commands to BMCs.
 
@@ -164,7 +168,7 @@ class Command(object):
         self.newpowerstate = powerstate
         response = self.ipmi_session.raw_command(netfn=0, command=1)
         if 'error' in response:
-            raise Exception(response['error'])
+            raise IpmiCommandException(response['error'])
         self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
         if self.powerstate == self.newpowerstate:
             return {'powerstate': self.powerstate}
@@ -173,7 +177,7 @@ class Command(object):
         response = self.ipmi_session.raw_command(
             netfn=0, command=2, data=[power_states[self.newpowerstate]])
         if 'error' in response:
-            raise Exception(response['error'])
+            raise IpmiCommandException(response['error'])
         self.lastresponse = {'pendingpowerstate': self.newpowerstate}
         waitattempts = 300
         if not isinstance(wait, bool):
@@ -193,7 +197,8 @@ class Command(object):
                 currpowerstate = 'on' if (response['data'][0] & 1) else 'off'
                 waitattempts -= 1
             if currpowerstate != self.waitpowerstate:
-                raise Exception("System did not accomplish power state change")
+                raise IpmiCommandException(
+                    "System did not accomplish power state change")
             return {'powerstate': currpowerstate}
         else:
             return self.lastresponse
@@ -281,7 +286,7 @@ class Command(object):
         """
         response = self.ipmi_session.raw_command(netfn=0, command=1)
         if 'error' in response:
-            raise Exception(response['error'])
+            raise IpmiCommandException(response['error'])
             return
         assert(response['command'] == 1 and response['netfn'] == 1)
         self.powerstate = 'on' if (response['data'][0] & 1) else 'off'

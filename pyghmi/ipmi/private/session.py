@@ -37,6 +37,10 @@ initialtimeout = 0.5  # minimum timeout for first packet to retry in any given
                      # in case of congestion
 
 
+class IpmiException(Exception):
+    pass
+
+
 def _monotonic_time():
     """Provides a monotonic timer
 
@@ -184,7 +188,7 @@ class Session:
         a client-provided callback.
         """
         if 'error' in response:
-            raise Exception(response['error'])
+            raise IpmiException(response['error'])
 
     def __init__(self,
                  bmc,
@@ -448,7 +452,7 @@ class Session:
         password = self.password
         padneeded = 16 - len(password)
         if padneeded < 0:
-            raise Exception("Password is too long for ipmi 1.5")
+            raise IpmiException("Password is too long for ipmi 1.5")
         password += '\x00' * padneeded
         passdata = struct.unpack("16B", password)
         if checkremotecode:
@@ -547,7 +551,8 @@ class Session:
     def _get_session_challenge(self):
         reqdata = [2]
         if len(self.userid) > 16:
-            raise Exception("Username too long for IPMI, must not exceed 16")
+            raise IpmiException(
+                "Username too long for IPMI, must not exceed 16")
         padneeded = 16 - len(self.userid)
         userid = self.userid + ('\x00' * padneeded)
         reqdata += struct.unpack("!16B", userid)

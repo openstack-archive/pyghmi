@@ -54,7 +54,7 @@ class Console(object):
             self.console_in = None
             self.out_handler = iohandler
         else:
-            raise(Exception('No IO handler provided'))
+            raise Exception('No IO handler provided')
         if self.console_in is not None:
             fcntl.fcntl(self.console_in.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
         self.remseq = 0
