@@ -226,7 +226,8 @@ class Console(object):
             else:  # TODO(jbjohnso) what if remote sequence number is wrong??
                 self.remseq = newseq
             self.lastsize = remdatalen
-            self._print_data(remdata)
+            if remdata: # Do not subject callers to empty data
+                self._print_data(remdata)
             ackpayload = (0, self.remseq, remdatalen, 0)
             #Why not put pending data into the ack? because it's rare
             #and might be hard to decide what to do in the context of
