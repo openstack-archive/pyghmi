@@ -141,6 +141,7 @@ class Session:
     @classmethod
     def _cleanup(cls):
         for session in cls.bmc_handlers.itervalues():
+            session.cleaningup = True
             session.logout()
 
     @classmethod
@@ -194,6 +195,7 @@ class Session:
                  port=623,
                  kg=None,
                  onlogon=None):
+        self.cleaningup = False
         self.lastpayload = None
         self.bmc = bmc
         self.userid = userid
@@ -712,6 +714,10 @@ class Session:
             cls._external_handlers[handle] = (callback, handle)
         else:
             cls._external_handlers[handle.fileno()] = (callback, handle)
+        #If we don't have a socket yet, we need one for the code to behave
+        #correctly from this point forward
+        if not hasattr(Session, 'socket'):
+            cls._createsocket()
         cls.readersockets += [handle]
 
     @classmethod
@@ -1106,6 +1112,9 @@ class Session:
                 return {'success': True}
             callback({'success': True})
             return
+        if self.cleaningup:
+            self.nowait = True
+            callback = False
         self.raw_command(command=0x3c,
                          netfn=6,
                          data=struct.unpack("4B",
@@ -1114,7 +1123,8 @@ class Session:
                          callback=callback,
                          callback_args=callback_args)
         self.logged = 0
-        if callback is None:
+        self.nowait = False
+        if not callback:
             return {'success': True}
         callback({'success': True})
 

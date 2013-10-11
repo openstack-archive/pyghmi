@@ -71,13 +71,29 @@ class Command(object):
     :param onlogon: function to run when logon completes in an asynchronous
                     fashion.  This will result in a greenthread behavior.
     :param kg: Optional parameter to use if BMC has a particular Kg configured
+    :param ipmisession: Optionally provide an existing session.  This is an
+                    advanced usage to share sessions between Console
+                    and Command, most people will not ever worry about this.
+
     """
 
-    def __init__(self, bmc, userid, password, port=623, onlogon=None, kg=None):
+    def __init__(self, bmc, userid, password, port=623, onlogon=None,
+                 kg=None, ipmisession=None):
         # TODO(jbjohnso): accept tuples and lists of each parameter for mass
         # operations without pushing the async complexities up the stack
         self.onlogon = onlogon
         self.bmc = bmc
+        if ipmisession:
+            # Reuse the passed session to allow session sharing
+            # between, for example, Console and Command classes
+            # do a simplistic get device id to prove liveness
+            # before invoking onlogon.  For now, only
+            # worry about onlogon case since this is
+            # advanced usage only anyway.
+            self.ipmi_session = ipmisession
+            self.ipmi_session.raw_command(netfn=6, command=1,
+                                          callback=self.logged)
+            return
         if onlogon is not None:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,

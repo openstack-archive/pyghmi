@@ -37,12 +37,15 @@ class Console(object):
                       use for input and output, or a tuple of (input, output)
                       handles
     :param kg: optional parameter for BMCs configured to require it
+    :param ipmisession: optional parameter for advanced use of sharing sessions
+                    amongst Console and Command objects.
     """
 
     #TODO(jbjohnso): still need an exit and a data callin function
     def __init__(self, bmc, userid, password,
                  iohandler, port=623,
-                 force=False, kg=None):
+                 force=False, kg=None,
+                 ipmisession=None):
         if type(iohandler) == tuple:  # two file handles
             self.console_in = iohandler[0]
             self.console_out = iohandler[1]
@@ -65,12 +68,17 @@ class Console(object):
         self.pendingoutput = ""
         self.awaitingack = False
         self.force_session = force
-        self.ipmi_session = session.Session(bmc=bmc,
-                                            userid=userid,
-                                            password=password,
-                                            port=port,
-                                            kg=kg,
-                                            onlogon=self._got_session)
+        if ipmisession:
+            self.ipmi_session = ipmisession
+            self.ipmi_session.raw_command(netfn=6, command=1,
+                                          callback=self._got_session)
+        else:
+            self.ipmi_session = session.Session(bmc=bmc,
+                                                userid=userid,
+                                                password=password,
+                                                port=port,
+                                                kg=kg,
+                                                onlogon=self._got_session)
 
     def _got_session(self, response):
         """Private function to navigate SOL payload activation
