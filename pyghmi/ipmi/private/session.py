@@ -109,7 +109,7 @@ def get_ipmi_error(response, suffix=""):
     return res
 
 
-class Session:
+class Session(object):
     """A class to manage common IPMI session logistics
 
     Almost all developers should not worry about this class and instead be
@@ -188,6 +188,30 @@ class Session:
         if 'error' in response:
             raise exc.IpmiException(response['error'])
 
+    def __new__(cls,
+                bmc,
+                userid,
+                password,
+                port=623,
+                kg=None,
+                onlogon=None):
+        trueself = None
+        for res in socket.getaddrinfo(bmc, port, 0, socket.SOCK_DGRAM):
+            sockaddr = res[4]
+            if (res[0] == socket.AF_INET):  # convert the sockaddr to AF_INET6
+                newhost = '::ffff:' + sockaddr[0]
+                sockaddr = (newhost, sockaddr[1], 0, 0)
+            if sockaddr in cls.bmc_handlers:
+                self = cls.bmc_handlers[sockaddr]
+                if (self.bmc == bmc and self.userid == userid and
+                        self.password == password and self.kgo == kg):
+                    trueself = self
+                else:
+                    del cls.bmc_handlers[sockaddr]
+            if trueself:
+                return trueself
+            return object.__new__(cls)
+
     def __init__(self,
                  bmc,
                  userid,
@@ -195,6 +219,11 @@ class Session:
                  port=623,
                  kg=None,
                  onlogon=None):
+        if hasattr(self, 'initialized'):
+            # new found an existing session, do not corrupt it
+            self.raw_command(netfn=6, command=1, callback=onlogon)
+            return
+        self.initialized = True
         self.cleaningup = False
         self.lastpayload = None
         self.bmc = bmc
@@ -202,6 +231,7 @@ class Session:
         self.password = password
         self.nowait = False
         self.pendingpayloads = collections.deque([])
+        self.kgo = kg
         if kg is not None:
             self.kg = kg
         else:
