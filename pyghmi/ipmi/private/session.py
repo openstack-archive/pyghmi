@@ -135,6 +135,7 @@ class Session(object):
     waiting_sessions = {}
     keepalive_sessions = {}
     peeraddr_to_nodes = {}
+    iterwaiters = []
     # Upon exit of python, make sure we play nice with BMCs by assuring closed
     # sessions for all that we tracked
 
@@ -221,8 +222,16 @@ class Session(object):
                  onlogon=None):
         if hasattr(self, 'initialized'):
             # new found an existing session, do not corrupt it
-            self.raw_command(netfn=6, command=1, callback=onlogon)
+            if onlogon is None:
+                while not self.logged:
+                    Session.wait_for_rsp()
+            else:
+                if not self.logged:
+                    self.logonwaiters.append(onlogon)
+                else:
+                    self.iterwaiters.append(onlogon)
             return
+        self.incommand = False
         self.initialized = True
         self.cleaningup = False
         self.lastpayload = None
@@ -239,16 +248,21 @@ class Session(object):
         self.port = port
         if (onlogon is None):
             self.async = False
-            self.onlogon = self._sync_login
+            self.logonwaiters = [self._sync_login]
         else:
             self.async = True
-            self.onlogon = onlogon
+            self.logonwaiters = [onlogon]
         if not hasattr(Session, 'socket'):
             self._createsocket()
         self.login()
         if not self.async:
             while not self.logged:
                 Session.wait_for_rsp()
+
+    def onlogon(self, parameter):
+        while self.logonwaiters:
+            waiter = self.logonwaiters.pop()
+            waiter(parameter)
 
     def _initsession(self):
         # NOTE(jbjohnso): this number can be whatever we want.
@@ -344,6 +358,9 @@ class Session(object):
                     callback=None,
                     callback_args=None,
                     delay_xmit=None):
+        while self.incommand:
+            Session.wait_for_rsp()
+        self.incommand = True
         self.ipmicallbackargs = callback_args
         if callback is None:
             self.lastresponse = None
@@ -629,7 +646,7 @@ class Session(object):
         self._get_channel_auth_cap()
 
     @classmethod
-    def wait_for_rsp(cls, timeout=None):
+    def wait_for_rsp(cls, timeout=None, callout=True):
         """IPMI Session Event loop iteration
 
         This watches for any activity on IPMI handles and handles registered
@@ -675,6 +692,9 @@ class Session(object):
         # If the loop above found no sessions wanting *and* the caller had no
         # timeout, exit function. In this case there is no way a session
         # could be waiting so we can always return 0
+        while cls.iterwaiters:
+            waiter = cls.iterwaiters.pop()
+            waiter({'success': True})
         if timeout is None:
             return 0
         rdylist, _, _ = select.select(cls.readersockets, (), (), timeout)
@@ -700,7 +720,7 @@ class Session(object):
                     myhandle = handlepair
                 else:
                     myhandle = handlepair.fileno()
-                if myhandle != cls.socket.fileno():
+                if myhandle != cls.socket.fileno() and callout:
                     myfile = cls._external_handlers[myhandle][1]
                     cls._external_handlers[myhandle][0](myfile)
         sessionstodel = []
@@ -726,6 +746,8 @@ class Session(object):
     def _keepalive(self):
         """Performs a keepalive to avoid idle disconnect
         """
+        if self.incommand:  # if currently in command, no cause to keepalive
+            return
         self.raw_command(netfn=6, command=1)
 
     @classmethod
@@ -863,6 +885,12 @@ class Session(object):
                     self.lastpayload = None
                     self.last_payload_type = None
                     Session.waiting_sessions.pop(self, None)
+                if len(self.pendingpayloads) > 0:
+                    (nextpayload, nextpayloadtype, retry) = \
+                        self.pendingpayloads.popleft()
+                    self.send_payload(payload=nextpayload,
+                                      payload_type=nextpayloadtype,
+                                      retry=retry)
                 if self.sol_handler:
                     self.sol_handler(payload)
 
@@ -1052,6 +1080,7 @@ class Session(object):
             self.send_payload(payload=nextpayload,
                               payload_type=nextpayloadtype,
                               retry=retry)
+        self.incommand = False
         call_with_optional_args(self.ipmicallback,
                                 response,
                                 self.ipmicallbackargs)
@@ -1066,6 +1095,7 @@ class Session(object):
             call_with_optional_args(self.ipmicallback,
                                     response,
                                     self.ipmicallbackargs)
+            self.incommand = False
             self.nowait = False
             return
         elif self.sessioncontext == 'FAILED':
@@ -1098,7 +1128,7 @@ class Session(object):
     def _xmit_packet(self, retry=True, delay_xmit=None):
         if not self.nowait:  # if we are retrying, we really need to get the
                             # packet out and get our timeout updated
-            Session.wait_for_rsp(timeout=0)  # take a convenient opportunity
+            Session.wait_for_rsp(timeout=0, callout=False)  # take opportunity
                                                  # to drain the socket queue if
                                                  # applicable
             while Session.pending > Session.maxpending:
