@@ -259,7 +259,7 @@ class Command(object):
             return response
         return {'bootdev': bootdev}
 
-    def raw_command(self, netfn, command, data=()):
+    def raw_command(self, netfn, command, bridge_request={}, data=()):
         """Send raw ipmi command to BMC
 
         This allows arbitrary IPMI bytes to be issued.  This is commonly used
@@ -269,10 +269,13 @@ class Command(object):
 
         :param netfn: Net function number
         :param command: Command value
+        :param bridge_request: The target slave address and channel number for
+                                the bridge request.
         :param data: Command data as a tuple or list
         :returns: dict -- The response from IPMI device
         """
         return self.ipmi_session.raw_command(netfn=netfn, command=command,
+                                             bridge_request=bridge_request,
                                              data=data)
 
     def get_power(self):
