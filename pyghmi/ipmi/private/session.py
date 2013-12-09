@@ -316,10 +316,25 @@ class Session(object):
         csum &= 0xff
         return csum
 
-    def _make_ipmi_payload(self, netfn, command, data=()):
+    def _make_bridge_request_msg(self, channel, netfn, command):
+        """This function generate message for bridge request. It is a
+        part of ipmi payload.
+        """
+        head = [constants.IPMI_BMC_ADDRESS,
+                constants.netfn_codes['application'] << 2]
+        check_sum = self._checksum(*head)
+        #NOTE(fengqian): according IPMI Figure 14-11, rqSWID is set to 81h
+        boday = [0x81, self.seqlun, constants.IPMI_SEND_MESSAGE_CMD]
+        #NOTE(fengqian): Track request
+        boday.append(0x40 | channel)
+        return head + [check_sum] + boday
+
+    def _make_ipmi_payload(self, netfn, command, bridge_request={}, data=()):
         """This function generates the core ipmi payload that would be
         applicable for any channel (including KCS)
         """
+        bridge_msg = []
+        payload = []
         self.expectedcmd = command
         self.expectednetfn = netfn + \
             1  # in ipmi, the response netfn is always one
@@ -334,14 +349,34 @@ class Session(object):
             self.seqlun += 4  # the last two bits are lun, so add 4 to add 1
             self.seqlun &= 0xff  # we only have one byte, wrap when exceeded
             seqincrement -= 1
-        header = [0x20, netfn << 2]
-            #figure 13-4, first two bytes are rsaddr and
-                               # netfn, rsaddr is always 0x20 since we are
-                               # addressing BMC
-        reqbody = [self.rqaddr, self.seqlun, command] + list(data)
+
+        if bridge_request:
+            addr = bridge_request.get('addr', 0x0)
+            channel = bridge_request.get('channel', 0x0)
+            bridge_msg = self._make_bridge_request_msg(channel, netfn, command)
+            #NOTE(fengqian): For bridge request, rsaddr is specified and
+            # rqaddr is BMC address.
+            rqaddr = constants.IPMI_BMC_ADDRESS
+            rsaddr = addr
+        else:
+            rqaddr = self.rqaddr
+            rsaddr = constants.IPMI_BMC_ADDRESS
+
+        #figure 13-4, first two bytes are rsaddr and
+        # netfn, for non-bridge request, rsaddr is always 0x20 since we are
+        # addressing BMC while rsaddr is specified forbridge request
+        header = [rsaddr, netfn << 2]
+
+        reqbody = [rqaddr, self.seqlun, command] + list(data)
         headsum = self._checksum(*header)
         bodysum = self._checksum(*reqbody)
         payload = header + [headsum] + reqbody + [bodysum]
+        if bridge_request:
+            payload = bridge_msg + payload
+            #NOTE(fengqian): For bridge request, another check sum is needed.
+            tail_csum = self._checksum(*payload[3:])
+            payload.append(tail_csum)
+
         return payload
 
     def _generic_callback(self, response):
@@ -353,6 +388,7 @@ class Session(object):
     def raw_command(self,
                     netfn,
                     command,
+                    bridge_request={},
                     data=[],
                     retry=True,
                     callback=None,
@@ -367,8 +403,9 @@ class Session(object):
             self.ipmicallback = self._generic_callback
         else:
             self.ipmicallback = callback
-        self._send_ipmi_net_payload(netfn, command, data, retry=retry,
-                                    delay_xmit=delay_xmit)
+        self._send_ipmi_net_payload(netfn, command, data,
+                                    bridge_request=bridge_request,
+                                    retry=retry, delay_xmit=delay_xmit)
         if retry:  # in retry case, let the retry timers indicate wait time
             timeout = None
         else:  # if not retry, give it a second before surrending
@@ -385,9 +422,10 @@ class Session(object):
                 Session.wait_for_rsp(timeout=timeout)
             return self.lastresponse
 
-    def _send_ipmi_net_payload(self, netfn, command, data, retry=True,
-                               delay_xmit=None):
-        ipmipayload = self._make_ipmi_payload(netfn, command, data)
+    def _send_ipmi_net_payload(self, netfn, command, data, bridge_request={},
+                               retry=True, delay_xmit=None):
+        ipmipayload = self._make_ipmi_payload(netfn, command, bridge_request,
+                                              data)
         payload_type = constants.payload_types['ipmi']
         self.send_payload(payload=ipmipayload, payload_type=payload_type,
                           retry=retry, delay_xmit=delay_xmit)
@@ -699,22 +737,7 @@ class Session(object):
             return 0
         rdylist, _, _ = select.select(cls.readersockets, (), (), timeout)
         if len(rdylist) > 0:
-            while _poller((cls.socket,)):  # if the somewhat lengthy
-                        # queue # processing takes long enough for packets to
-                        # come in, be eager
-                pktqueue = collections.deque([])
-                while _poller((cls.socket,)):  # looks rendundant, but
-                              # want # to queue and process packets to keep
-                              # things off RCVBUF
-                    rdata = cls.socket.recvfrom(3000)
-                    pktqueue.append(rdata)
-                while len(pktqueue):
-                    (data, sockaddr) = pktqueue.popleft()
-                    cls._route_ipmiresponse(sockaddr, data)
-                    while _poller((cls.socket,)):  # seems ridiculous,
-                         #but between every callback, check for packets again
-                        rdata = cls.socket.recvfrom(3000)
-                        pktqueue.append(rdata)
+            cls.route_ipmi_response()
             for handlepair in _poller(cls.readersockets):
                 if isinstance(handlepair, int):
                     myhandle = handlepair
@@ -771,6 +794,26 @@ class Session(object):
         if not hasattr(Session, 'socket'):
             cls._createsocket()
         cls.readersockets += [handle]
+
+    @classmethod
+    def route_ipmi_response(cls):
+        while _poller((cls.socket,)):
+            # if the somewhat lengthy
+            # queue # processing takes long enough for packets to
+            # come in, be eager
+            pktqueue = collections.deque([])
+            while _poller((cls.socket,)):  # looks rendundant, but
+                              # want # to queue and process packets to keep
+                              # things off RCVBUF
+                rdata = cls.socket.recvfrom(3000)
+                pktqueue.append(rdata)
+            while len(pktqueue):
+                (data, sockaddr) = pktqueue.popleft()
+                cls._route_ipmiresponse(sockaddr, data)
+                while _poller((cls.socket,)):  # seems ridiculous,
+                         #but between every callback, check for packets again
+                    rdata = cls.socket.recvfrom(3000)
+                    pktqueue.append(rdata)
 
     @classmethod
     def _route_ipmiresponse(cls, sockaddr, data):
@@ -1048,7 +1091,25 @@ class Session(object):
         if (payload[4] != self.seqlun or
                 payload[1] >> 2 != self.expectednetfn or
                 payload[5] != self.expectedcmd):
-            return -1  # payload is not a match for our last packet
+            #NOTE(fengqian): for bridge request, we need to hanle the response
+            #twice. First response shows if message send correctly, second
+            #response is the real response.
+            if (payload[5] == 0x34 and
+               ((payload[1] >> 2 == 0x06) or (payload[1] >> 2 == 0x07))):
+
+                if payload[-2] == 0x0:
+                    return self.route_ipmi_response()
+                else:
+                    return self._parse_payload(payload)
+
+            # payload is not a match for our last packet
+            # it is also not a bridge request.
+            return -1
+
+        self._parse_payload(payload)
+
+    def _parse_payload(self, payload):
+
         if hasattr(self, 'hasretried') and self.hasretried:
             self.hasretried = 0
             self.tabooseq[
