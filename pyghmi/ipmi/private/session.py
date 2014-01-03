@@ -1140,27 +1140,19 @@ class Session(object):
                 raise exc.IpmiException(
                     "Unable to transmit to specified address")
 
-    def logout(self, callback=None, callback_args=None):
+    def logout(self):
         if not self.logged:
-            if callback is None:
-                return {'success': True}
-            callback({'success': True})
-            return
+            return {'success': True}
         if self.cleaningup:
             self.nowait = True
-            callback = False
         self.raw_command(command=0x3c,
                          netfn=6,
                          data=struct.unpack("4B",
                                             struct.pack("I", self.sessionid)),
-                         retry=False,
-                         callback=callback,
-                         callback_args=callback_args)
+                         retry=False)
         self.logged = 0
         self.nowait = False
-        if not callback:
-            return {'success': True}
-        callback({'success': True})
+        return {'success': True}
 
 
 if __name__ == "__main__":
