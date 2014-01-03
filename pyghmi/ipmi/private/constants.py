@@ -81,7 +81,14 @@ command_completion_codes = {
         0x80: "Parameter not supported",
         0x81: "Attempt to set set 'set in progress' when not 'set complete'",
         0x82: "Attempt to write read-only parameter",
-    }
+    },
+    (7, 0x48): {  # activate payload
+        0x80: "Payload already active on another session",
+        0x81: "Payload is disabled",
+        0x82: "Payload activation limit reached",
+        0x83: "Cannot activate payload with encryption",
+        0x84: "Cannot activate payload without encryption",
+    },
 }
 
 ipmi_completion_codes = {
