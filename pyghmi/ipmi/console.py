@@ -86,13 +86,8 @@ class Console(object):
         #        0b11000000, -encrypt, authenticate,
         #                      disable serial/modem alerts, CTS fine
         #        0, 0, 0 reserved
-        self.ipmi_session.raw_command(netfn=0x6, command=0x48,
-                                      data=(1, 1, 192, 0, 0, 0),
-                                      callback=self._payload_activated)
-
-    def _payload_activated(self, response):
-        """Check status of activate payload request
-        """
+        response = self.ipmi_session.raw_command(netfn=0x6, command=0x48,
+                                                 data=(1, 1, 192, 0, 0, 0))
         if 'error' in response:
             self._print_data(response['error'])
         #given that these are specific to the command,
@@ -112,9 +107,11 @@ class Console(object):
             elif response['code'] == 0x80:
                 if self.force_session and not self.retriedpayload:
                     self.retriedpayload = 1
-                    self.ipmi_session.raw_command(netfn=0x6, command=0x49,
-                                                  data=(1, 1, 0, 0, 0, 0),
-                                                  callback=self._got_session)
+                    sessrsp = self.ipmi_session.raw_command(
+                        netfn=0x6,
+                        command=0x49,
+                        data=(1, 1, 0, 0, 0, 0))
+                    self._got_session(sessrsp)
                     return
                 else:
                     self._print_data('SOL Session active for another client\n')
