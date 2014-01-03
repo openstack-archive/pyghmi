@@ -77,19 +77,6 @@ def _aespad(data):
     return newdata
 
 
-def call_with_optional_args(callback, *args):
-    """In order to simplify things, in a number of places there is a callback
-    facility and optional arguments to pass in.  An object-oriented caller may
-    find the additional argument needless. Allow them to ignore it by skipping
-    the argument if None.
-    """
-    newargs = []
-    for arg in args:
-        if arg is not None:
-            newargs.append(arg)
-    callback(*newargs)
-
-
 def get_ipmi_error(response, suffix=""):
     if 'error' in response:
         return response['error'] + suffix
@@ -280,7 +267,6 @@ class Session(object):
         self.k1 = None
         self.rmcptag = 1
         self.ipmicallback = None
-        self.ipmicallbackargs = None
         self.sessioncontext = None
         self.sequencenumber = 0
         self.sessionid = 0
@@ -355,35 +341,27 @@ class Session(object):
                     command,
                     data=[],
                     retry=True,
-                    callback=None,
-                    callback_args=None,
                     delay_xmit=None):
         while self.incommand:
             Session.wait_for_rsp()
         self.incommand = True
-        self.ipmicallbackargs = callback_args
-        if callback is None:
-            self.lastresponse = None
-            self.ipmicallback = self._generic_callback
-        else:
-            self.ipmicallback = callback
+        self.lastresponse = None
+        self.ipmicallback = self._generic_callback
         self._send_ipmi_net_payload(netfn, command, data, retry=retry,
                                     delay_xmit=delay_xmit)
         if retry:  # in retry case, let the retry timers indicate wait time
             timeout = None
         else:  # if not retry, give it a second before surrending
             timeout = 1
-        #In the synchronous case, wrap the event loop in this call
         #The event loop is shared amongst pyghmi session instances
         #within a process.  In this way, synchronous usage of the interface
         #plays well with asynchronous use.  In fact, this produces the behavior
-        #of only the constructor *really* needing a callback.  From then on,
+        #of only the constructor needing a callback.  From then on,
         #synchronous usage of the class acts in a greenthread style governed by
         #order of data on the network
-        if callback is None:
-            while self.lastresponse is None:
-                Session.wait_for_rsp(timeout=timeout)
-            return self.lastresponse
+        while self.lastresponse is None:
+            Session.wait_for_rsp(timeout=timeout)
+        return self.lastresponse
 
     def _send_ipmi_net_payload(self, netfn, command, data, retry=True,
                                delay_xmit=None):
@@ -1081,9 +1059,7 @@ class Session(object):
                               payload_type=nextpayloadtype,
                               retry=retry)
         self.incommand = False
-        call_with_optional_args(self.ipmicallback,
-                                response,
-                                self.ipmicallbackargs)
+        self.ipmicallback(response)
 
     def _timedout(self):
         if not self.lastpayload:
@@ -1092,9 +1068,7 @@ class Session(object):
         self.timeout += 1
         if self.timeout > 5:
             response = {'error': 'timeout'}
-            call_with_optional_args(self.ipmicallback,
-                                    response,
-                                    self.ipmicallbackargs)
+            self.ipmicallback(response)
             self.incommand = False
             self.nowait = False
             return
