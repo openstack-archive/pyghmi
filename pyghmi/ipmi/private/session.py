@@ -227,6 +227,7 @@ class Session(object):
         self.password = password
         self.nowait = False
         self.pendingpayloads = collections.deque([])
+        self.request_entry = []
         self.kgo = kg
         if kg is not None:
             self.kg = kg
@@ -302,10 +303,42 @@ class Session(object):
         csum &= 0xff
         return csum
 
-    def _make_ipmi_payload(self, netfn, command, data=()):
+    def _make_bridge_request_msg(self, channel, netfn, command):
+        """This function generate message for bridge request. It is a
+        part of ipmi payload.
+        """
+        head = [constants.IPMI_BMC_ADDRESS,
+                constants.netfn_codes['application'] << 2]
+        check_sum = self._checksum(*head)
+        #NOTE(fengqian): according IPMI Figure 14-11, rqSWID is set to 81h
+        boday = [0x81, self.seqlun, constants.IPMI_SEND_MESSAGE_CMD]
+        #NOTE(fengqian): Track request
+        boday.append(0x40 | channel)
+        self._add_request_entry((constants.netfn_codes['application'] + 1,
+                                 self.seqlun, constants.IPMI_SEND_MESSAGE_CMD))
+        return head + [check_sum] + boday
+
+    def _add_request_entry(self, entry=()):
+        """This function record the request with netfn, sequence number and
+        command, which will be used in parse_ipmi_payload.
+        :param entry: a set of netfn, sequence number and command.
+        """
+        if not self._lookup_request_entry(entry):
+            self.request_entry.append(entry)
+
+    def _lookup_request_entry(self, entry=()):
+        return entry in self.request_entry
+
+    def _remove_request_entry(self, entry=()):
+        if self._lookup_request_entry(entry):
+            self.request_entry.remove(entry)
+
+    def _make_ipmi_payload(self, netfn, command, bridge_request={}, data=()):
         """This function generates the core ipmi payload that would be
         applicable for any channel (including KCS)
         """
+        bridge_msg = []
+        payload = []
         self.expectedcmd = command
         self.expectednetfn = netfn + \
             1  # in ipmi, the response netfn is always one
@@ -320,14 +353,35 @@ class Session(object):
             self.seqlun += 4  # the last two bits are lun, so add 4 to add 1
             self.seqlun &= 0xff  # we only have one byte, wrap when exceeded
             seqincrement -= 1
-        header = [0x20, netfn << 2]
-            #figure 13-4, first two bytes are rsaddr and
-                               # netfn, rsaddr is always 0x20 since we are
-                               # addressing BMC
-        reqbody = [self.rqaddr, self.seqlun, command] + list(data)
+
+        if bridge_request:
+            addr = bridge_request.get('addr', 0x0)
+            channel = bridge_request.get('channel', 0x0)
+            bridge_msg = self._make_bridge_request_msg(channel, netfn, command)
+            #NOTE(fengqian): For bridge request, rsaddr is specified and
+            # rqaddr is BMC address.
+            rqaddr = constants.IPMI_BMC_ADDRESS
+            rsaddr = addr
+        else:
+            rqaddr = self.rqaddr
+            rsaddr = constants.IPMI_BMC_ADDRESS
+
+        #figure 13-4, first two bytes are rsaddr and
+        # netfn, for non-bridge request, rsaddr is always 0x20 since we are
+        # addressing BMC while rsaddr is specified forbridge request
+        header = [rsaddr, netfn << 2]
+
+        reqbody = [rqaddr, self.seqlun, command] + list(data)
         headsum = self._checksum(*header)
         bodysum = self._checksum(*reqbody)
         payload = header + [headsum] + reqbody + [bodysum]
+        if bridge_request:
+            payload = bridge_msg + payload
+            #NOTE(fengqian): For bridge request, another check sum is needed.
+            tail_csum = self._checksum(*payload[3:])
+            payload.append(tail_csum)
+
+        self._add_request_entry((self.expectednetfn, self.seqlun, command))
         return payload
 
     def _generic_callback(self, response):
@@ -339,6 +393,7 @@ class Session(object):
     def raw_command(self,
                     netfn,
                     command,
+                    bridge_request={},
                     data=[],
                     retry=True,
                     delay_xmit=None):
@@ -347,8 +402,10 @@ class Session(object):
         self.incommand = True
         self.lastresponse = None
         self.ipmicallback = self._generic_callback
-        self._send_ipmi_net_payload(netfn, command, data, retry=retry,
-                                    delay_xmit=delay_xmit)
+        self._send_ipmi_net_payload(netfn, command, data,
+                                    bridge_request=bridge_request,
+                                    retry=retry, delay_xmit=delay_xmit)
+
         if retry:  # in retry case, let the retry timers indicate wait time
             timeout = None
         else:  # if not retry, give it a second before surrending
@@ -363,9 +420,10 @@ class Session(object):
             Session.wait_for_rsp(timeout=timeout)
         return self.lastresponse
 
-    def _send_ipmi_net_payload(self, netfn, command, data, retry=True,
-                               delay_xmit=None):
-        ipmipayload = self._make_ipmi_payload(netfn, command, data)
+    def _send_ipmi_net_payload(self, netfn, command, data, bridge_request={},
+                               retry=True, delay_xmit=None):
+        ipmipayload = self._make_ipmi_payload(netfn, command, bridge_request,
+                                              data)
         payload_type = constants.payload_types['ipmi']
         self.send_payload(payload=ipmipayload, payload_type=payload_type,
                           retry=retry, delay_xmit=delay_xmit)
@@ -1023,10 +1081,32 @@ class Session(object):
         # For now, skip the checksums since we are in LAN only,
         # TODO(jbjohnso): if implementing other channels, add checksum checks
         # here
-        if (payload[4] != self.seqlun or
-                payload[1] >> 2 != self.expectednetfn or
-                payload[5] != self.expectedcmd):
-            return -1  # payload is not a match for our last packet
+        entry = (payload[1] >> 2, payload[4], payload[5])
+        if self._lookup_request_entry(entry):
+            self._remove_request_entry(entry)
+
+            #NOTE(fengqian): for bridge request, we need to handle the response
+            #twice. First response shows if message send correctly, second
+            #response is the real response.
+            #If the message is send crrectly, we will discard the first
+            #response or else error message will be parsed and return.
+            if ((entry[0] in [0x06, 0x07]) and (entry[2] == 0x34)
+               and (payload[-2] == 0x0)):
+                return -1
+            else:
+                self._parse_payload(payload)
+                #NOTE(fengqian): recheck if the certain entry is removed in
+                #case that bridge request failed.
+                if self.request_entry:
+                    self._remove_request_entry((self.expectednetfn,
+                                                self.seqlun, self.expectedcmd))
+        else:
+            # payload is not a match for our last packet
+            # it is also not a bridge request.
+            return -1
+
+    def _parse_payload(self, payload):
+
         if hasattr(self, 'hasretried') and self.hasretried:
             self.hasretried = 0
             self.tabooseq[

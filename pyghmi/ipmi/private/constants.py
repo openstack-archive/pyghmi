@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+IPMI_BMC_ADDRESS = 0x20
+IPMI_SEND_MESSAGE_CMD = 0x34
 
 payload_types = {
     'ipmi': 0x0,
