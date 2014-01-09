@@ -122,9 +122,7 @@ class Command(object):
 
         :returns: dict --The response will be provided in the return as a dict
         """
-        response = self.ipmi_session.raw_command(netfn=0,
-                                                 command=9,
-                                                 data=(5, 0, 0))
+        response = self.raw_command(netfn=0, command=9, data=(5, 0, 0))
         # interpret response per 'get system boot options'
         if 'error' in response:
             return response
@@ -167,7 +165,7 @@ class Command(object):
             raise exc.InvalidParameterValue(
                 "Unknown power state %s requested" % powerstate)
         self.newpowerstate = powerstate
-        response = self.ipmi_session.raw_command(netfn=0, command=1)
+        response = self.raw_command(netfn=0, command=1)
         if 'error' in response:
             raise exc.IpmiException(response['error'])
         self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
@@ -175,7 +173,7 @@ class Command(object):
             return {'powerstate': self.powerstate}
         if self.newpowerstate == 'boot':
             self.newpowerstate = 'on' if self.powerstate == 'off' else 'reset'
-        response = self.ipmi_session.raw_command(
+        response = self.raw_command(
             netfn=0, command=2, data=[power_states[self.newpowerstate]])
         if 'error' in response:
             raise exc.IpmiException(response['error'])
@@ -191,8 +189,7 @@ class Command(object):
                 self.waitpowerstate = self.newpowerstate
             currpowerstate = None
             while currpowerstate != self.waitpowerstate and waitattempts > 0:
-                response = self.ipmi_session.raw_command(netfn=0, command=1,
-                                                         delay_xmit=1)
+                response = self.raw_command(netfn=0, command=1, delay_xmit=1)
                 if 'error' in response:
                     return response
                 currpowerstate = 'on' if (response['data'][0] & 1) else 'off'
@@ -243,8 +240,7 @@ class Command(object):
         # then move on to set chassis capabilities
         self.requestpending = True
         # Set System Boot Options is netfn=0, command=8, data
-        response = self.ipmi_session.raw_command(netfn=0, command=8,
-                                                 data=(3, 8))
+        response = self.raw_command(netfn=0, command=8, data=(3, 8))
         self.lastresponse = response
         if 'error' in response:
             return response
@@ -256,12 +252,12 @@ class Command(object):
         if self.bootdev == 0:
             bootflags = 0
         data = (5, bootflags, self.bootdev, 0, 0, 0)
-        response = self.ipmi_session.raw_command(netfn=0, command=8, data=data)
+        response = self.raw_command(netfn=0, command=8, data=data)
         if 'error' in response:
             return response
         return {'bootdev': bootdev}
 
-    def raw_command(self, netfn, command, data=()):
+    def raw_command(self, netfn, command, bridge_request={}, data=()):
         """Send raw ipmi command to BMC
 
         This allows arbitrary IPMI bytes to be issued.  This is commonly used
@@ -271,10 +267,13 @@ class Command(object):
 
         :param netfn: Net function number
         :param command: Command value
+        :param bridge_request: The target slave address and channel number for
+                               the bridge request.
         :param data: Command data as a tuple or list
         :returns: dict -- The response from IPMI device
         """
         return self.ipmi_session.raw_command(netfn=netfn, command=command,
+                                             bridge_request=bridge_request,
                                              data=data)
 
     def get_power(self):
@@ -285,7 +284,7 @@ class Command(object):
 
         :returns: dict -- {'powerstate': value}
         """
-        response = self.ipmi_session.raw_command(netfn=0, command=1)
+        response = self.raw_command(netfn=0, command=1)
         if 'error' in response:
             raise exc.IpmiException(response['error'])
         assert(response['command'] == 1 and response['netfn'] == 1)
