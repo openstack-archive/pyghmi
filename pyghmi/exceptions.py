@@ -28,3 +28,8 @@ class IpmiException(PyghmiException):
 
 class InvalidParameterValue(PyghmiException):
     pass
+
+
+class BmcErrorException(IpmiException):
+    # This denotes when library detects an invalid BMC behavior
+    pass
