@@ -1,7 +1,6 @@
-
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2013 IBM Corporation
+# Copyright 2014 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,22 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# The Exceptions that Pyghmi can throw
 
 
-class PyghmiException(Exception):
-    pass
-
-
-class IpmiException(PyghmiException):
-    pass
-
-
-class InvalidParameterValue(PyghmiException):
-    pass
-
-
-class BmcErrorException(IpmiException):
-    # This denotes when library detects an invalid BMC behavior
-    pass
+class Health:
+    Ok = 0
+    Warning, Critical, Failed = [2**x for x in range(0, 3)]
