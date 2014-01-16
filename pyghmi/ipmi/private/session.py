@@ -15,6 +15,8 @@
 # limitations under the License.
 # This represents the low layer message framing portion of IPMI
 
+from __future__ import print_function
+
 import atexit
 import collections
 import hashlib
@@ -1160,5 +1162,5 @@ if __name__ == "__main__":
     ipmis = Session(bmc=sys.argv[1],
                     userid=sys.argv[2],
                     password=os.environ['IPMIPASS'])
-    print ipmis.raw_command(command=2, data=[1], netfn=0)
-    print get_ipmi_error({'command': 8, 'code': 128, 'netfn': 1})
+    print(ipmis.raw_command(command=2, data=[1], netfn=0))
+    print(get_ipmi_error({'command': 8, 'code': 128, 'netfn': 1}))

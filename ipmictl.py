@@ -20,6 +20,8 @@
 it isn't conceived as a general utility to actually use, just help developers
 understand how the ipmi_command class workes.
 """
+from __future__ import print_function
+
 import os
 import string
 import sys
@@ -28,8 +30,9 @@ from pyghmi.ipmi import command
 password = os.environ['IPMIPASSWORD']
 os.environ['IPMIPASSWORD'] = ""
 if (len(sys.argv) < 3):
-    print "Usage:"
-    print " IPMIPASSWORD=password %s bmc username <cmd> <optarg>" % sys.argv[0]
+    print("Usage:")
+    print(" IPMIPASSWORD=password %s bmc username <cmd> <optarg>"
+          % sys.argv[0])
     sys.exit(1)
 bmc = sys.argv[1]
 userid = sys.argv[2]
@@ -42,25 +45,26 @@ ipmicmd = None
 
 def docommand(result, ipmisession):
     cmmand = sys.argv[3]
-    print "Logged into %s" % ipmisession.bmc
+    print("Logged into %s" % ipmisession.bmc)
     if 'error' in result:
-        print result['error']
+        print(result['error'])
         return
     if cmmand == 'power':
         if args:
-            print ipmisession.set_power(args[0], wait=True)
+            print(ipmisession.set_power(args[0], wait=True))
         else:
             value = ipmisession.get_power()
-            print "%s: %s" % (ipmisession.bmc, value['powerstate'])
+            print("%s: %s" % (ipmisession.bmc, value['powerstate']))
     elif cmmand == 'bootdev':
         if args:
-            print ipmisession.set_bootdev(args[0])
+            print(ipmisession.set_bootdev(args[0]))
         else:
-            print ipmisession.get_bootdev()
+            print(ipmisession.get_bootdev())
     elif cmmand == 'raw':
-        print ipmisession.raw_command(netfn=int(args[0]),
+        print(ipmisession.raw_command(netfn=int(args[0]),
                                       command=int(args[1]),
-                                      data=map(lambda x: int(x, 16), args[2:]))
+                                      data=map(lambda x: int(x, 16),
+                                               args[2:])))
 
 bmcs = string.split(bmc, ",")
 for bmc in bmcs:

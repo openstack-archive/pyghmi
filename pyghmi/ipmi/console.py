@@ -46,7 +46,7 @@ class Console(object):
         if type(iohandler) == tuple:  # two file handles
             self.console_in = iohandler[0]
             self.console_out = iohandler[1]
-        elif type(iohandler) == file:  # one full duplex file handle
+        elif type(iohandler) == file:  # one full duplex file handle # NOQA
             self.console_out = iohandler
             self.console_in = iohandler
         elif hasattr(iohandler, '__call__'):
@@ -117,7 +117,7 @@ class Console(object):
                     self._print_data('SOL Session active for another client\n')
                     return
             elif response['code'] in sol_activate_codes:
-                self._print_data(sol_activate_codes[response['code']]+'\n')
+                self._print_data(sol_activate_codes[response['code']] + '\n')
                 return
             else:
                 self._print_data(
@@ -242,7 +242,7 @@ class Console(object):
                 else:  # retry all or part of packet, but in a new form
                     # also add pending output for efficiency and ease
                     newtext = self.lastpayload[4 + ackcount:]
-                    newtext = struct.pack("B"*len(newtext), *newtext)
+                    newtext = struct.pack("B" * len(newtext), *newtext)
                     self.pendingoutput = newtext + self.pendingoutput
                     self._sendpendingoutput()
         elif self.awaitingack:  # session marked us as happy, but we are not
