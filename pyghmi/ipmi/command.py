@@ -15,6 +15,7 @@
 # limitations under the License.
 # This represents the low layer message framing portion of IPMI
 
+import pyghmi.constants as const
 import pyghmi.exceptions as exc
 
 from pyghmi.ipmi.private import session
@@ -290,6 +291,22 @@ class Command(object):
         assert(response['command'] == 1 and response['netfn'] == 1)
         self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
         return {'powerstate': self.powerstate}
+
+    def get_health(self):
+        """Summarize health of managed system
+
+        This provides a summary of the health of the managed system.
+        It additionally provides an iterable list of reasons for
+        warning, critical, or failed assessments.
+        """
+        summary = {}
+        summary['badreadings'] = []
+        summary['health'] = const.Health.Ok
+        for reading in self.get_sensor_data():
+            if reading.health != const.Health.Ok:
+                summary['health'] |= reading.health
+                summary['badreadings'].append(reading)
+        return summary
 
     def get_sensor_data(self):
         """Get sensor reading objects
