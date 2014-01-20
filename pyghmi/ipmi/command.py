@@ -18,6 +18,7 @@
 import pyghmi.exceptions as exc
 
 from pyghmi.ipmi.private import session
+import pyghmi.ipmi.sdr as sdr
 
 
 boot_devices = {
@@ -289,3 +290,21 @@ class Command(object):
         assert(response['command'] == 1 and response['netfn'] == 1)
         self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
         return {'powerstate': self.powerstate}
+
+    def get_sensor_data(self):
+        """Get sensor reading objects
+
+        Iterates sensor reading objects pertaining to the currently
+        managed BMC.
+
+        :returns: Iterator of sdr.SensorReading objects
+        """
+        if not '_sdr' in self.__dict__:
+            self._sdr = sdr.SDR(self)
+        for sensor in self._sdr.get_sensor_numbers():
+            rsp = self.raw_command(command=0x2d, netfn=4, data=(sensor,))
+            if 'error' in rsp:
+                if rsp['code'] == 203:  # Sensor does not exist, optional dev
+                    continue
+                raise Exception(rsp['error'])
+            yield self._sdr.sensors[sensor].decode_sensor_reading(rsp['data'])

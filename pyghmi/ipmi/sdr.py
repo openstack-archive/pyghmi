@@ -31,7 +31,6 @@
 import math
 import pyghmi.constants as const
 import pyghmi.exceptions as exc
-import pyghmi.ipmi.command as ipmicmd
 import pyghmi.ipmi.private.constants as ipmiconstants
 import struct
 
@@ -188,18 +187,20 @@ class SensorReading(object):
     def __init__(self, reading, suffix):
         self.health = const.Health.Ok
         self.type = reading['type']
-        if 'health' in reading:
+        self.value = None
+        self.imprecision = None
+        self.states = ()
+        try:
             self.health = reading['health']
-        if 'value' in reading:
             self.value = reading['value']
-        else:
-            self.value = None
-        self.states = reading['states']
+            self.states = reading['states']
+            self.imprecision = reading['imprecision']
+        except KeyError:
+            pass
         if 'unavailable' in reading:
             self.unavailable = 1
         self.units = suffix
         self.name = reading['name']
-        self.imprecision = reading['imprecision']
 
     def __repr__(self):
         return repr({
@@ -410,7 +411,7 @@ class SDREntry(object):
             if reading[2] & 0b100000:
                 output['health'] |= const.Health.Failed
                 output['states'].append(upper + " non-recoverable threshold")
-            return SensorReading(output, self.unit_suffix)
+        return SensorReading(output, self.unit_suffix)
 
     def decode_value(self, value):
         # Take the input value and return meaningful value
@@ -585,6 +586,7 @@ class SDR(object):
 
 if __name__ == "__main__":  # test code
     import os
+    import pyghmi.ipmi.command as ipmicmd
     import sys
     password = os.environ['IPMIPASSWORD']
     bmc = sys.argv[1]
