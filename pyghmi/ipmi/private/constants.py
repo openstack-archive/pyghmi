@@ -15,6 +15,9 @@
 # limitations under the License.
 
 
+import pyghmi.constants as const
+
+
 payload_types = {
     'ipmi': 0x0,
     'sol': 0x1,
@@ -74,90 +77,412 @@ sensor_type_codes = {
     0x2c: 'FRU State',
 }
 
+# This is from table 42-2
+#For severity, we really have very little to go on in this case
+#Optimistically assume 'warning' when generic sensors have something
+#to assert
 
-sensor_type_offsets = {
-    1: 'Temperature',
-    2: 'Voltage',
-    3: 'Current',
-    4: 'Fan',
+discrete_type_offsets = {
+    2: {
+        0: {
+            'desc': 'Idle',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Active',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Busy',
+            'severity': const.Health.Ok,
+        },
+    },
+    3: {
+        0: {
+            'desc': 'Deasserted',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Asserted',
+            'severity': const.Health.Warning,
+        },
+    },
+    4: {
+        0: {
+            'desc': 'Predictive Failure deasserted',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Predictive Failure',
+            'severity': const.Health.Warning,
+        },
+    },
     5: {
-        0: 'General Chassis Intrusion',
-        1: 'Drive Bay intrusion',
-        2: 'I/O Card area intrusion',
-        3: 'Processor area intrusion',
-        4: 'Lost LAN connection',
-        5: 'Unauthorized dock',
-        6: 'Fan area intrusion',
+        0: {
+            'desc': 'Limit Not Exceeded',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Limit Exceeded',
+            'severity': const.Health.Warning,
+        },
     },
     6: {
-        0: 'Front Panel Lockout Violation attempt',
-        1: 'Pre-boot password violation - user',
-        2: 'Pre-boot password violation - setup',
-        3: 'Pre-boot password violation - netboot',
-        4: 'Pre-boot password violation',
-        5: 'Out-of-band access password violation',
+        0: {
+            'desc': 'Performance Met',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Perfermance Lags',
+            'severity': const.Health.Warning,
+        },
     },
     7: {
-        0: 'processor IERR',
-        1: 'processor thermal trip',
-        2: 'processor FRB1/BIST failure',
-        3: 'processor FRB2/Hang in POST failure',
-        4: 'processor FRB3/processor startup failure',
-        5: 'processor configuration error',
-        6: 'uncorrectable cpu complex error',
-        7: 'processor presence detected',
-        8: 'processor disabled',
-        9: 'processor terminator presence detected',
-        0xa: 'processor throttled',
-        0xb: 'uncorrectable machine check exception',
-        0xc: 'correctable machine check exception',
+        0: {
+            'desc': 'Ok',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Non-Critical',
+            'severity': const.Health.Warning,
+        },
+        2: {
+            'desc': 'Critical',
+            'severity': const.Health.Critical,
+        },
+        3: {
+            'desc': 'Non-recoverable',
+            'severity': const.Health.Failed,
+        },
+        4: {
+            'desc': 'Non-Critical',
+            'severity': const.Health.Warning,
+        },
+        5: {
+            'desc': 'Critical',
+            'severity': const.Health.Critical,
+        },
+        6: {
+            'desc': 'Non-recoverable',
+            'severity': const.Health.Failed,
+        },
+        7: {
+            'desc': 'Monitor',
+            'severity': const.Health.Ok,
+        },
+        8: {
+            'desc': 'Informational',
+            'severity': const.Health.Ok,
+        },
     },
     8: {
-        0: 'power supply presence detected',
-        1: 'power supply failure',
-        2: 'power supply predictive failure',
-        3: 'power supply input lost',
-        4: 'power supply input out of range or lost',
-        5: 'power supply input out of range',
-        6: 'power supply configuration error',  # event data 3 available
+        0: {
+            'desc': 'Absent',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Present',
+            'severity': const.Health.Ok,
+        },
     },
     9: {
-        0: 'power off/down',
-        1: 'power cycle',
-        2: '240VA power down',
-        3: 'interlock power down',
-        4: 'power input lost',
-        5: 'soft power control failure',
-        6: 'power unit failure',
-        7: 'power unit predictive failure',
+        0: {
+            'desc': 'Disabled',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Enabled',
+            'severity': const.Health.Ok,
+        },
+    }
+}
+
+sensor_type_offsets = {
+    # For the security sensors, we assume if armed,
+    # the operator considers these to  be critical situations
+    5: {
+        0: {
+            'desc': 'General Chassis Intrusion',
+            'severity': const.Health.Critical,
+        },
+        1: {
+            'desc': 'Drive Bay intrusion',
+            'severity': const.Health.Critical,
+        },
+        2: {
+            'desc': 'I/O Card area intrusion',
+            'severity': const.Health.Critical,
+        },
+        3: {
+            'desc': 'Processor area intrusion',
+            'severity': const.Health.Critical,
+        },
+        4: {
+            'desc': 'Lost LAN connection',
+            'severity': const.Health.Critical,
+        },
+        5: {
+            'desc': 'Unauthorized dock',
+            'severity': const.Health.Critical,
+        },
+        6: {
+            'desc': 'Fan area intrusion',
+            'severity': const.Health.Critical,
+        },
     },
-    0xa: 'cooling device',
-    0xb: 'units based sensor',
-    0xc: {
-        0: 'correctable memory error',
-        1: 'uncorrectable memory error',
-        2: 'memory parity',
-        3: 'memory scrub failed',
-        4: 'memory device disabled',
-        5: 'correctable memory error logging limit reached',
-        6: 'memory presence detected',
-        7: 'memory configuration error',
-        8: 'spare memory',  # event data 3 available
-        9: 'memory throttled',
-        0xa: 'critical memory overtemperature',
+    6: {
+        0: {
+            'desc': 'Front Panel Lockout Violation attempt',
+            'severity': const.Health.Critical,
+        },
+        1: {
+            'desc': 'Pre-boot password violation - user',
+            'severity': const.Health.Critical,
+        },
+        2: {
+            'desc': 'Pre-boot password violation - setup',
+            'severity': const.Health.Critical,
+        },
+        3: {
+            'desc': 'Pre-boot password violation - netboot',
+            'severity': const.Health.Critical,
+        },
+        4: {
+            'desc': 'Pre-boot password violation',
+            'severity': const.Health.Critical,
+        },
+        5: {
+            'desc': 'Out-of-band access password violation',
+            'severity': const.Health.Critical,
+        },
     },
-    0xd: {
-        0: 'drive presence',
-        1: 'drive fault',
-        2: 'predictive drive failure',
-        3: 'hot spare drive',
-        4: 'drive consitency check in progress',
-        5: 'drive in critical array',
-        6: 'drive in failed array',
-        7: 'rebuild in progress',
-        8: 'rebuild aborted',
+    7: {
+        0: {
+            'desc': 'processor IERR',
+            'severity': const.Health.Failed,
+        },
+        1: {
+            'desc': 'processor thermal trip',
+            'severity': const.Health.Failed,
+        },
+        2: {
+            'desc': 'processor FRB1/BIST failure',
+            'severity': const.Health.Failed,
+        },
+        3: {
+            'desc': 'processor FRB2/Hang in POST failure',
+            'severity': const.Health.Failed,
+        },
+        4: {
+            'desc': 'processor FRB3/processor startup failure',
+            'severity': const.Health.Failed,
+        },
+        5: {
+            'desc': 'processor configuration error',
+            'severity': const.Health.Failed,
+        },
+        6: {
+            'desc': 'uncorrectable cpu complex error',
+            'severity': const.Health.Failed,
+        },
+        7: {
+            'desc': 'Present',
+            'severity': const.Health.Ok,
+        },
+        8: {
+            'desc': 'Disabled',
+            'severity': const.Health.Warning,
+        },
+        9: {
+            'desc': 'processor terminator presence detected',
+            'severity': const.Health.Ok,
+        },
+        0xa: {
+            'desc': 'processor throttled',
+            'severity': const.Health.Warning,
+        },
+        0xb: {
+            'desc': 'uncorrectable machine check exception',
+            'severity': const.Health.Failed,
+        },
+        0xc: {
+            'desc': 'correctable machine check exception',
+            'severity': const.Health.Warning,
+        },
     },
-    0xe: 'POST memory resize',
+    8: {  # power supply
+        0: {
+            'desc': 'Present',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'power supply failure',
+            'severity': const.Health.Critical,
+        },
+        2: {
+            'desc': 'power supply predictive failure',
+            'severity': const.Health.Critical,
+        },
+        3: {
+            'desc': 'power supply input lost',
+            'severity': const.Health.Critical,
+        },
+        4: {
+            'desc': 'power supply input out of range or lost',
+            'severity': const.Health.Critical,
+        },
+        5: {
+            'desc': 'power supply input out of range',
+            'severity': const.Health.Critical,
+        },
+        6: {
+            # clarified by SEL/PET event data 3
+            'desc': 'power supply configuration error',
+            'severity': const.Health.Warning,
+        },
+    },
+    9: {  # power unit
+        0: {
+            'desc': 'power off/down',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'power cycle',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': '240VA power down',
+            'severity': const.Health.Warning,
+        },
+        3: {
+            'desc': 'interlock power down',
+            'severity': const.Health.Ok,
+        },
+        4: {
+            'desc': 'power input lost',
+            'severity': const.Health.Warning,
+        },
+        5: {
+            'desc': 'soft power control failure',
+            'severity': const.Health.Failed,
+        },
+        6: {
+            'desc': 'power unit failure',
+            'severity': const.Health.Critical,
+        },
+        7: {
+            'desc': 'power unit predictive failure',
+            'severity': const.Health.Warning,
+        },
+    },
+    0xc: {  # memory
+        0: {
+            'desc': 'correctable memory error',
+            'severity': const.Health.Warning,
+        },
+        1: {
+            'desc': 'uncorrectable memory error',
+            'severity': const.Health.Failed,
+        },
+        2: {
+            'desc': 'memory parity',
+            'severity': const.Health.Warning,
+        },
+        3: {
+            'desc': 'memory scrub failed',
+            'severity': const.Health.Critical,
+        },
+        4: {
+            'desc': 'memory device disabled',
+            'severity': const.Health.Warning,
+        },
+        5: {
+            'desc': 'correctable memory error logging limit reached',
+            'severity': const.Health.Critical,
+        },
+        6: {
+            'desc': 'Present',
+            'severity': const.Health.Ok,
+        },
+        7: {
+            'desc': 'memory configuration error',
+            'severity': const.Health.Critical,
+        },
+        8: {
+            'desc': 'spare memory',  # event data 3 available
+            'severity': const.Health.Ok,
+        },
+        9: {
+            'desc': 'memory throttled',
+            'severity': const.Health.Warning,
+        },
+        0xa: {
+            'desc': 'critical memory overtemperature',
+            'severity': const.Health.Critical,
+        },
+    },
+    0xd: {  # drive bay
+        0: {
+            'desc': 'Present',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'drive fault',
+            'severity': const.Health.Critical,
+        },
+        2: {
+            'desc': 'predictive drive failure',
+            'severity': const.Health.Warning,
+        },
+        3: {
+            'desc': 'hot spare drive',
+            'severity': const.Health.Ok,
+        },
+        4: {
+            'desc': 'drive consitency check in progress',
+            'severity': const.Health.Ok,
+        },
+        5: {
+            'desc': 'drive in critical array',
+            'severity': const.Health.Critical,
+        },
+        6: {
+            'desc': 'drive in failed array',
+            'severity': const.Health.Failed,
+        },
+        7: {
+            'desc': 'rebuild in progress',
+            'severity': const.Health.Ok,
+        },
+        8: {
+            'desc': 'rebuild aborted',
+            'severity': const.Health.Critical,
+        },
+    },
+    0x1b: {  # Cable/Interconnect
+        0: {
+            'desc': 'Connected',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Connection error',
+            'severity': const.Health.Critical,
+        },
+    },
+    0x25: {  # entity presence
+        0: {
+            'desc': 'Present',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Absent',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Disabled',
+            'severity': const.Health.Ok,
+        },
+    },
 }
 
 

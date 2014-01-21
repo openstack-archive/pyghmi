@@ -31,7 +31,7 @@
 import math
 import pyghmi.constants as const
 import pyghmi.exceptions as exc
-import pyghmi.ipmi.private.constants as ipmiconstants
+import pyghmi.ipmi.private.constants as ipmiconst
 import struct
 
 TYPE_UNKNOWN = 0
@@ -189,11 +189,11 @@ class SensorReading(object):
         self.type = reading['type']
         self.value = None
         self.imprecision = None
-        self.states = ()
+        self.states = []
         try:
             self.health = reading['health']
-            self.value = reading['value']
             self.states = reading['states']
+            self.value = reading['value']
             self.imprecision = reading['imprecision']
         except KeyError:
             pass
@@ -213,7 +213,13 @@ class SensorReading(object):
             'health': self.health
         })
 
-    def _prettyprint(self):
+    def simplestring(self):
+        """Return a summary string of the reading.
+
+        This is intended as a sampling of how the data could be presented by
+        a UI.  It's intended to help a developer understand the relation
+        between the attributes of a sensor reading if it is not quite clear
+        """
         repr = self.name + ": "
         if self.value is not None:
             repr += str(self.value)
@@ -310,9 +316,10 @@ class SDREntry(object):
         # this function handles the common aspects of compact and full
         # offsets from spec, minus 6
         self.sensor_number = entry[2]
-        self.entity = ipmiconstants.entity_ids[entry[3]]
+        self.entity = ipmiconst.entity_ids[entry[3]]
+        self.sensor_type_number = entry[7]
         try:
-            self.sensor_type = ipmiconstants.sensor_type_codes[entry[7]]
+            self.sensor_type = ipmiconst.sensor_type_codes[entry[7]]
         except KeyError:
             self.sensor_type = "UNKNOWN type " + str(entry[7])
         self.reading_type = entry[8]  # table 42-1
@@ -359,6 +366,20 @@ class SDREntry(object):
             # reading interpretation
             self.decode_formula(entry)
 
+    def _decode_state(self, state):
+        mapping = ipmiconst.discrete_type_offsets
+        if self.reading_type in mapping:
+            desc = mapping[self.reading_type][state]['desc']
+            health = mapping[self.reading_type][state]['severity']
+        elif self.reading_type == 0x6f:
+            mapping = ipmiconst.sensor_type_offsets
+            desc = mapping[self.sensor_type_number][state]['desc']
+            health = mapping[self.sensor_type_number][state]['severity']
+        else:
+            desc = "Unknown state %d" % state
+            health = const.Health.Warning
+        return (desc, health)
+
     def decode_sensor_reading(self, reading):
         numeric = None
         output = {
@@ -391,8 +412,20 @@ class SDREntry(object):
             upper = 'lower'
             lower = 'upper'
         output['states'] = []
-        if not discrete:
-            output['health'] = const.Health.Ok
+        output['health'] = const.Health.Ok
+        if discrete:
+            for state in range(8):
+                if reading[2] & (0b1 << state):
+                    statedesc, health = self._decode_state(state)
+                    output['health'] |= health
+                    output['states'].append(statedesc)
+            if len(reading) > 3:
+                for state in range(7):
+                    if reading[3] & (0b1 << state):
+                        statedesc, health = self._decode_state(state + 7)
+                        output['health'] |= health
+                        output['states'].append(statedesc)
+        else:
             if reading[2] & 0b1:
                 output['health'] |= const.Health.Warning
                 output['states'].append(lower + " non-critical threshold")
