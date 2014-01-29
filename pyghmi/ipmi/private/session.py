@@ -1151,6 +1151,9 @@ class Session(object):
             self.ipmicallback(response)
             self.incommand = False
             self.nowait = False
+            # since our connection has failed retries
+            # deregister our keepalive facility
+            Session.keepalive_sessions.pop(self, None)
             return
         elif self.sessioncontext == 'FAILED':
             self.nowait = False
