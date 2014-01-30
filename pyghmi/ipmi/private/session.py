@@ -257,6 +257,8 @@ class Session(object):
         # replace this one
         for sockaddr in self.allsockaddrs:
             del Session.bmc_handlers[sockaddr]
+        if self.sol_handler:
+            self.sol_handler({'error': 'Session Disconnected'})
 
     def onlogon(self, parameter):
         if 'error' in parameter:

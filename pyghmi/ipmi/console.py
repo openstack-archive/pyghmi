@@ -18,6 +18,7 @@
 
 import fcntl
 import os
+import pyghmi.exceptions as exc
 import struct
 
 from pyghmi.ipmi.private import constants
@@ -89,7 +90,7 @@ class Console(object):
         response = self.ipmi_session.raw_command(netfn=0x6, command=0x48,
                                                  data=(1, 1, 192, 0, 0, 0))
         if 'error' in response:
-            self._print_data(response['error'])
+            self._print_error(response['error'])
         #given that these are specific to the command,
         #it's probably best if one can grep the error
         #here instead of in constants
@@ -101,7 +102,7 @@ class Console(object):
         }
         if response['code']:
             if response['code'] in constants.ipmi_completion_codes:
-                self._print_data(
+                self._print_error(
                     constants.ipmi_completion_codes[response['code']])
                 return
             elif response['code'] == 0x80:
@@ -114,14 +115,14 @@ class Console(object):
                     self._got_session(sessrsp)
                     return
                 else:
-                    self._print_data('SOL Session active for another client\n')
+                    self._print_error('SOL Session active for another client')
                     return
             elif response['code'] in sol_activate_codes:
-                self._print_data(sol_activate_codes[response['code']]+'\n')
+                self._print_error(sol_activate_codes[response['code']])
                 return
             else:
-                self._print_data(
-                    'SOL encountered Unrecognized error code %d\n' %
+                self._print_error(
+                    'SOL encountered Unrecognized error code %d' %
                     response['code'])
                 return
         #data[0:3] is reserved except for the test mode, which we don't use
@@ -178,7 +179,20 @@ class Console(object):
         self.awaitingack = True
         payload = struct.unpack("%dB" % len(payload), payload)
         self.lastpayload = payload
-        self.ipmi_session.send_payload(payload, payload_type=1)
+        self.send_payload(payload)
+
+    def send_payload(self, payload, payload_type=1, retry=True):
+        if not self.ipmi_session.logged:
+            raise exc.IpmiException('Session no longer connected')
+        self.ipmi_session.send_payload(payload,
+                                       payload_type=payload_type,
+                                       retry=retry)
+
+    def _print_info(self, info):
+        self._print_data({'info': info})
+
+    def _print_error(self, error):
+        self._print_data({'error': error})
 
     def _print_data(self, data):
         """Convey received data back to caller in the format of their choice.
@@ -188,6 +202,12 @@ class Console(object):
         caller.
         """
         if self.console_out is not None:
+            # if we are writing to a dumb stream, format a string ourselves
+            if type(data) == dict:
+                if 'error' in data:
+                    data = 'ERROR: ' + data['error'] + '\n'
+                elif 'info' in data:
+                    data = 'INFO: ' + data['info'] + '\n'
             self.console_out.write(data)
             self.console_out.flush()
         elif self.out_handler:  # callback style..
@@ -199,6 +219,9 @@ class Console(object):
         #TODO(jbjohnso) test cases to throw some likely scenarios at functions
         #for example, retry with new data, retry with no new data
         #retry with unexpected sequence number
+        if type(payload) == dict:  # we received an error condition
+            self._print_error(payload)
+            return
         newseq = payload[0] & 0b1111
         ackseq = payload[1] & 0b1111
         ackcount = payload[2]
@@ -229,16 +252,15 @@ class Console(object):
             #Why not put pending data into the ack? because it's rare
             #and might be hard to decide what to do in the context of
             #retry situation
-            self.ipmi_session.send_payload(ackpayload,
-                                           payload_type=1, retry=False)
+            self.send_payload(ackpayload, retry=False)
         if self.myseq != 0 and ackseq == self.myseq:  # the bmc has something
                                                       # to say about last xmit
             self.awaitingack = False
             if nacked > 0:  # the BMC was in some way unhappy
                 if poweredoff:
-                    self._print_data("Remote system is powered down\n")
+                    self._print_info("Remote system is powered down")
                 if deactivated:
-                    self._print_data("Remote IPMI console disconnected\n")
+                    self._print_error("Remote IPMI console disconnected")
                 else:  # retry all or part of packet, but in a new form
                     # also add pending output for efficiency and ease
                     newtext = self.lastpayload[4 + ackcount:]
@@ -248,8 +270,7 @@ class Console(object):
         elif self.awaitingack:  # session marked us as happy, but we are not
                 #this does mean that we will occasionally retry a packet
                 #sooner than retry suggests, but that's no big deal
-            self.ipmi_session.send_payload(payload=self.lastpayload,
-                                           payload_type=1)
+            self.send_payload(payload=self.lastpayload)
 
     def main_loop(self):
         """Process all events until no more sessions exist.
