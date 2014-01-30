@@ -247,7 +247,21 @@ class Session(object):
             while not self.logged:
                 Session.wait_for_rsp()
 
+    def _mark_broken(self):
+        # since our connection has failed retries
+        # deregister our keepalive facility
+        Session.keepalive_sessions.pop(self, None)
+        self.logged = 0  # mark session as busted
+        # since this session is broken, remove it from the handler list.
+        # This allows constructor to create a new, functional object to
+        # replace this one
+        for sockaddr in self.allsockaddrs:
+            del Session.bmc_handlers[sockaddr]
+
     def onlogon(self, parameter):
+        if 'error' in parameter:
+            self._mark_broken()
+            return
         while self.logonwaiters:
             waiter = self.logonwaiters.pop()
             waiter(parameter)
@@ -397,8 +411,12 @@ class Session(object):
                     data=[],
                     retry=True,
                     delay_xmit=None):
+        if not self.logged:
+            raise exc.IpmiException('Session no longer connected')
         while self.incommand:
             Session.wait_for_rsp()
+        if not self.logged:
+            raise exc.IpmiException('Session no longer connected')
         self.incommand = True
         self.lastresponse = None
         self.ipmicallback = self._generic_callback
@@ -760,11 +778,14 @@ class Session(object):
                     myfile = cls._external_handlers[myhandle][1]
                     cls._external_handlers[myhandle][0](myfile)
         sessionstodel = []
+        sessionstokeepalive = []
         for session, parms in cls.keepalive_sessions.iteritems():
             if parms['timeout'] < curtime:
                 cls.keepalive_sessions[session]['timeout'] = 25 + \
                     (random.random() * 4.9)
-                session._keepalive()
+                sessionstokeepalive.append(session)
+        for session in sessionstokeepalive:
+            session._keepalive()
         for session, parms in cls.waiting_sessions.iteritems():
             if parms['timeout'] < curtime:  # timeout has expired, time to
                                             # give up on it and trigger timeout
@@ -1151,9 +1172,7 @@ class Session(object):
             self.ipmicallback(response)
             self.incommand = False
             self.nowait = False
-            # since our connection has failed retries
-            # deregister our keepalive facility
-            Session.keepalive_sessions.pop(self, None)
+            self._mark_broken()
             return
         elif self.sessioncontext == 'FAILED':
             self.nowait = False
@@ -1207,6 +1226,7 @@ class Session(object):
             Session.socket.sendto(self.netpacket, self.sockaddr)
         else:  # he have not yet picked a working sockaddr for this connection,
               # try all the candidates that getaddrinfo provides
+            self.allsockaddrs = []
             try:
                 for res in socket.getaddrinfo(self.bmc,
                                               self.port,
@@ -1217,6 +1237,7 @@ class Session(object):
                                                     # to AF_INET6
                         newhost = '::ffff:' + sockaddr[0]
                         sockaddr = (newhost, sockaddr[1], 0, 0)
+                    self.allsockaddrs.append(sockaddr)
                     Session.bmc_handlers[sockaddr] = self
                     Session.socket.sendto(self.netpacket, sockaddr)
             except socket.gaierror:
