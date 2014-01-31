@@ -89,8 +89,6 @@ class Console(object):
         #        0, 0, 0 reserved
         response = self.ipmi_session.raw_command(netfn=0x6, command=0x48,
                                                  data=(1, 1, 192, 0, 0, 0))
-        if 'error' in response:
-            self._print_error(response['error'])
         #given that these are specific to the command,
         #it's probably best if one can grep the error
         #here instead of in constants
@@ -100,7 +98,7 @@ class Console(object):
             0x83: 'Cannot activate payload with encryption',
             0x84: 'Cannot activate payload without encryption',
         }
-        if response['code']:
+        if 'code' in response and response['code']:
             if response['code'] in constants.ipmi_completion_codes:
                 self._print_error(
                     constants.ipmi_completion_codes[response['code']])
@@ -125,6 +123,8 @@ class Console(object):
                     'SOL encountered Unrecognized error code %d' %
                     response['code'])
                 return
+        if 'error' in response:
+            self._print_error(response['error'])
         #data[0:3] is reserved except for the test mode, which we don't use
         data = response['data']
         self.maxoutcount = (data[5] << 8) + data[4]
