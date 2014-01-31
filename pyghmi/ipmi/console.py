@@ -192,7 +192,10 @@ class Console(object):
         self._print_data({'info': info})
 
     def _print_error(self, error):
-        self._print_data({'error': error})
+        if type(error) == dict:
+            self._print_data(error)
+        else:
+            self._print_data({'error': error})
 
     def _print_data(self, data):
         """Convey received data back to caller in the format of their choice.
