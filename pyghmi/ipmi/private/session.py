@@ -256,7 +256,8 @@ class Session(object):
         # This allows constructor to create a new, functional object to
         # replace this one
         for sockaddr in self.allsockaddrs:
-            del Session.bmc_handlers[sockaddr]
+            if sockaddr in Session.bmc_handlers:
+                del Session.bmc_handlers[sockaddr]
         if self.sol_handler:
             self.sol_handler({'error': 'Session Disconnected'})
 
