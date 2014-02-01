@@ -44,6 +44,8 @@ class Console(object):
     def __init__(self, bmc, userid, password,
                  iohandler, port=623,
                  force=False, kg=None):
+        self.connected = False
+        self.broken = False
         if type(iohandler) == tuple:  # two file handles
             self.console_in = iohandler[0]
             self.console_out = iohandler[1]
@@ -77,7 +79,7 @@ class Console(object):
         """Private function to navigate SOL payload activation
         """
         if 'error' in response:
-            self._print_data(response['error'])
+            self._print_error(response['error'])
             return
         #Send activate sol payload directive
         #netfn= 6 (application)
@@ -140,6 +142,7 @@ class Console(object):
         if self.console_in is not None:
             self.ipmi_session.register_handle_callback(self.console_in,
                                                        self._got_cons_input)
+        self.connected = True
 
     def _got_cons_input(self, handle):
         """Callback for handle events detected by ipmi session
@@ -182,6 +185,8 @@ class Console(object):
         self.send_payload(payload)
 
     def send_payload(self, payload, payload_type=1, retry=True):
+        while not (self.connected or self.broken):
+            session.Session.wait_for_rsp(timeout=10)
         if not self.ipmi_session.logged:
             raise exc.IpmiException('Session no longer connected')
         self.ipmi_session.send_payload(payload,
@@ -192,6 +197,7 @@ class Console(object):
         self._print_data({'info': info})
 
     def _print_error(self, error):
+        self.broken = True
         if type(error) == dict:
             self._print_data(error)
         else:

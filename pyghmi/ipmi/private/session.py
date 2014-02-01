@@ -264,7 +264,6 @@ class Session(object):
     def onlogon(self, parameter):
         if 'error' in parameter:
             self._mark_broken()
-            return
         while self.logonwaiters:
             waiter = self.logonwaiters.pop()
             waiter(parameter)
