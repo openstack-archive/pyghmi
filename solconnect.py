@@ -19,12 +19,15 @@
 
 """A simple little script to exemplify/test ipmi.console module
 """
+import fcntl
 import os
+import select
 import sys
 import termios
 import tty
 
 from pyghmi.ipmi import console
+import threading
 
 tcattr = termios.tcgetattr(sys.stdin)
 newtcattr = tcattr
@@ -34,12 +37,32 @@ newtcattr[-1][termios.VSUSP] = 0
 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, newtcattr)
 
 tty.setcbreak(sys.stdin.fileno())
+fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
 
 passwd = os.environ['IPMIPASSWORD']
 
+sol = None
+
+
+def _doinput():
+    while True:
+        select.select((sys.stdin,), (), (), 600)
+        try:
+            data = sys.stdin.read()
+        except OSError:
+            continue
+        sol.send_data(data)
+
+
+def _print(data):
+    sys.stdout.write(data)
+    sys.stdout.flush()
+
 try:
     sol = console.Console(bmc=sys.argv[1], userid=sys.argv[2], password=passwd,
-                          iohandler=(sys.stdin, sys.stdout), force=True)
+                          iohandler=_print, force=True)
+    inputthread = threading.Thread(target=_doinput)
+    inputthread.start()
     sol.main_loop()
 finally:
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, tcattr)

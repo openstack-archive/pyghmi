@@ -16,8 +16,6 @@
 #
 # This represents the low layer message framing portion of IPMI
 
-import fcntl
-import os
 import pyghmi.exceptions as exc
 import struct
 
@@ -46,18 +44,7 @@ class Console(object):
                  force=False, kg=None):
         self.connected = False
         self.broken = False
-        if type(iohandler) == tuple:  # two file handles
-            self.console_in = iohandler[0]
-            self.console_out = iohandler[1]
-        elif type(iohandler) == file:  # one full duplex file handle
-            self.console_out = iohandler
-            self.console_in = iohandler
-        elif hasattr(iohandler, '__call__'):
-            self.console_out = None
-            self.console_in = None
-            self.out_handler = iohandler
-        if self.console_in is not None:
-            fcntl.fcntl(self.console_in.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
+        self.out_handler = iohandler
         self.remseq = 0
         self.myseq = 0
         self.lastsize = 0
@@ -139,9 +126,6 @@ class Console(object):
         #ignore data[10:11] for now, the vlan detail, shouldn't matter to this
         #code anyway...
         self.ipmi_session.sol_handler = self._got_sol_payload
-        if self.console_in is not None:
-            self.ipmi_session.register_handle_callback(self.console_in,
-                                                       self._got_cons_input)
         self.connected = True
 
     def _got_cons_input(self, handle):
@@ -218,17 +202,7 @@ class Console(object):
         callback function that this class will use to convey data back to
         caller.
         """
-        if self.console_out is not None:
-            # if we are writing to a dumb stream, format a string ourselves
-            if type(data) == dict:
-                if 'error' in data:
-                    data = 'ERROR: ' + data['error'] + '\n'
-                elif 'info' in data:
-                    data = 'INFO: ' + data['info'] + '\n'
-            self.console_out.write(data)
-            self.console_out.flush()
-        elif self.out_handler:  # callback style..
-            self.out_handler(data)
+        self.out_handler(data)
 
     def _got_sol_payload(self, payload):
         """SOL payload callback
