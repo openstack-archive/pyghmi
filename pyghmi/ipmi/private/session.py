@@ -218,6 +218,7 @@ class Session(object):
                 else:
                     self.iterwaiters.append(onlogon)
             return
+        self.maxtimeout = 3  # be aggressive about giving up on initial packet
         self.incommand = False
         self.initialized = True
         self.cleaningup = False
@@ -576,6 +577,7 @@ class Session(object):
         if 'error' in response:
             self.onlogon(response)
             return
+        self.maxtimeout = 6  # we have a confirmed bmc, be more tenacious
         if response['code'] == 0xcc and self.ipmi15only is not None:
             # tried ipmi 2.0 against a 1.5 which should work, but some bmcs
             # thought 'reserved' meant 'must be zero'
@@ -1169,7 +1171,7 @@ class Session(object):
             return
         self.nowait = True
         self.timeout += 1
-        if self.timeout > 5:
+        if self.timeout > self.maxtimeout:
             response = {'error': 'timeout'}
             self.ipmicallback(response)
             self.incommand = False
