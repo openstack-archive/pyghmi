@@ -17,12 +17,14 @@
 
 import atexit
 import collections
+import fcntl
 import hashlib
 import os
 import random
 import select
 import socket
 import struct
+import threading
 import time
 
 from Crypto.Cipher import AES
@@ -36,6 +38,101 @@ from pyghmi.ipmi.private import constants
 initialtimeout = 0.5  # minimum timeout for first packet to retry in any given
                      # session.  This will be randomized to stagger out retries
                      # in case of congestion
+iothread = None  # the thread in which all IO will be performed
+                 # While the model as-is works fine for it's own coroutine
+                 # structure, when combined with threading or something like
+                 # eventlet, it becomes difficult for the calling code to cope
+                 # This thread will tuck away the threading situation such that
+                 # calling code doesn't have to do any gymnastics to cope with
+                 # the nature of things.
+ioqueue = collections.deque([])
+iolock = None
+selectbreak = None
+selectdeadline = 0
+running = True
+iosockets = []  # set of iosockets that will be shared amongst Session objects
+
+
+def _ioworker():
+    global iolock
+    global selectbreak
+    global selectdeadline
+    selectbreak = os.pipe()
+    fcntl.fcntl(selectbreak[0], fcntl.F_SETFL, os.O_NONBLOCK)
+    iolock = threading.RLock()
+    iosockets.append(selectbreak[0])
+    iowaiters = []
+    timeout = 300
+    while running:
+        selectdeadline = _monotonic_time() + timeout
+        tmplist, _, _ = select.select(iosockets, (), (), timeout)
+        rdylist = []
+        for handle in tmplist:
+            if handle is selectbreak[0]:
+                try:  # flush all requests to interrupt that may be pending
+                    while True:
+                        os.read(handle, 1)
+                except OSError:
+                    # this means an EWOULDBLOCK occurred, ignore that as that
+                    # was the endgame
+                    pass
+            else:
+                rdylist.append(handle)
+        for w in iowaiters:
+            w[2].append(tuple(rdylist))
+            w[3].set()
+        iowaiters = []
+        timeout = 300
+        with iolock:
+            while ioqueue:
+                workitem = ioqueue.popleft()
+                # structure is function, args, list to append to ,event to set
+                if isinstance(workitem[1], tuple):  # positional arguments
+                    workitem[2].append(workitem[0](*workitem[1]))
+                    workitem[3].set()
+                elif isinstance(workitem[1], dict):
+                    workitem[2].append(workitem[0](**workitem[1]))
+                    workitem[3].set()
+                elif workitem[0] == 'wait':
+                    if len(rdylist) > 0:
+                        workitem[2].append(tuple(rdylist))
+                        workitem[3].set()
+                    else:
+                        ltimeout = workitem[1] - _monotonic_time()
+                        if ltimeout < timeout:
+                            timeout = ltimeout
+                        iowaiters.append(workitem)
+
+
+def _io_apply(function, args):
+    global iolock
+    global selectbreak
+    evt = threading.Event()
+    result = []
+    with iolock:
+        ioqueue.append((function, args, result, evt))
+    if not (function == 'wait' and selectdeadline < args):
+        os.write(selectbreak[1], '1')
+    evt.wait()
+    return result[0]
+
+
+selectdeadline = 0
+selectwait = None
+
+
+def _io_sendto(mysocket, packet, sockaddr):
+    #Want sendto to act reasonably sane..
+    mysocket.setblocking(1)
+    mysocket.sendto(packet, sockaddr)
+
+
+def _io_recvfrom(mysocket, size):
+    mysocket.setblocking(0)
+    try:
+        return mysocket.recvfrom(size)
+    except socket.error:
+        return None
 
 
 def _monotonic_time():
@@ -55,7 +152,7 @@ def _monotonic_time():
 
 
 def _poller(readhandles, timeout=0):
-    rdylist, _, _ = select.select(readhandles, (), (), timeout)
+    rdylist = _io_apply('wait', timeout + _monotonic_time())
     return rdylist
 
 
@@ -117,7 +214,6 @@ class Session(object):
     :param port: UDP port to communicate with, pretty much always 623
     :param onlogon: callback to receive notification of login completion
     """
-    _external_handlers = {}
     bmc_handlers = {}
     waiting_sessions = {}
     keepalive_sessions = {}
@@ -128,14 +224,23 @@ class Session(object):
 
     @classmethod
     def _cleanup(cls):
+        global running
         for session in cls.bmc_handlers.itervalues():
             session.cleaningup = True
             session.logout()
+        running = False
 
     @classmethod
     def _createsocket(cls):
+        global iowork
+        global iothread
+        global iosockets
+        if iothread is None:
+            iothread = threading.Thread(target=_ioworker)
+            iothread.start()
         atexit.register(cls._cleanup)
-        cls.socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)  # INET6
+        cls.socket = _io_apply(socket.socket,
+                               (socket.AF_INET6, socket.SOCK_DGRAM))  # INET6
                                     # can do IPv4 if you are nice to it
         try:  # we will try to fixup our receive buffer size if we are smaller
              # than allowed.
@@ -145,15 +250,16 @@ class Session(object):
             curmax = cls.socket.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
             curmax = curmax / 2
             if (rmemmax > curmax):
-                cls.socket.setsockopt(socket.SOL_SOCKET,
-                                      socket.SO_RCVBUF,
-                                      rmemmax)
+                _io_apply(cls.socket.setsockopt, (socket.SOL_SOCKET,
+                                                  socket.SO_RCVBUF,
+                                                  rmemmax))
         except Exception:
             # FIXME: be more selective in catching exceptions
             pass
 
-        curmax = cls.socket.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
-        cls.readersockets = [cls.socket]
+        curmax = _io_apply(cls.socket.getsockopt,
+                           (socket.SOL_SOCKET, socket.SO_RCVBUF))
+        iosockets.append(cls.socket)
         curmax = curmax / 2
         # we throttle such that we never have no more outstanding packets than
         # our receive buffer should be able to handle
@@ -713,6 +819,14 @@ class Session(object):
         self._get_channel_auth_cap()
 
     @classmethod
+    def pulltoqueue(cls, mysocket, queue):
+        while True:
+            rdata = _io_apply(_io_recvfrom, (mysocket, 3000))
+            if rdata is None:
+                break
+            queue.append(rdata)
+
+    @classmethod
     def wait_for_rsp(cls, timeout=None, callout=True):
         """IPMI Session Event loop iteration
 
@@ -723,6 +837,7 @@ class Session(object):
         :param timeout: Maximum time to wait for data to come across.  If
                         unspecified, will autodetect based on earliest timeout
         """
+        global iosockets
         #Assume:
         #Instance A sends request to packet B
         #Then Instance C sends request to BMC D
@@ -762,34 +877,24 @@ class Session(object):
         while cls.iterwaiters:
             waiter = cls.iterwaiters.pop()
             waiter({'success': True})
+            # cause a quick exit from the event loop iteration for calling code
+            # to be able to reasonably set up for the next iteration before
+            # a long select comes along
+            if timeout is not None:
+                timeout = 0
         if timeout is None:
             return 0
-        rdylist, _, _ = select.select(cls.readersockets, (), (), timeout)
+        rdylist = _poller(iosockets, timeout=timeout)
         if len(rdylist) > 0:
             while _poller((cls.socket,)):  # if the somewhat lengthy
                         # queue # processing takes long enough for packets to
                         # come in, be eager
                 pktqueue = collections.deque([])
-                while _poller((cls.socket,)):  # looks rendundant, but
-                              # want # to queue and process packets to keep
-                              # things off RCVBUF
-                    rdata = cls.socket.recvfrom(3000)
-                    pktqueue.append(rdata)
+                cls.pulltoqueue(cls.socket, pktqueue)
                 while len(pktqueue):
                     (data, sockaddr) = pktqueue.popleft()
                     cls._route_ipmiresponse(sockaddr, data)
-                    while _poller((cls.socket,)):  # seems ridiculous,
-                         #but between every callback, check for packets again
-                        rdata = cls.socket.recvfrom(3000)
-                        pktqueue.append(rdata)
-            for handlepair in _poller(cls.readersockets):
-                if isinstance(handlepair, int):
-                    myhandle = handlepair
-                else:
-                    myhandle = handlepair.fileno()
-                if myhandle != cls.socket.fileno() and callout:
-                    myfile = cls._external_handlers[myhandle][1]
-                    cls._external_handlers[myhandle][0](myfile)
+                    cls.pulltoqueue(cls.socket, pktqueue)
         sessionstodel = []
         sessionstokeepalive = []
         for session, parms in cls.keepalive_sessions.iteritems():
@@ -819,28 +924,6 @@ class Session(object):
         if self.incommand:  # if currently in command, no cause to keepalive
             return
         self.raw_command(netfn=6, command=1)
-
-    @classmethod
-    def register_handle_callback(cls, handle, callback):
-        """Add a handle to be watched by Session's event loop
-
-        In the event that an application would like IPMI Session event loop
-        to drive things while adding their own filehandle to watch for events,
-        this class method will register that.
-
-        :param handle: filehandle too watch for input
-        :param callback: function to call when input detected on the handle.
-                         will receive the handle as an argument
-        """
-        if isinstance(handle, int):
-            cls._external_handlers[handle] = (callback, handle)
-        else:
-            cls._external_handlers[handle.fileno()] = (callback, handle)
-        #If we don't have a socket yet, we need one for the code to behave
-        #correctly from this point forward
-        if not hasattr(Session, 'socket'):
-            cls._createsocket()
-        cls.readersockets += [handle]
 
     @classmethod
     def _route_ipmiresponse(cls, sockaddr, data):
@@ -1236,7 +1319,8 @@ class Session(object):
                 _monotonic_time()
             return  # skip transmit, let retry timer do it's thing
         if self.sockaddr:
-            Session.socket.sendto(self.netpacket, self.sockaddr)
+            _io_apply(_io_sendto,
+                      (Session.socket, self.netpacket, self.sockaddr))
         else:  # he have not yet picked a working sockaddr for this connection,
               # try all the candidates that getaddrinfo provides
             self.allsockaddrs = []
@@ -1252,7 +1336,8 @@ class Session(object):
                         sockaddr = (newhost, sockaddr[1], 0, 0)
                     self.allsockaddrs.append(sockaddr)
                     Session.bmc_handlers[sockaddr] = self
-                    Session.socket.sendto(self.netpacket, sockaddr)
+                    _io_apply(_io_sendto, (Session.socket,
+                              self.netpacket, sockaddr))
             except socket.gaierror:
                 raise exc.IpmiException(
                     "Unable to transmit to specified address")
