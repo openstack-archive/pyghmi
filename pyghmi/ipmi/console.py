@@ -167,6 +167,10 @@ class Console(object):
         return session.Session.wait_for_rsp(timeout=timeout)
 
     def _sendpendingoutput(self):
+        self._sendoutput(self.pendingoutput)
+        self.pendingoutput = ""
+
+    def _sendoutput(self, output):
         self.myseq += 1
         self.myseq &= 0xf
         if self.myseq == 0:
@@ -176,22 +180,26 @@ class Console(object):
                               self.ackedseq,
                               self.ackedseq,
                               self.sendbreak)
-        payload += self.pendingoutput
-        self.lasttextsize = len(self.pendingoutput)
-        self.pendingoutput = ""
+        payload += output
+        self.lasttextsize = len(output)
+        needskeepalive = False
+        if self.lasttextsize == 0:
+            needskeepalive = True
         self.awaitingack = True
         payload = struct.unpack("%dB" % len(payload), payload)
         self.lastpayload = payload
-        self.send_payload(payload)
+        self.send_payload(payload, needskeepalive=needskeepalive)
 
-    def send_payload(self, payload, payload_type=1, retry=True):
+    def send_payload(self, payload, payload_type=1, retry=True,
+                     needskeepalive=False):
         while not (self.connected or self.broken):
             session.Session.wait_for_rsp(timeout=10)
         if not self.ipmi_session.logged:
             raise exc.IpmiException('Session no longer connected')
         self.ipmi_session.send_payload(payload,
                                        payload_type=payload_type,
-                                       retry=retry)
+                                       retry=retry,
+                                       needskeepalive=needskeepalive)
 
     def _print_info(self, info):
         self._print_data({'info': info})
@@ -276,6 +284,8 @@ class Console(object):
                     newtext = struct.pack("B"*len(newtext), *newtext)
                     self.pendingoutput = newtext + self.pendingoutput
                     self._sendpendingoutput()
+            if len(self.pendingoutput) > 0:
+                self._sendpendingoutput()
         elif self.awaitingack:  # session marked us as happy, but we are not
                 #this does mean that we will occasionally retry a packet
                 #sooner than retry suggests, but that's no big deal
