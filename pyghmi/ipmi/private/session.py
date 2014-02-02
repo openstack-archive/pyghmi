@@ -450,7 +450,15 @@ class Session(object):
                           retry=retry, delay_xmit=delay_xmit)
 
     def send_payload(self, payload=None, payload_type=None, retry=True,
-                     delay_xmit=None):
+                     delay_xmit=None, needskeepalive=False):
+        """
+        :param needskeepalive: If the payload is expected not to count as
+                               'active' by the BMC, set this to True
+                               to avoid Session considering the
+                               job done because of this payload.
+                               Notably, 0-length SOL packets
+                               are prone to confusion.
+        """
         if payload is not None and self.lastpayload is not None:
                              #we already have a packet outgoing, make this
                              # a pending payload
@@ -543,7 +551,7 @@ class Session(object):
         self.netpacket = struct.pack("!%dB" % len(message), *message)
         #advance idle timer since we don't need keepalive while sending packets
         #out naturally
-        if self in Session.keepalive_sessions:
+        if self in Session.keepalive_sessions and not needskeepalive:
             Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
                 25 + (random.random() * 4.9)
         self._xmit_packet(retry, delay_xmit=delay_xmit)
