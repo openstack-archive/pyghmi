@@ -87,6 +87,9 @@ class Command(object):
                                                 onlogon=self.logged,
                                                 port=port,
                                                 kg=kg)
+            # induce one iteration of the loop, now that we would be
+            # prepared for it in theory
+            session.Session.wait_for_rsp(0)
         else:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,

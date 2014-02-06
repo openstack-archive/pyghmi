@@ -61,6 +61,9 @@ class Console(object):
                                             port=port,
                                             kg=kg,
                                             onlogon=self._got_session)
+        # induce one iteration of the loop, now that we would be
+        # prepared for it in theory
+        session.Session.wait_for_rsp(0)
 
     def _got_session(self, response):
         """Private function to navigate SOL payload activation

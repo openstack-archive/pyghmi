@@ -318,9 +318,6 @@ class Session(object):
                     self.logonwaiters.append(onlogon)
                 else:
                     self.iterwaiters.append(onlogon)
-            # Induce an immediate iteration of the event loop
-            # so that these handlers get the information they are hoping for
-            Session.wait_for_rsp(0)
             return
         self.maxtimeout = 3  # be aggressive about giving up on initial packet
         self.incommand = False
