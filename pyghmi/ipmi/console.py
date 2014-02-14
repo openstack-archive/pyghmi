@@ -154,8 +154,12 @@ class Console(object):
         return session.Session.wait_for_rsp(timeout=timeout)
 
     def _sendpendingoutput(self):
-        self._sendoutput(self.pendingoutput)
-        self.pendingoutput = ""
+        if len(self.pendingoutput) > self.maxoutcount:
+            self._sendoutput(self.pendingoutput[:self.maxoutcount])
+            self.pendingoutput = self.pendingoutput[self.maxoutcount:]
+        else:
+            self._sendoutput(self.pendingoutput)
+            self.pendingoutput = ""
 
     def _sendoutput(self, output):
         self.myseq += 1
