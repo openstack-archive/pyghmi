@@ -130,6 +130,8 @@ class Console(object):
         #code anyway...
         self.ipmi_session.sol_handler = self._got_sol_payload
         self.connected = True
+        if len(self.pendingoutput) > 0:
+            self._sendpendingoutput()
 
     def _got_cons_input(self, handle):
         """Callback for handle events detected by ipmi session
@@ -139,7 +141,11 @@ class Console(object):
             self._sendpendingoutput()
 
     def send_data(self, data):
+        if self.broken:
+            return
         self.pendingoutput += data
+        if not self.connected:
+            return
         if not self.awaitingack:
             self._sendpendingoutput()
 
