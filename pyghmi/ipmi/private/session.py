@@ -65,6 +65,11 @@ def _ioworker(initialized):
             timeout = 0
         selectdeadline = _monotonic_time() + timeout
         tmplist, _, _ = select.select(iosockets, (), (), timeout)
+        # pessimistically move out the deadline
+        # doing it this early (before ioqueue is evaluated)
+        # this avoids other threads making a bad assumption
+        # about not having to break into the select
+        selectdeadline = _monotonic_time() + 300
         rdylist = []
         for handle in tmplist:
             if handle is selectbreak[0]:
