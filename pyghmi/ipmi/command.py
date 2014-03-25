@@ -260,7 +260,8 @@ class Command(object):
             return response
         return {'bootdev': bootdev}
 
-    def raw_command(self, netfn, command, bridge_request={}, data=()):
+    def raw_command(self, netfn, command, bridge_request={}, data=(),
+                    delay_xmit=None):
         """Send raw ipmi command to BMC
 
         This allows arbitrary IPMI bytes to be issued.  This is commonly used
@@ -277,7 +278,7 @@ class Command(object):
         """
         return self.ipmi_session.raw_command(netfn=netfn, command=command,
                                              bridge_request=bridge_request,
-                                             data=data)
+                                             data=data, delay_xmit=delay_xmit)
 
     def get_power(self):
         """Get current power state of the managed system
