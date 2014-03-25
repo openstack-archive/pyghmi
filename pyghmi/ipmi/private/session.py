@@ -330,16 +330,24 @@ class Session(object):
         self.cleaningup = False
         self.lastpayload = None
         self.bmc = bmc
-        self.userid = userid
-        self.password = password
+        try:
+            self.userid = userid.encode('utf-8')
+            self.password = password.encode('utf-8')
+        except AttributeError:
+            self.userid = userid
+            self.password = password
         self.nowait = False
         self.pendingpayloads = collections.deque([])
         self.request_entry = []
         self.kgo = kg
         if kg is not None:
+            try:
+                kg = kg.encode('utf-8')
+            except AttributeError:
+                pass
             self.kg = kg
         else:
-            self.kg = password
+            self.kg = self.password
         self.port = port
         if (onlogon is None):
             self.async = False
