@@ -19,6 +19,7 @@ import atexit
 import collections
 import fcntl
 import hashlib
+import hmac
 import os
 import random
 import select
@@ -27,8 +28,6 @@ import struct
 import threading
 
 from Crypto.Cipher import AES
-from Crypto.Hash import HMAC
-from Crypto.Hash import SHA
 
 import pyghmi.exceptions as exc
 from pyghmi.ipmi.private import constants
@@ -657,10 +656,10 @@ class Session(object):
                 message.append(7)  # reserved, 7 is the required value for the
                                   # specification followed
                 integdata = message[4:]
-                authcode = HMAC.new(self.k1,
+                authcode = hmac.new(self.k1,
                                     struct.pack("%dB" % len(integdata),
                                                 *integdata),
-                                    SHA).digest()[:12]  # SHA1-96
+                                    hashlib.sha1).digest()[:12]  # SHA1-96
                                     # per RFC2404 truncates to 96 bits
                 message += struct.unpack("12B", authcode)
         self.netpacket = struct.pack("!%dB" % len(message), *message)
@@ -1011,8 +1010,8 @@ class Session(object):
             if data[5] & 0b10000000:
                 encrypted = 1
             authcode = rawdata[-12:]
-            expectedauthcode = HMAC.new(
-                self.k1, rawdata[4:-12], SHA).digest()[:12]
+            expectedauthcode = hmac.new(
+                self.k1, rawdata[4:-12], hashlib.sha1).digest()[:12]
             if authcode != expectedauthcode:
                 return  # BMC failed to assure integrity to us, drop it
             sid = struct.unpack("<I", rawdata[6:10])[0]
@@ -1123,7 +1122,7 @@ class Session(object):
             self.randombytes + self.remoterandombytes + self.remoteguid +\
             struct.pack("2B", self.privlevel, userlen) +\
             self.userid
-        expectedhash = HMAC.new(self.password, hmacdata, SHA).digest()
+        expectedhash = hmac.new(self.password, hmacdata, hashlib.sha1).digest()
         givenhash = struct.pack("%dB" % len(data[40:]), *data[40:])
         if givenhash != expectedhash:
             self.sessioncontext = "FAILED"
@@ -1131,12 +1130,12 @@ class Session(object):
             return -9
         # We have now validated that the BMC and client agree on password, time
         # to store the keys
-        self.sik = HMAC.new(self.kg,
+        self.sik = hmac.new(self.kg,
                             self.randombytes + self.remoterandombytes +
                             struct.pack("2B", self.privlevel, userlen) +
-                            self.userid, SHA).digest()
-        self.k1 = HMAC.new(self.sik, '\x01' * 20, SHA).digest()
-        self.k2 = HMAC.new(self.sik, '\x02' * 20, SHA).digest()
+                            self.userid, hashlib.sha1).digest()
+        self.k1 = hmac.new(self.sik, '\x01' * 20, hashlib.sha1).digest()
+        self.k2 = hmac.new(self.sik, '\x02' * 20, hashlib.sha1).digest()
         self.aeskey = self.k2[0:16]
         self.sessioncontext = "EXPECTINGRAKP4"
         self.lastpayload = None
@@ -1151,7 +1150,7 @@ class Session(object):
             struct.pack("<I", self.localsid) +\
             struct.pack("2B", self.privlevel, len(self.userid)) +\
             self.userid
-        authcode = HMAC.new(self.password, hmacdata, SHA).digest()
+        authcode = hmac.new(self.password, hmacdata, hashlib.sha1).digest()
         payload += list(struct.unpack("%dB" % len(authcode), authcode))
         self.send_payload(
             payload=payload, payload_type=constants.payload_types['rakp3'])
@@ -1185,7 +1184,8 @@ class Session(object):
         hmacdata = self.randombytes +\
             struct.pack("<I", self.pendingsessionid) +\
             self.remoteguid
-        expectedauthcode = HMAC.new(self.sik, hmacdata, SHA).digest()[:12]
+        expectedauthcode = hmac.new(self.sik, hmacdata,
+                                    hashlib.sha1).digest()[:12]
         authcode = struct.pack("%dB" % len(data[8:]), *data[8:])
         if authcode != expectedauthcode:
             self.onlogon({'error': "Invalid RAKP4 integrity code (wrong Kg?)"})
