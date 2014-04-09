@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2013 IBM Corporation
+# Copyright 2014 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,11 +48,8 @@ class Console(object):
         self.remseq = 0
         self.myseq = 0
         self.lastsize = 0
-        self.sendbreak = 0
-        self.ackedcount = 0
-        self.ackedseq = 0
         self.retriedpayload = 0
-        self.pendingoutput = ""
+        self.pendingoutput = []
         self.awaitingack = False
         self.force_session = force
         self.ipmi_session = session.Session(bmc=bmc,
@@ -133,17 +130,34 @@ class Console(object):
         if len(self.pendingoutput) > 0:
             self._sendpendingoutput()
 
+    def _addpendingdata(self, data):
+        if isinstance(data,dict):
+            self.pendingoutput.append(data)
+        else:  # it is a text situation
+            if (len(self.pendingoutput) == 0 or
+                    isinstance(self.pendingoutput[-1],dict)):
+                self.pendingoutput.append(data)
+            else:
+                self.pendingoutput[-1] += data
+
     def _got_cons_input(self, handle):
         """Callback for handle events detected by ipmi session
         """
-        self.pendingoutput += handle.read()
+        self._addpendingdata(handle.read())
         if not self.awaitingack:
             self._sendpendingoutput()
 
     def send_data(self, data):
         if self.broken:
             return
-        self.pendingoutput += data
+        self._addpendingdata(data)
+        if not self.connected:
+            return
+        if not self.awaitingack:
+            self._sendpendingoutput()
+
+    def send_break(self):
+        self._addpendingdata({'break': 1})
         if not self.connected:
             return
         if not self.awaitingack:
@@ -160,24 +174,33 @@ class Console(object):
         return session.Session.wait_for_rsp(timeout=timeout)
 
     def _sendpendingoutput(self):
-        if len(self.pendingoutput) > self.maxoutcount:
-            chunk = self.pendingoutput[:self.maxoutcount]
-            self.pendingoutput = self.pendingoutput[self.maxoutcount:]
+        if isinstance(self.pendingoutput[0], dict):
+            if 'break' in self.pendingoutput[0]:
+                self._sendoutput("", sendbreak=True)
+            else:
+                raise ValueError
+            del self.pendingoutput[0]
+            return
+        if len(self.pendingoutput[0]) > self.maxoutcount:
+            chunk = self.pendingoutput[0][:self.maxoutcount]
+            self.pendingoutput[0] = self.pendingoutput[0][self.maxoutcount:]
         else:
-            chunk = self.pendingoutput
-            self.pendingoutput = ""
+            chunk = self.pendingoutput[0]
+            del self.pendingoutput[0]
         self._sendoutput(chunk)
 
-    def _sendoutput(self, output):
+    def _sendoutput(self, output, sendbreak=False):
         self.myseq += 1
         self.myseq &= 0xf
         if self.myseq == 0:
             self.myseq = 1
-        payload = struct.pack("BBBB",
-                              self.myseq,
-                              self.ackedseq,
-                              self.ackedseq,
-                              self.sendbreak)
+        # currently we don't try to combine ack with outgoing data
+        # so we use 0 for ack sequence number and accepted character
+        # count
+        breakbyte = 0
+        if sendbreak:
+            breakbyte = 0b10000
+        payload = struct.pack("BBBB", self.myseq, 0, 0, breakbyte)
         payload += output
         self.lasttextsize = len(output)
         needskeepalive = False
@@ -233,6 +256,7 @@ class Console(object):
         nacked = payload[3] & 0b1000000
         poweredoff = payload[3] & 0b100000
         deactivated = payload[3] & 0b10000
+        breakdetected = payload[3] & 0b100
         #for now, ignore overrun.  I assume partial NACK for this reason or for
         #no reason would be treated the same, new payload with partial data
         remdata = ""
@@ -261,7 +285,7 @@ class Console(object):
         if self.myseq != 0 and ackseq == self.myseq:  # the bmc has something
                                                       # to say about last xmit
             self.awaitingack = False
-            if nacked > 0:  # the BMC was in some way unhappy
+            if nacked and not breakdetected:  # the BMC was in some way unhappy
                 if poweredoff:
                     self._print_info("Remote system is powered down")
                 if deactivated:
@@ -270,7 +294,11 @@ class Console(object):
                     # also add pending output for efficiency and ease
                     newtext = self.lastpayload[4 + ackcount:]
                     newtext = struct.pack("B"*len(newtext), *newtext)
-                    self.pendingoutput = newtext + self.pendingoutput
+                    if (self.pendingoutput and
+                            not isinstance(self.pendingoutput[0], dict)):
+                        self.pendingoutput[0] = newtext + self.pendingoutput[0]
+                    else:
+                        self.pendingoutput = [newtext] + self.pendingoutput
                     self._sendpendingoutput()
             if len(self.pendingoutput) > 0:
                 self._sendpendingoutput()
