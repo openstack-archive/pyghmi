@@ -368,15 +368,20 @@ class SDREntry(object):
 
     def _decode_state(self, state):
         mapping = ipmiconst.discrete_type_offsets
-        if self.reading_type in mapping:
-            desc = mapping[self.reading_type][state]['desc']
-            health = mapping[self.reading_type][state]['severity']
-        elif self.reading_type == 0x6f:
-            mapping = ipmiconst.sensor_type_offsets
-            desc = mapping[self.sensor_type_number][state]['desc']
-            health = mapping[self.sensor_type_number][state]['severity']
-        else:
-            desc = "Unknown state %d" % state
+        try:
+            if self.reading_type in mapping:
+                desc = mapping[self.reading_type][state]['desc']
+                health = mapping[self.reading_type][state]['severity']
+            elif self.reading_type == 0x6f:
+                mapping = ipmiconst.sensor_type_offsets
+                desc = mapping[self.sensor_type_number][state]['desc']
+                health = mapping[self.sensor_type_number][state]['severity']
+            else:
+                desc = "Unknown state %d" % state
+                health = const.Health.Warning
+        except KeyError:
+            desc = "Unknown state %d for reading type %d/sensor type %d" % (
+                state, self.reading_type, self.sensor_type_number)
             health = const.Health.Warning
         return (desc, health)
 
