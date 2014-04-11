@@ -461,6 +461,36 @@ sensor_type_offsets = {
             'severity': const.Health.Critical,
         },
     },
+    0x10: {  # event log disabled
+        0: {
+            'desc': 'Correctable Memory Error Logging Disabled',
+            'severity': const.Health.Warning,
+        },
+        1: {
+            'desc': 'Specific event logging disabled',
+            'severity': const.Health.Warning,
+        },
+        2: {
+            'desc': 'Log Cleared',
+            'severity': const.Health.Ok,
+        },
+        3: {
+            'desc': 'Logging Disabled',
+            'severity': const.Health.Warning,
+        },
+        4: {
+            'desc': 'Event log full',
+            'severity': const.Health.Warning,
+        },
+        5: {
+            'desc': 'Event log nearly full',
+            'severity': const.Health.Warning,
+        },
+        6: {
+            'desc': 'Correctable Machine Check Logging Disabled',
+            'severity': const.Health.Warning,
+        },
+    },
     0x1b: {  # Cable/Interconnect
         0: {
             'desc': 'Connected',
