@@ -515,6 +515,40 @@ sensor_type_offsets = {
             'severity': const.Health.Ok,
         },
     },
+    0x2b: {  # Version Change
+        0: {
+            'desc': 'Hardware change detected',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Firmware or software change detected',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Hardware incompatibility detected',
+            'severity': const.Health.Critical,
+        },
+        3: {
+            'desc': 'Firmware/software incompatibility detected',
+            'severity': const.Health.Critical,
+        },
+        4: {
+            'desc': 'Invalid/Unsupported hardware revision',
+            'severity': const.Health.Critical,
+        },
+        5: {
+            'desc': 'Invalid/Unsupported firmware/software version',
+            'severity': const.Health.Critical,
+        },
+        6: {
+            'desc': 'Successful Hardware Change',
+            'severity': const.Health.Ok,
+        },
+        7: {
+            'desc': 'Successful Software/Firmware Change',
+            'severity': const.Health.Ok,
+        },
+    },
 }
 
 
