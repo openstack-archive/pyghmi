@@ -461,6 +461,20 @@ sensor_type_offsets = {
             'severity': const.Health.Critical,
         },
     },
+    0xf: {
+        0: {
+            'desc': 'System Firmware boot error',
+            'severity': const.Health.Failed,
+        },
+        1: {
+            'desc': 'System Firmware hang',
+            'severity': const.Health.Failed,
+        },
+        2: {
+            'desc': 'System Firmware Progress',
+            'severity': const.Health.Ok,
+        },
+    },
     0x10: {  # event log disabled
         0: {
             'desc': 'Correctable Memory Error Logging Disabled',
@@ -491,6 +505,114 @@ sensor_type_offsets = {
             'severity': const.Health.Warning,
         },
     },
+    0x12: {  # system event
+        0: {
+            'desc': 'System reconfigured',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'OEM boot event',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Undetermined hardware failure',
+            'severity': const.Health.Failed,
+        },
+        3: {
+            'desc': 'Aux log entry',
+            'severity': const.Health.Ok,
+        },
+        4: {
+            'desc': 'Event Response',
+            'severity': const.Health.Ok,
+        },
+        5: {
+            'desc': 'Clock time change',
+            'severity': const.Health.Ok,
+        },
+    },
+    0x13: {  # critical interrupt
+        0: {
+            'desc': 'Front panel diagnostic interrupt',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Bus Timeout',
+            'severity': const.Health.Critical,
+        },
+        2: {
+            'desc': 'I/O NMI',
+            'severity': const.Health.Critical,
+        },
+        3: {
+            'desc': 'Software NMI',
+            'severity': const.Health.Critical,
+        },
+        4: {
+            'desc': 'PCI PERR',
+            'severity': const.Health.Failed,
+        },
+        5: {
+            'desc': 'PCI SERR',
+            'severity': const.Health.Failed,
+        },
+        6: {
+            'desc': 'EISA Fail safe timeout',
+            'severity': const.Health.Failed,
+        },
+        7: {
+            'desc': 'Bus Correctable Error',
+            'severity': const.Health.Warning,
+        },
+        8: {
+            'desc': 'Bus Uncorrectable Error',
+            'severity': const.Health.Failed,
+        },
+        9: {
+            'desc': 'Fatal NMI',
+            'severity': const.Health.Failed,
+        },
+        0xa: {
+            'desc': 'Bus Fatal Error',
+            'severity': const.Health.Failed,
+        },
+        0xb: {
+            'desc': 'Bus Degraded',
+            'severity': const.Health.Warning,
+        },
+    },
+    0x14: {  # button/switch
+        0: {
+            'desc': 'Power button pressed',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Sleep button pressed',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Reset button pressed',
+            'severity': const.Health.Ok,
+        },
+        3: {
+            'desc': 'FRU latch open',
+            'severity': const.Health.Ok,
+        },
+        4: {
+            'desc': 'Service requested',
+            'severity': const.Health.Warning,
+        },
+    },
+    0x19: {  # chipset
+        0: {
+            'desc': 'Soft power control failure',
+            'severity': const.Health.Critical,
+        },
+        1: {
+            'desc': 'Thermal Trip',
+            'severity': const.Health.Failed,
+        },
+    },
     0x1b: {  # Cable/Interconnect
         0: {
             'desc': 'Connected',
@@ -499,6 +621,258 @@ sensor_type_offsets = {
         1: {
             'desc': 'Connection error',
             'severity': const.Health.Critical,
+        },
+    },
+    0x1d: {  # system boot initiated
+        0: {
+            'desc': 'Power up',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Hard Reset',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Warm Reset',
+            'severity': const.Health.Ok,
+        },
+        3: {
+            'desc': 'PXE Boot',
+            'severity': const.Health.Ok,
+        },
+        4: {
+            'desc': 'Autoboot to diagnostic',
+            'severity': const.Health.Warning,
+        },
+        0: {
+            'desc': 'OS hard reset',
+            'severity': const.Health.Ok,
+        },
+        0: {
+            'desc': 'OS warm reset',
+            'severity': const.Health.Ok,
+        },
+        0: {
+            'desc': 'System restart',
+            'severity': const.Health.Ok,
+        },
+    },
+    0x1e: {  # boot error
+        0: {
+            'desc': 'No bootable media',
+            'severity': const.Health.Failed,
+        },
+        1: {
+            'desc': 'Unbootable removable media',
+            'severity': const.Health.Failed,
+        },
+        2: {
+            'desc': 'PXE Failure',
+            'severity': const.Health.Failed,
+        },
+        3: {
+            'desc': 'Invalid boot sector',
+            'severity': const.Health.Failed,
+        },
+        4: {
+            'desc': 'Interactive boot timeout',
+            'severity': const.Health.Failed,
+        },
+    },
+    0x1f: {  # OS boot
+        0: {
+            'desc': 'A: boot completed',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Hard drive boot completed',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Network boot completed',
+            'severity': const.Health.Ok,
+        },
+        3: {
+            'desc': 'Diagnostic boot completed',
+            'severity': const.Health.Ok,
+        },
+        4: {
+            'desc': 'CD boot completed',
+            'severity': const.Health.Ok,
+        },
+        5: {
+            'desc': 'ROM boot completed',
+            'severity': const.Health.Ok,
+        },
+        6: {
+            'desc': 'Boot completed',
+            'severity': const.Health.Ok,
+        },
+    },
+    0x20: {  # OS Stop
+        0: {
+            'desc': 'OS boot stop',
+            'severity': const.Health.Failed,
+        },
+        1: {
+            'desc': 'OS Crash',
+            'severity': const.Health.Failed,
+        },
+        2: {
+            'desc': 'OS Cleanly Halted',
+            'severity': const.Health.Ok,
+        },
+        3: {
+            'desc': 'OS Cleanly shutdown',
+            'severity': const.Health.Ok,
+        },
+        4: {
+            'desc': 'Event driven soft shutdown',
+            'severity': const.Health.Warning,
+        },
+        5: {
+            'desc': 'Event driven soft shutdown failed',
+            'severity': const.Health.Warning,
+        },
+    },
+    0x21:  {  # slot/connector
+        0x0: {
+            'desc': 'Fault',
+            'severity': const.Health.Critical,
+        },
+        0x1: {
+            'desc': 'Identify',
+            'severity': const.Health.Ok,
+        },
+        0x2: {
+            'desc': 'Slot/Connector installed',
+            'severity': const.Health.Ok,
+        },
+        0x3: {
+            'desc': 'Slot/connector ready for install',
+            'severity': const.Health.Ok,
+        },
+        0x4: {
+            'desc': 'Slot/connector ready for removal',
+            'severity': const.Health.Ok,
+        },
+        0x5: {
+            'desc': 'Slot powered down',
+            'severity': const.Health.Ok,
+        },
+        0x6: {
+            'desc': 'Slot/connector device removal requested',
+            'severity': const.Health.Warning,
+        },
+        0x7: {
+            'desc': 'Slot/connector Interlock',
+            'severity': const.Health.Ok,
+        },
+        0x8: {
+            'desc': 'Slot/connector disabled',
+            'severity': const.Health.Warning,
+        },
+        0x9: {
+            'desc': 'Slot holds spare device',
+            'severity': const.Health.Ok,
+        },
+    },
+    0x22: {  # system acpi power state
+        0x0: {
+            'desc': 'Online',
+            'severity': const.Health.Ok,
+        },
+        0x1: {
+            'desc': 'S1 Sleep',
+            'severity': const.Health.Ok,
+        },
+        0x2: {
+            'desc': 'S2 Sleep',
+            'severity': const.Health.Ok,
+        },
+        0x3: {
+            'desc': 'Sleep',
+            'severity': const.Health.Ok,
+        },
+        0x4: {
+            'desc': 'Hibernated',
+            'severity': const.Health.Ok,
+        },
+        0x5: {
+            'desc': 'Off',
+            'severity': const.Health.Ok,
+        },
+        0x6: {
+            'desc': 'Hibernated or Off',
+            'severity': const.Health.Ok,
+        },
+        0x7: {
+            'desc': 'Mechanically Off',
+            'severity': const.Health.Ok,
+        },
+        0x8: {
+            'desc': 'Sleep',
+            'severity': const.Health.Ok,
+        },
+        0x9: {
+            'desc': 'G1 Sleep',
+            'severity': const.Health.Ok,
+        },
+        0xa: {
+            'desc': 'Shutdown',
+            'severity': const.Health.Ok,
+        },
+        0xb: {
+            'desc': 'On',
+            'severity': const.Health.Ok,
+        },
+        0xc: {
+            'desc': 'Off',
+            'severity': const.Health.Ok,
+        },
+        0xe: {
+            'desc': 'Unknown',
+            'severity': const.Health.Ok,
+        },
+    },
+    0x23: {  # watchdog
+        0x0: {
+            'desc': 'Watchdog expired',
+            'severity': const.Health.Critical,
+        },
+        0x1: {
+            'desc': 'Watchdog hard reset',
+            'severity': const.Health.Failed,
+        },
+        0x2: {
+            'desc': 'Watchdog Power down',
+            'severity': const.Health.Failed,
+        },
+        0x3: {
+            'desc': 'Watchdog Power Cycle',
+            'severity': const.Health.Failed,
+        },
+        0x8: {
+            'desc': 'Watchdog Interrupt',
+            'severity': const.Health.Ok,
+        },
+    },
+    0x24: {  # platform event
+        0x0: {
+            'desc': 'Platform generated page',
+            'severity': const.Health.Ok,
+        },
+        0x1: {
+            'desc': 'Platform generated Network alert',
+            'severity': const.Health.Ok,
+        },
+        0x2: {
+            'desc': 'Platform generated Network alert, PET format',
+            'severity': const.Health.Ok,
+        },
+        0x3: {
+            'desc': 'Platform generated Network alert, OEM SNMP format',
+            'severity': const.Health.Ok,
         },
     },
     0x25: {  # entity presence
@@ -512,7 +886,77 @@ sensor_type_offsets = {
         },
         2: {
             'desc': 'Disabled',
+            'severity': const.Health.Warning,
+        },
+    },
+    0x27: {  # LAN heartbeat
+        0: {
+            'desc': 'Heartbeat lost',
+            'severity': const.Health.Warning,
+        },
+        1: {
+            'desc': 'Heartbeat',
             'severity': const.Health.Ok,
+        },
+    },
+    0x28: {  # management subsystem health
+        0: {
+            'desc': 'Sensor access degraded or unavailable',
+            'severity': const.Health.Warning,
+        },
+        1: {
+            'desc': 'Controller access degraded or unavailable',
+            'severity': const.Health.Warning,
+        },
+        2: {
+            'desc': 'Controller Offline',
+            'severity': const.Health.Warning,
+        },
+        3: {
+            'desc': 'Controller Offline',
+            'severity': const.Health.Warning,
+        },
+        4: {
+            'desc': 'Sensor Error',
+            'severity': const.Health.Warning,
+        },
+        5: {
+            'desc': 'FRU Failure',
+            'severity': const.Health.Warning,
+        },
+    },
+    0x29: {  # battery
+        0: {
+            'desc': 'Battery Low',
+            'severity': const.Health.Warning,
+        },
+        1: {
+            'desc': 'Battery Failed',
+            # Critical here because typical battery failure
+            # does not indicate a 'failed' runtime
+            'severity': const.Health.Critical,
+        },
+        0: {
+            'desc': 'Battery Present',
+            'severity': const.Health.Ok,
+        },
+    },
+    0x2a: {  # session audit
+        0: {
+            'desc': 'Session activated',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Session deactivated',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Invalid username or password',
+            'severity': const.Health.Warning,
+        },
+        3: {
+            'desc': 'Account disabled due to failure count',
+            'severity': const.Health.Critical,
         },
     },
     0x2b: {  # Version Change
