@@ -323,6 +323,7 @@ class Session(object):
                 else:
                     self.iterwaiters.append(onlogon)
             return
+        self.privlevel = 4
         self.maxtimeout = 3  # be aggressive about giving up on initial packet
         self.incommand = False
         self.initialized = True
@@ -387,11 +388,6 @@ class Session(object):
         #                 I picked 'xCAT' minus 1 so that a hexdump of packet
         #                 would show xCAT
         self.localsid = 2017673555
-
-        # NOTE(jbjohnso): for the moment, assume admin access
-        # TODO(jbjohnso): make flexible
-        self.privlevel = 4
-
         self.confalgo = 0
         self.aeskey = None
         self.integrityalgo = 0
@@ -1069,7 +1065,10 @@ class Session(object):
             self.onlogon({'error': errstr})
             return -9
         self.allowedpriv = data[2]
-        # TODO(jbjohnso): enable lower priv access (e.g. operator/user)
+        # NOTE(jbjohnso): At this point, the BMC has no idea about what user
+        # shall be used.  As such, the allowedpriv field is actually
+        # not particularly useful.  got_rakp2 is a good place to
+        # gracefully detect and downgrade privilege for retry
         localsid = struct.unpack("<I", struct.pack("4B", *data[4:8]))[0]
         if self.localsid != localsid:
             return -9
@@ -1103,6 +1102,12 @@ class Session(object):
         if data[0] != self.rmcptag:  # ignore mismatched tags for retry logic
             return -9
         if data[1] != 0:  # if not successful, consider next move
+            if data[1] == 9 and self.privlevel == 4:
+                # Here the situation is likely that the peer didn't want
+                # us to use Operator.  Degrade to operator and try again
+                self.privlevel = 3
+                self.login()
+                return
             if data[1] == 2:  # invalid sessionid 99% of the time means a retry
                              # scenario invalidated an in-flight transaction
                 return
