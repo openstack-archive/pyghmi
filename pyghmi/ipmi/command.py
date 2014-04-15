@@ -27,15 +27,19 @@ boot_devices = {
     'network': 4,
     'pxe': 4,
     'hd': 8,
+    'safe': 0xc,
     'cd': 0x14,
     'cdrom': 0x14,
+    'optical': 0x14,
     'dvd': 0x14,
     'floppy': 0x3c,
     'default': 0x0,
     'setup': 0x18,
+    'bios': 0x18,
     'f1': 0x18,
     1: 'network',
     2: 'hd',
+    3: 'safe',
     5: 'optical',
     6: 'setup',
     0: 'default'
@@ -213,9 +217,10 @@ class Command(object):
         """Set boot device to use on next reboot
 
         :param bootdev:
-                        *net -- Request network boot
+                        *network -- Request network boot
                         *hd -- Boot from hard drive
-                        *optical -- boot from CD or DVD drive
+                        *safe -- Boot from hard drive, requesting 'safe mode'
+                        *optical -- boot from CD/DVD/BD drive
                         *setup -- Boot into setup utility
                         *default -- remove any IPMI directed boot device
                                     request
