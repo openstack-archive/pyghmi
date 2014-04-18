@@ -342,6 +342,10 @@ sensor_type_offsets = {
             'desc': 'power supply configuration error',
             'severity': const.Health.Warning,
         },
+        7: {
+            'desc': 'Standby',
+            'severity': const.Health.Ok,
+        },
     },
     9: {  # power unit
         0: {
@@ -707,6 +711,22 @@ sensor_type_offsets = {
         6: {
             'desc': 'Boot completed',
             'severity': const.Health.Ok,
+        },
+        7: {
+            'desc': 'OS deployment started',
+            'severity': const.Health.Ok,
+        },
+        8: {
+            'desc': 'OS deployment completed',
+            'severity': const.Health.Ok,
+        },
+        9: {
+            'desc': 'OS deployment aborted',
+            'severity': const.Health.Ok,
+        },
+        0xa: {
+            'desc': 'OS deployment failed',
+            'severity': const.Health.Failed,
         },
     },
     0x20: {  # OS Stop
