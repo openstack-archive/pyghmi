@@ -43,6 +43,8 @@ iothread = None  # the thread in which all IO will be performed
                  # This thread will tuck away the threading situation such that
                  # calling code doesn't have to do any gymnastics to cope with
                  # the nature of things.
+iothreadready = False  # whether io thread is yet ready to work
+iothreadwaiters = []  # threads waiting for iothreadready
 ioqueue = collections.deque([])
 selectbreak = None
 selectdeadline = 0
@@ -50,7 +52,8 @@ running = True
 iosockets = []  # set of iosockets that will be shared amongst Session objects
 
 
-def _ioworker(initialized):
+def _ioworker():
+    global iothreadready
     global selectbreak
     global selectdeadline
     selectbreak = os.pipe()
@@ -58,8 +61,11 @@ def _ioworker(initialized):
     iosockets.append(selectbreak[0])
     iowaiters = []
     timeout = 300
-    initialized.set()
+    iothreadready = True
     while running:
+        while iothreadwaiters:
+            waiter = iothreadwaiters.pop()
+            waiter.set()
         if timeout < 0:
             timeout = 0
         selectdeadline = _monotonic_time() + timeout
@@ -230,12 +236,18 @@ class Session(object):
     def _createsocket(cls):
         global iowork
         global iothread
+        global iothreadready
         global iosockets
         if iothread is None:
             initevt = threading.Event()
-            iothread = threading.Thread(target=_ioworker, args=(initevt,))
+            iothreadwaiters.append(initevt)
+            iothread = threading.Thread(target=_ioworker)
             iothread.daemon = True
             iothread.start()
+            initevt.wait()
+        elif not iothreadready:
+            initevt = threading.Event()
+            iothreadwaiters.append(initevt)
             initevt.wait()
         atexit.register(cls._cleanup)
         cls.socket = _io_apply(socket.socket,
