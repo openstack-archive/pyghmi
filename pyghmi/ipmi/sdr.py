@@ -427,7 +427,7 @@ class SDREntry(object):
             if len(reading) > 3:
                 for state in range(7):
                     if reading[3] & (0b1 << state):
-                        statedesc, health = self._decode_state(state + 7)
+                        statedesc, health = self._decode_state(state + 8)
                         output['health'] |= health
                         output['states'].append(statedesc)
         else:
