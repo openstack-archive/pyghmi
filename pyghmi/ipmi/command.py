@@ -84,6 +84,7 @@ class Command(object):
         # operations without pushing the async complexities up the stack
         self.onlogon = onlogon
         self.bmc = bmc
+        self._sdr = None
         if onlogon is not None:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,
@@ -106,7 +107,7 @@ class Command(object):
 
     @classmethod
     def eventloop(cls):
-        while (session.Session.wait_for_rsp()):
+        while session.Session.wait_for_rsp():
             pass
 
     @classmethod
@@ -145,7 +146,7 @@ class Command(object):
         else:  # will consult data2 of the boot flags parameter for the data
             bootnum = (response['data'][3] & 0b111100) >> 2
             bootdev = boot_devices[bootnum]
-            if (bootdev):
+            if bootdev:
                 return {'bootdev': bootdev}
             else:
                 return {'bootdev': bootnum}
@@ -171,49 +172,47 @@ class Command(object):
         if powerstate not in power_states:
             raise exc.InvalidParameterValue(
                 "Unknown power state %s requested" % powerstate)
-        self.newpowerstate = powerstate
+        newpowerstate = powerstate
         response = self.raw_command(netfn=0, command=1)
         if 'error' in response:
             raise exc.IpmiException(response['error'])
-        self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
-        if self.powerstate == self.newpowerstate:
-            return {'powerstate': self.powerstate}
-        if self.newpowerstate == 'boot':
-            self.newpowerstate = 'on' if self.powerstate == 'off' else 'reset'
+        oldpowerstate = 'on' if (response['data'][0] & 1) else 'off'
+        if oldpowerstate == newpowerstate:
+            return {'powerstate': oldpowerstate}
+        if newpowerstate == 'boot':
+            newpowerstate = 'on' if oldpowerstate == 'off' else 'reset'
         response = self.raw_command(
-            netfn=0, command=2, data=[power_states[self.newpowerstate]])
+            netfn=0, command=2, data=[power_states[newpowerstate]])
         if 'error' in response:
             raise exc.IpmiException(response['error'])
-        self.lastresponse = {'pendingpowerstate': self.newpowerstate}
+        lastresponse = {'pendingpowerstate': newpowerstate}
         waitattempts = 300
         if not isinstance(wait, bool):
             waitattempts = wait
         if (wait and
-           self.newpowerstate in ('on', 'off', 'shutdown', 'softoff')):
-            if self.newpowerstate in ('softoff', 'shutdown'):
-                self.waitpowerstate = 'off'
+           newpowerstate in ('on', 'off', 'shutdown', 'softoff')):
+            if newpowerstate in ('softoff', 'shutdown'):
+                waitpowerstate = 'off'
             else:
-                self.waitpowerstate = self.newpowerstate
+                waitpowerstate = newpowerstate
             currpowerstate = None
-            while currpowerstate != self.waitpowerstate and waitattempts > 0:
+            while currpowerstate != waitpowerstate and waitattempts > 0:
                 response = self.raw_command(netfn=0, command=1, delay_xmit=1)
                 if 'error' in response:
                     return response
                 currpowerstate = 'on' if (response['data'][0] & 1) else 'off'
                 waitattempts -= 1
-            if currpowerstate != self.waitpowerstate:
+            if currpowerstate != waitpowerstate:
                 raise exc.IpmiException(
                     "System did not accomplish power state change")
             return {'powerstate': currpowerstate}
         else:
-            return self.lastresponse
+            return lastresponse
 
     def set_bootdev(self,
                     bootdev,
                     persist=False,
-                    uefiboot=False,
-                    callback=None,
-                    callback_args=None):
+                    uefiboot=False):
         """Set boot device to use on next reboot
 
         :param bootdev:
@@ -232,40 +231,31 @@ class Command(object):
                          should BIOS boot and offers no "don't care" option.
                          In practice, this flag not being set does not preclude
                          UEFI boot on any system I've encountered.
-        :param callback: optional callback
-        :param callback_args: optional arguments to callback
         :returns: dict or True -- If callback is not provided, the response
         """
-
-        self.commandcallback = callback
-        self.commandcallbackargs = callback_args
         if bootdev not in boot_devices:
             return {'error': "Unknown bootdevice %s requested" % bootdev}
-        self.bootdev = boot_devices[bootdev]
-        self.persistboot = persist
-        self.uefiboot = uefiboot
+        bootdev = boot_devices[bootdev]
         # first, we disable timer by way of set system boot options,
         # then move on to set chassis capabilities
-        self.requestpending = True
         # Set System Boot Options is netfn=0, command=8, data
         response = self.raw_command(netfn=0, command=8, data=(3, 8))
-        self.lastresponse = response
         if 'error' in response:
             return response
         bootflags = 0x80
-        if self.uefiboot:
-            bootflags = bootflags | 1 << 5
-        if self.persistboot:
-            bootflags = bootflags | 1 << 6
-        if self.bootdev == 0:
+        if uefiboot:
+            bootflags |= 1 << 5
+        if persist:
+            bootflags |= 1 << 6
+        if bootdev == 0:
             bootflags = 0
-        data = (5, bootflags, self.bootdev, 0, 0, 0)
+        data = (5, bootflags, bootdev, 0, 0, 0)
         response = self.raw_command(netfn=0, command=8, data=data)
         if 'error' in response:
             return response
         return {'bootdev': bootdev}
 
-    def raw_command(self, netfn, command, bridge_request={}, data=(),
+    def raw_command(self, netfn, command, bridge_request=(), data=(),
                     delay_xmit=None):
         """Send raw ipmi command to BMC
 
@@ -297,8 +287,8 @@ class Command(object):
         if 'error' in response:
             raise exc.IpmiException(response['error'])
         assert(response['command'] == 1 and response['netfn'] == 1)
-        self.powerstate = 'on' if (response['data'][0] & 1) else 'off'
-        return {'powerstate': self.powerstate}
+        powerstate = 'on' if (response['data'][0] & 1) else 'off'
+        return {'powerstate': powerstate}
 
     def get_health(self):
         """Summarize health of managed system
@@ -307,9 +297,7 @@ class Command(object):
         It additionally provides an iterable list of reasons for
         warning, critical, or failed assessments.
         """
-        summary = {}
-        summary['badreadings'] = []
-        summary['health'] = const.Health.Ok
+        summary = {'badreadings': [], 'health': const.Health.Ok}
         for reading in self.get_sensor_data():
             if reading.health != const.Health.Ok:
                 summary['health'] |= reading.health
