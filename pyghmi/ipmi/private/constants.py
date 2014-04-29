@@ -648,15 +648,15 @@ sensor_type_offsets = {
             'desc': 'Autoboot to diagnostic',
             'severity': const.Health.Warning,
         },
-        0: {
+        5: {
             'desc': 'OS hard reset',
             'severity': const.Health.Ok,
         },
-        0: {
+        6: {
             'desc': 'OS warm reset',
             'severity': const.Health.Ok,
         },
-        0: {
+        7: {
             'desc': 'System restart',
             'severity': const.Health.Ok,
         },
@@ -956,7 +956,7 @@ sensor_type_offsets = {
             # does not indicate a 'failed' runtime
             'severity': const.Health.Critical,
         },
-        0: {
+        2: {
             'desc': 'Battery Present',
             'severity': const.Health.Ok,
         },
