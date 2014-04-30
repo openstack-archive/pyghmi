@@ -123,10 +123,6 @@ def _io_apply(function, args):
     return result[0]
 
 
-selectdeadline = 0
-selectwait = None
-
-
 def _io_sendto(mysocket, packet, sockaddr):
     #Want sendto to act reasonably sane..
     mysocket.setblocking(1)
@@ -195,6 +191,14 @@ def get_ipmi_error(response, suffix=""):
     return res
 
 
+def _checksum(*data):  # Two's complement over the data
+    csum = sum(data)
+    csum ^= 0xff
+    csum += 1
+    csum &= 0xff
+    return csum
+
+
 class Session(object):
     """A class to manage common IPMI session logistics
 
@@ -221,6 +225,9 @@ class Session(object):
     keepalive_sessions = {}
     peeraddr_to_nodes = {}
     iterwaiters = []
+    pending = 0
+    maxpending = 128
+    socket = None
     # Upon exit of python, make sure we play nice with BMCs by assuring closed
     # sessions for all that we tracked
 
@@ -234,7 +241,6 @@ class Session(object):
 
     @classmethod
     def _createsocket(cls):
-        global iowork
         global iothread
         global iothreadready
         global iosockets
@@ -257,10 +263,10 @@ class Session(object):
              # than allowed.
             maxmf = open("/proc/sys/net/core/rmem_max")
             rmemmax = int(maxmf.read())
-            rmemmax = rmemmax / 2
+            rmemmax /= 2
             curmax = cls.socket.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
-            curmax = curmax / 2
-            if (rmemmax > curmax):
+            curmax /= 2
+            if rmemmax > curmax:
                 _io_apply(cls.socket.setsockopt, (socket.SOL_SOCKET,
                                                   socket.SO_RCVBUF,
                                                   rmemmax))
@@ -303,7 +309,7 @@ class Session(object):
         trueself = None
         for res in socket.getaddrinfo(bmc, port, 0, socket.SOCK_DGRAM):
             sockaddr = res[4]
-            if (res[0] == socket.AF_INET):  # convert the sockaddr to AF_INET6
+            if res[0] == socket.AF_INET:  # convert the sockaddr to AF_INET6
                 newhost = '::ffff:' + sockaddr[0]
                 sockaddr = (newhost, sockaddr[1], 0, 0)
             if sockaddr in cls.bmc_handlers:
@@ -361,13 +367,13 @@ class Session(object):
         else:
             self.kg = self.password
         self.port = port
-        if (onlogon is None):
+        if onlogon is None:
             self.async = False
             self.logonwaiters = [self._sync_login]
         else:
             self.async = True
             self.logonwaiters = [onlogon]
-        if not hasattr(Session, 'socket'):
+        if not Session.socket:
             self._createsocket()
         self.login()
         if not self.async:
@@ -434,24 +440,17 @@ class Session(object):
         self.sol_handler = None
         # NOTE(jbjohnso): This is the callback handler for any SOL payload
 
-    def _checksum(self, *data):  # Two's complement over the data
-        csum = sum(data)
-        csum = csum ^ 0xff
-        csum += 1
-        csum &= 0xff
-        return csum
-
     def _make_bridge_request_msg(self, channel, netfn, command):
         """This function generate message for bridge request. It is a
         part of ipmi payload.
         """
         head = [constants.IPMI_BMC_ADDRESS,
                 constants.netfn_codes['application'] << 2]
-        check_sum = self._checksum(*head)
+        check_sum = _checksum(*head)
         #NOTE(fengqian): according IPMI Figure 14-11, rqSWID is set to 81h
-        boday = [0x81, self.seqlun, constants.IPMI_SEND_MESSAGE_CMD]
+        boday = [0x81, self.seqlun, constants.IPMI_SEND_MESSAGE_CMD,
+                 0x40 | channel]
         #NOTE(fengqian): Track request
-        boday.append(0x40 | channel)
         self._add_request_entry((constants.netfn_codes['application'] + 1,
                                  self.seqlun, constants.IPMI_SEND_MESSAGE_CMD))
         return head + [check_sum] + boday
@@ -471,12 +470,11 @@ class Session(object):
         if self._lookup_request_entry(entry):
             self.request_entry.remove(entry)
 
-    def _make_ipmi_payload(self, netfn, command, bridge_request={}, data=()):
+    def _make_ipmi_payload(self, netfn, command, bridge_request=None, data=()):
         """This function generates the core ipmi payload that would be
         applicable for any channel (including KCS)
         """
         bridge_msg = []
-        payload = []
         self.expectedcmd = command
         self.expectednetfn = netfn + \
             1  # in ipmi, the response netfn is always one
@@ -510,13 +508,13 @@ class Session(object):
         header = [rsaddr, netfn << 2]
 
         reqbody = [rqaddr, self.seqlun, command] + list(data)
-        headsum = self._checksum(*header)
-        bodysum = self._checksum(*reqbody)
+        headsum = _checksum(*header)
+        bodysum = _checksum(*reqbody)
         payload = header + [headsum] + reqbody + [bodysum]
         if bridge_request:
             payload = bridge_msg + payload
             #NOTE(fengqian): For bridge request, another check sum is needed.
-            tail_csum = self._checksum(*payload[3:])
+            tail_csum = _checksum(*payload[3:])
             payload.append(tail_csum)
 
         self._add_request_entry((self.expectednetfn, self.seqlun, command))
@@ -531,8 +529,8 @@ class Session(object):
     def raw_command(self,
                     netfn,
                     command,
-                    bridge_request={},
-                    data=[],
+                    bridge_request=None,
+                    data=(),
                     retry=True,
                     delay_xmit=None):
         if not self.logged:
@@ -562,7 +560,7 @@ class Session(object):
             Session.wait_for_rsp(timeout=timeout)
         return self.lastresponse
 
-    def _send_ipmi_net_payload(self, netfn, command, data, bridge_request={},
+    def _send_ipmi_net_payload(self, netfn, command, data, bridge_request=None,
                                retry=True, delay_xmit=None):
         ipmipayload = self._make_ipmi_payload(netfn, command, bridge_request,
                                               data)
@@ -570,7 +568,7 @@ class Session(object):
         self.send_payload(payload=ipmipayload, payload_type=payload_type,
                           retry=retry, delay_xmit=delay_xmit)
 
-    def send_payload(self, payload=None, payload_type=None, retry=True,
+    def send_payload(self, payload=(), payload_type=None, retry=True,
                      delay_xmit=None, needskeepalive=False):
         """Send payload over the IPMI Session
 
@@ -581,8 +579,8 @@ class Session(object):
                                Notably, 0-length SOL packets
                                are prone to confusion.
         """
-        if payload is not None and self.lastpayload is not None:
-                             #we already have a packet outgoing, make this
+        if payload and self.lastpayload:
+                             # we already have a packet outgoing, make this
                              # a pending payload
                              # this way a simplistic BMC won't get confused
                              # and we also avoid having to do more complicated
@@ -592,7 +590,7 @@ class Session(object):
             return
         if payload_type is None:
             payload_type = self.last_payload_type
-        if payload is None:
+        if not payload:
             payload = self.lastpayload
         message = [0x6, 0, 0xff, 0x07]  # constant RMCP header for IPMI
         if retry:
@@ -604,9 +602,9 @@ class Session(object):
             payload_type |= 0b01000000
         if self.confalgo:
             payload_type |= 0b10000000
-        if (self.ipmiversion == 2.0):
+        if self.ipmiversion == 2.0:
             message.append(payload_type)
-            if (baretype == 2):
+            if baretype == 2:
                 #TODO(jbjohnso): OEM payload types
                 raise NotImplementedError("OEM Payloads")
             elif baretype not in constants.payload_types.values():
@@ -614,7 +612,7 @@ class Session(object):
                     "Unrecognized payload type %d" % baretype)
             message += struct.unpack("!4B", struct.pack("<I", self.sessionid))
         message += struct.unpack("!4B", struct.pack("<I", self.sequencenumber))
-        if (self.ipmiversion == 1.5):
+        if self.ipmiversion == 1.5:
             message += struct.unpack("!4B", struct.pack("<I", self.sessionid))
             if not self.authtype == 0:
                 message += self._ipmi15authcode(payload)
@@ -623,7 +621,7 @@ class Session(object):
             totlen = 34 + \
                 len(message)  # Guessing the ipmi spec means the whole
                                    # packet and assume no tag in old 1.5 world
-            if (totlen in (56, 84, 112, 128, 156)):
+            if totlen in (56, 84, 112, 128, 156):
                 message.append(0)  # Legacy pad as mandated by ipmi spec
         elif self.ipmiversion == 2.0:
             psize = len(payload)
@@ -819,7 +817,7 @@ class Session(object):
 
     def _get_channel_auth_cap(self):
         self.ipmicallback = self._got_channel_auth_cap
-        if (self.ipmi15only):
+        if self.ipmi15only:
             self._send_ipmi_net_payload(netfn=0x6,
                                         command=0x38,
                                         data=[0x0e, self.privlevel])
@@ -1355,7 +1353,7 @@ class Session(object):
                                               0,
                                               socket.SOCK_DGRAM):
                     sockaddr = res[4]
-                    if (res[0] == socket.AF_INET):  # convert the sockaddr
+                    if res[0] == socket.AF_INET:  # convert the sockaddr
                                                     # to AF_INET6
                         newhost = '::ffff:' + sockaddr[0]
                         sockaddr = (newhost, sockaddr[1], 0, 0)
