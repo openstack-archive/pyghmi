@@ -312,7 +312,7 @@ class Command(object):
 
         :returns: Iterator of sdr.SensorReading objects
         """
-        if '_sdr' not in self.__dict__:
+        if self._sdr is None:
             self._sdr = sdr.SDR(self)
         for sensor in self._sdr.get_sensor_numbers():
             rsp = self.raw_command(command=0x2d, netfn=4, data=(sensor,))
