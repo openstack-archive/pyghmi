@@ -934,7 +934,10 @@ class Session(object):
         """
         if self.incommand:  # if currently in command, no cause to keepalive
             return
-        self.raw_command(netfn=6, command=1)
+        try:
+            self.raw_command(netfn=6, command=1)
+        except exc.IpmiException:
+            self._mark_broken()
 
     @classmethod
     def _route_ipmiresponse(cls, sockaddr, data):
