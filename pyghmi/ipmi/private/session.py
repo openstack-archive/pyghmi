@@ -315,7 +315,8 @@ class Session(object):
             if sockaddr in cls.bmc_handlers:
                 self = cls.bmc_handlers[sockaddr]
                 if (self.bmc == bmc and self.userid == userid and
-                        self.password == password and self.kgo == kg):
+                        self.password == password and self.kgo == kg and
+                        self.logged):
                     trueself = self
                 else:
                     del cls.bmc_handlers[sockaddr]
