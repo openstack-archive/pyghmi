@@ -336,6 +336,7 @@ class Session(object):
         self.initialized = True
         self.cleaningup = False
         self.lastpayload = None
+        self._customkeepalives = None
         self.bmc = bmc
         self.broken = False
         try:
@@ -931,13 +932,48 @@ class Session(object):
             session._timedout()
         return len(cls.waiting_sessions)
 
+    def register_keepalive(self, cmd, callback):
+        '''Register  custom keepalive IPMI command
+
+        This is mostly intended for use by the console code.
+        calling code would have an easier time just scheduling in their
+        own threading scheme.  Such a behavior would naturally cause
+        the default keepalive to not occur anyway if the calling code
+        is at least as aggressive about timing as pyghmi
+        :param cmd: A dict of arguments to be passed into raw_command
+        :param callback: A function to be called with results of the keepalive
+
+        :returns: value to identify registration for unregister_keepalive
+        '''
+        regid = random.random()
+        if self._customkeepalives is None:
+            self._customkeepalives = {regid: (cmd, callback)}
+        else:
+            while regid in self._customkeepalives:
+                regid = random.random()
+            self._customkeepalives[regid] = (cmd, callback)
+        return regid
+
+    def unregister_keepalive(self, regid):
+        try:
+            del self._customkeepalives[regid]
+        except KeyError:
+            pass
+
     def _keepalive(self):
         """Performs a keepalive to avoid idle disconnect
         """
-        if self.incommand:  # if currently in command, no cause to keepalive
-            return
         try:
-            self.raw_command(netfn=6, command=1)
+            if not self._customkeepalives:
+                if self.incommand:
+                    # if currently in command, no cause to keepalive
+                    return
+                self.raw_command(netfn=6, command=1)
+            else:
+                kaids = list(self._customkeepalives.keys())
+                for keepalive in kaids:
+                    cmd, callback = self._customkeepalives[keepalive]
+                    callback(self.raw_command(**cmd))
         except exc.IpmiException:
             self._mark_broken()
 
