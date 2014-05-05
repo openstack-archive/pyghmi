@@ -51,6 +51,7 @@ class Console(object):
         self.retriedpayload = 0
         self.pendingoutput = []
         self.awaitingack = False
+        self.activated = False
         self.force_session = force
         self.ipmi_session = session.Session(bmc=bmc,
                                             userid=userid,
@@ -114,6 +115,7 @@ class Console(object):
                 return
         if 'error' in response:
             self._print_error(response['error'])
+        self.activated = True
         #data[0:3] is reserved except for the test mode, which we don't use
         data = response['data']
         self.maxoutcount = (data[5] << 8) + data[4]
@@ -125,10 +127,36 @@ class Console(object):
             raise NotImplementedError("Non-standard SOL Port Number")
         #ignore data[10:11] for now, the vlan detail, shouldn't matter to this
         #code anyway...
+        #NOTE(jbjohnso):
+        #We will use a special purpose keepalive
+        self.keepaliveid = self.ipmi_session.register_keepalive(
+            cmd={'netfn': 6, 'command': 0x4b, 'data': (1, 1)},
+            callback=self._got_payload_instance_info)
         self.ipmi_session.sol_handler = self._got_sol_payload
         self.connected = True
         if len(self.pendingoutput) > 0:
             self._sendpendingoutput()
+
+    def _got_payload_instance_info(self, response):
+        if 'error' in response:
+            self.activated = False
+            self.ipmi_session.unregister_keepalive(self.keepaliveid)
+            self._print_error(response['error'])
+            return
+        currowner = struct.unpack(
+            "<I", struct.pack('4B', *response['data'][:4]))
+        if currowner[0] != self.ipmi_session.sessionid:
+            # the session is deactivated or active for something else
+            self.activated = False
+            self.ipmi_session.unregister_keepalive(self.keepaliveid)
+            self._print_error('SOL deactivated')
+            return
+        # ok, still here, that means session is alive, but another
+        # common issue is firmware messing with mux on reboot
+        # this would be a nice thing to check, but the serial channel
+        # number is needed and there isn't an obvious means to reliably
+        # discern which channel or even *if* the serial port in question
+        # correlates at all to an ipmi channel to check mux
 
     def _addpendingdata(self, data):
         if isinstance(data, dict):
@@ -146,6 +174,14 @@ class Console(object):
         self._addpendingdata(handle.read())
         if not self.awaitingack:
             self._sendpendingoutput()
+
+    def close(self):
+        """Shut down an SOL session,
+        """
+        self.ipmi_session.unregister_keepalive(self.keepaliveid)
+        if self.activated:
+            self.ipmi_session.raw_command(netfn=6, command=0x49,
+                                          data=(1, 1, 0, 0, 0, 0))
 
     def send_data(self, data):
         if self.broken:
@@ -248,6 +284,7 @@ class Console(object):
         #for example, retry with new data, retry with no new data
         #retry with unexpected sequence number
         if type(payload) == dict:  # we received an error condition
+            self.activated = False
             self._print_error(payload)
             return
         newseq = payload[0] & 0b1111
@@ -289,6 +326,7 @@ class Console(object):
                 if poweredoff:
                     self._print_info("Remote system is powered down")
                 if deactivated:
+                    self.activated = False
                     self._print_error("Remote IPMI console disconnected")
                 else:  # retry all or part of packet, but in a new form
                     # also add pending output for efficiency and ease
