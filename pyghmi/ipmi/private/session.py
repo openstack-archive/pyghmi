@@ -376,18 +376,19 @@ class Session(object):
         # since our connection has failed retries
         # deregister our keepalive facility
         Session.keepalive_sessions.pop(self, None)
-        self.logged = 0  # mark session as busted
-        if not self.broken:
-            self.socketpool[self.socket] -= 1
-            self.broken = True
-        # since this session is broken, remove it from the handler list.
-        # This allows constructor to create a new, functional object to
-        # replace this one
-        for sockaddr in self.allsockaddrs:
-            if sockaddr in Session.bmc_handlers:
-                del Session.bmc_handlers[sockaddr]
-        if self.sol_handler:
-            self.sol_handler({'error': 'Session Disconnected'})
+        if self.logged:
+            self.logged = 0  # mark session as busted
+            if not self.broken:
+                self.socketpool[self.socket] -= 1
+                self.broken = True
+                # since this session is broken, remove it from the handler list
+                # This allows constructor to create a new, functional object to
+                # replace this one
+                for sockaddr in self.allsockaddrs:
+                    if sockaddr in Session.bmc_handlers:
+                        del Session.bmc_handlers[sockaddr]
+                if self.sol_handler:
+                    self.sol_handler({'error': 'Session Disconnected'})
 
     def onlogon(self, parameter):
         if 'error' in parameter:
@@ -1370,6 +1371,8 @@ class Session(object):
                          data=struct.unpack("4B",
                                             struct.pack("I", self.sessionid)),
                          retry=False)
+        # stop trying for a keepalive,
+        Session.keepalive_sessions.pop(self, None)
         self.logged = 0
         self.nowait = False
         self.socketpool[self.socket] -= 1
