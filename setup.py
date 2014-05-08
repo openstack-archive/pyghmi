@@ -18,5 +18,6 @@
 import setuptools
 
 setuptools.setup(
+    scripts=['bin/pyghmicons', 'bin/pyghmiutil'],
     setup_requires=['pbr'],
     pbr=True)
