@@ -379,6 +379,7 @@ class Session(object):
         Session.keepalive_sessions.pop(self, None)
         if self.logged:
             self.logged = 0  # mark session as busted
+            self._customkeepalives = None
             if not self.broken:
                 self.socketpool[self.socket] -= 1
                 self.broken = True
@@ -1410,6 +1411,7 @@ class Session(object):
         # stop trying for a keepalive,
         Session.keepalive_sessions.pop(self, None)
         self.logged = 0
+        self._customkeepalives = None
         self.nowait = False
         self.socketpool[self.socket] -= 1
         return {'success': True}
