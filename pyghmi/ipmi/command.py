@@ -235,7 +235,7 @@ class Command(object):
         """
         if bootdev not in boot_devices:
             return {'error': "Unknown bootdevice %s requested" % bootdev}
-        bootdev = boot_devices[bootdev]
+        bootdevnum = boot_devices[bootdev]
         # first, we disable timer by way of set system boot options,
         # then move on to set chassis capabilities
         # Set System Boot Options is netfn=0, command=8, data
@@ -247,9 +247,9 @@ class Command(object):
             bootflags |= 1 << 5
         if persist:
             bootflags |= 1 << 6
-        if bootdev == 0:
+        if bootdevnum == 0:
             bootflags = 0
-        data = (5, bootflags, bootdev, 0, 0, 0)
+        data = (5, bootflags, bootdevnum, 0, 0, 0)
         response = self.raw_command(netfn=0, command=8, data=data)
         if 'error' in response:
             return response
