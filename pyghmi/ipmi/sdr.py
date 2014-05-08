@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 # coding=utf8
 
-# Copyright 2013 IBM Corporation
+# Copyright 2014 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -383,7 +383,7 @@ class SDREntry(object):
             desc = "Unknown state %d for reading type %d/sensor type %d" % (
                 state, self.reading_type, self.sensor_type_number)
             health = const.Health.Warning
-        return (desc, health)
+        return desc, health
 
     def decode_sensor_reading(self, reading):
         numeric = None
@@ -505,18 +505,18 @@ class SDREntry(object):
 
     def tlv_decode(self, tlv, data):
         # Per IPMI 'type/length byte format
-        type = (tlv & 0b11000000) >> 6
+        ipmitype = (tlv & 0b11000000) >> 6
         if not len(data):
             return ""
-        if type == 0:  # Unicode per 43.15 in ipmi 2.0 spec
+        if ipmitype == 0:  # Unicode per 43.15 in ipmi 2.0 spec
             # the spec is not specific about encoding, assuming utf8
             return unicode(struct.pack("%dB" % len(data), *data), "utf_8")
-        elif type == 1:  # BCD '+'
+        elif ipmitype == 1:  # BCD '+'
             tmpl = "%02X" * len(data)
             tstr = tmpl % tuple(data)
             tstr = tstr.replace("A", " ").replace("B", "-").replace("C", ".")
             return tstr.replace("D", ":").replace("E", ",").replace("F", "_")
-        elif type == 2:  # 6 bit ascii, start at 0x20 and stop when out of bits
+        elif ipmitype == 2:  # 6 bit ascii, start at 0x20
             # the ordering is very peculiar and is best understood from
             # IPMI SPEC "6-bit packed ascii example
             tstr = ""
@@ -528,7 +528,7 @@ class SDREntry(object):
                             (data[1] >> 4) + 0x20)
                 tstr += chr((data[2] >> 2) + 0x20)
             return tstr
-        elif type == 3:  # ACSII+LATIN1
+        elif ipmitype == 3:  # ACSII+LATIN1
             return struct.pack("%dB" % len(data), *data)
 
 
@@ -569,9 +569,15 @@ class SDR(object):
             self.aux_fw = self.decode_aux(rsp['data'][11:15])
         self.get_sdr()
 
+    def get_sdr_reservation(self):
+        rsp = self.ipmicmd.raw_command(netfn=0x0a, command=0x22)
+        if rsp['code'] != 0:
+            raise exc.IpmiException(rsp['error'])
+        return rsp['data'][0] + (rsp['data'][1] << 8)
+
     def get_sdr(self):
-        rsp = self.ipmicmd.raw_command(netfn=0x0a, command=0x20)
-        if (rsp['data'][0] != 0x51):
+        repinfo = self.ipmicmd.raw_command(netfn=0x0a, command=0x20)
+        if (repinfo['data'][0] != 0x51):
             # we only understand SDR version 51h, the only version defined
             # at time of this writing
             raise NotImplementedError
@@ -589,14 +595,50 @@ class SDR(object):
         rsvid = 0  # partial 'get sdr' will require this
         offset = 0
         size = 0xff
+        chunksize = 128
         while recid != 0xffff:  # per 33.12 Get SDR command, 0xffff marks end
-            rqdata = [rsvid & 0xff, rsvid >> 8,
-                      recid & 0xff, recid >> 8,
-                      offset, size]
-            rsp = self.ipmicmd.raw_command(netfn=0x0a, command=0x23,
-                                           data=rqdata)
-            newrecid = (rsp['data'][1] << 8) + rsp['data'][0]
-            self.add_sdr(rsp['data'][2:])
+            newrecid = 0
+            currlen = 0
+            sdrdata = bytearray()
+            while True:  # loop until SDR fetched wholly
+                if size != 0xff and rsvid == 0:
+                    rsvid = self.get_sdr_reservation()
+                rqdata = [rsvid & 0xff, rsvid >> 8,
+                          recid & 0xff, recid >> 8,
+                          offset, size]
+                sdrrec = self.ipmicmd.raw_command(netfn=0x0a, command=0x23,
+                                                  data=rqdata)
+                if sdrrec['code'] == 0xca:
+                    if size == 0xff:  # get just 5 to get header to know length
+                        size = 5
+                    elif size > 0:
+                        size /= 2
+                        chunksize = size
+                    continue
+                if sdrrec['code'] == 0xc5:  # need a new reservation id
+                    rsvid = 0
+                    continue
+                if sdrrec['code'] != 0:
+                    raise exc.IpmiException(sdrrec['error'])
+                if newrecid == 0:
+                    newrecid = (sdrrec['data'][1] << 8) + sdrrec['data'][0]
+                if currlen == 0:
+                    currlen = sdrrec['data'][6] + 5  # compensate for header
+                sdrdata.extend(sdrrec['data'][2:])
+                # determine next offset to use based on current offset and the
+                # size used last time.
+                offset += size
+                if offset >= currlen:
+                    break
+                if size == 5 and offset == 5:
+                    # bump up size after header retrieval
+                    size = chunksize
+                if (offset + size) > currlen:
+                    size = currlen - offset
+            self.add_sdr(sdrdata)
+            offset = 0
+            if size != 0xff:
+                size = 5
             if newrecid == recid:
                 raise exc.BmcErrorException("Incorrect SDR record id from BMC")
             recid = newrecid
