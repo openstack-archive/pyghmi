@@ -564,7 +564,7 @@ class Session(object):
         #of only the constructor needing a callback.  From then on,
         #synchronous usage of the class acts in a greenthread style governed by
         #order of data on the network
-        while self.lastresponse is None:
+        while retry and self.lastresponse is None:
             Session.wait_for_rsp(timeout=timeout)
         return self.lastresponse
 
@@ -1338,12 +1338,14 @@ class Session(object):
             # In this case, we want to craft a new session request to have
             # unambiguous session id regardless of how packet was dropped or
             # delayed in this case, it's safe to just redo the request
+            self.lastpayload = None
             self._open_rmcpplus_request()
         elif (self.sessioncontext == 'EXPECTINGRAKP2' or
               self.sessioncontext == 'EXPECTINGRAKP4'):
             # If we can't be sure which RAKP was dropped or if RAKP3/4 was just
             # delayed, the most reliable thing to do is rewind and start over
             # bmcs do not take kindly to receiving RAKP1 or RAKP3 twice
+            self.lastpayload = None
             self._relog()
         else:  # in IPMI case, the only recourse is to act as if the packet is
               # idempotent.  SOL has more sophisticated retry handling
