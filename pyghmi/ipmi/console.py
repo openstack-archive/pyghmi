@@ -42,6 +42,7 @@ class Console(object):
     def __init__(self, bmc, userid, password,
                  iohandler, port=623,
                  force=False, kg=None):
+        self.keepaliveid = None
         self.connected = False
         self.broken = False
         self.out_handler = iohandler
