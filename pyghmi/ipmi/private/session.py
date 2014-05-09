@@ -46,6 +46,8 @@ iothread = None  # the thread in which all IO will be performed
                  # the nature of things.
 iothreadready = False  # whether io thread is yet ready to work
 iothreadwaiters = []  # threads waiting for iothreadready
+ignoresockets = set()  # between 'select' firing and 'recvfrom', a socket
+                       # should be ignored
 ioqueue = collections.deque([])
 selectbreak = None
 selectdeadline = 0
@@ -72,7 +74,13 @@ def _ioworker():
         if timeout < 0:
             timeout = 0
         selectdeadline = _monotonic_time() + timeout
-        mysockets = iosockets + [selectbreak[0]]
+        if ignoresockets:
+            mysockets = [selectbreak[0]]
+            for pendingsocket in iosockets:
+                if pendingsocket not in ignoresockets:
+                    mysockets.append(pendingsocket)
+        else:
+            mysockets = iosockets + [selectbreak[0]]
         tmplist, _, _ = select.select(mysockets, (), (), timeout)
         # pessimistically move out the deadline
         # doing it this early (before ioqueue is evaluated)
@@ -90,6 +98,7 @@ def _ioworker():
                     # was the endgame
                     pass
             else:
+                ignoresockets.add(handle)
                 rdylist.append(handle)
         for w in iowaiters:
             w[2].append(tuple(rdylist))
@@ -135,6 +144,7 @@ def _io_sendto(mysocket, packet, sockaddr):
 
 def _io_recvfrom(mysocket, size):
     mysocket.setblocking(0)
+    ignoresockets.discard(mysocket)
     try:
         return mysocket.recvfrom(size)
     except socket.error:
@@ -153,7 +163,7 @@ def _monotonic_time():
     return os.times()[4]
 
 
-def _poller(readhandles, timeout=0):
+def _poller(timeout=0):
     rdylist = _io_apply('wait', timeout + _monotonic_time())
     return rdylist
 
@@ -895,22 +905,14 @@ class Session(object):
                 timeout = 0
         if timeout is None:
             return 0
-        if selectbreak is None:
-            mysockets = iosockets
-        else:
-            mysockets = [iosockets + [selectbreak[0]]]
-        rdylist = _poller(mysockets, timeout=timeout)
+        rdylist = _poller(timeout=timeout)
         if len(rdylist) > 0:
-            while _poller(iosockets):  # if the somewhat lengthy
-                        # queue # processing takes long enough for packets to
-                        # come in, be eager
-                mysockets = _poller(iosockets)
-                pktqueue = collections.deque([])
-                cls.pulltoqueue(mysockets, pktqueue)
-                while len(pktqueue):
-                    (data, sockaddr) = pktqueue.popleft()
-                    cls._route_ipmiresponse(sockaddr, data)
-                    cls.pulltoqueue(mysockets, pktqueue)
+            pktqueue = collections.deque([])
+            cls.pulltoqueue(iosockets, pktqueue)
+            while len(pktqueue):
+                (data, sockaddr) = pktqueue.popleft()
+                cls._route_ipmiresponse(sockaddr, data)
+                cls.pulltoqueue(iosockets, pktqueue)
         sessionstodel = []
         sessionstokeepalive = []
         for session, parms in cls.keepalive_sessions.iteritems():
