@@ -958,6 +958,8 @@ class Session(object):
         return regid
 
     def unregister_keepalive(self, regid):
+        if self._customkeepalives is None:
+            return
         try:
             del self._customkeepalives[regid]
         except KeyError:
