@@ -1059,6 +1059,8 @@ class Session(object):
             if data[5] & 0b10000000:
                 encrypted = 1
             authcode = rawdata[-12:]
+            if self.k1 is None:  # we are in no shape to process a packet now
+                return
             expectedauthcode = hmac.new(
                 self.k1, rawdata[4:-12], hashlib.sha1).digest()[:12]
             if authcode != expectedauthcode:
