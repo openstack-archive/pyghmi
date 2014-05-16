@@ -164,8 +164,9 @@ def _monotonic_time():
 
 
 def _poller(timeout=0):
-    rdylist = _io_apply('wait', timeout + _monotonic_time())
-    return rdylist
+    if ignoresockets:
+        return True
+    return _io_apply('wait', timeout + _monotonic_time())
 
 
 def _aespad(data):
@@ -905,8 +906,7 @@ class Session(object):
                 timeout = 0
         if timeout is None:
             return 0
-        rdylist = _poller(timeout=timeout)
-        if len(rdylist) > 0:
+        if _poller(timeout=timeout):
             pktqueue = collections.deque([])
             cls.pulltoqueue(iosockets, pktqueue)
             while len(pktqueue):
