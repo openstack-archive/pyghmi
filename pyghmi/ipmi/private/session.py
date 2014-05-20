@@ -388,6 +388,7 @@ class Session(object):
         # since our connection has failed retries
         # deregister our keepalive facility
         Session.keepalive_sessions.pop(self, None)
+        Session.waiting_sessions.pop(self, None)
         if self.logged:
             self.logged = 0  # mark session as busted
             self._customkeepalives = None
