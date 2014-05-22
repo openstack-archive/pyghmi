@@ -116,6 +116,7 @@ class Console(object):
                 return
         if 'error' in response:
             self._print_error(response['error'])
+            return
         self.activated = True
         #data[0:3] is reserved except for the test mode, which we don't use
         data = response['data']
