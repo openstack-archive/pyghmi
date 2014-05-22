@@ -403,6 +403,9 @@ class Session(object):
                         del Session.bmc_handlers[sockaddr]
                 if self.sol_handler:
                     self.sol_handler({'error': 'Session Disconnected'})
+        elif not self.broken:
+            self.broken = True
+            self.socketpool[self.socket] -= 1
 
     def onlogon(self, parameter):
         if 'error' in parameter:
