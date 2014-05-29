@@ -40,8 +40,6 @@ tty.setraw(sys.stdin.fileno())
 currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
 fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
 
-passwd = os.environ['IPMIPASSWORD']
-
 sol = None
 
 
@@ -66,6 +64,13 @@ def _print(data):
         raise Exception(data)
 
 try:
+    if sys.argv[3] is None:
+        passwd = os.environ['IPMIPASSWORD']
+    else:
+        passwd_file = sys.argv[3]
+        with open(passwd_file, "r") as f:
+            passwd = f.read()
+
     sol = console.Console(bmc=sys.argv[1], userid=sys.argv[2], password=passwd,
                           iohandler=_print, force=True)
     inputthread = threading.Thread(target=_doinput)
