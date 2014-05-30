@@ -50,8 +50,9 @@ def _doinput():
         select.select((sys.stdin,), (), (), 600)
         try:
             data = sys.stdin.read()
-        except OSError:
-            continue
+        except (IOError, OSError) as e:
+            if e.errno == 11:
+                continue
         sol.send_data(data)
 
 
