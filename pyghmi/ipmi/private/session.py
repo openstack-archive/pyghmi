@@ -287,6 +287,7 @@ class Session(object):
         tmpsocket = _io_apply(socket.socket,
                               (socket.AF_INET6, socket.SOCK_DGRAM))  # INET6
                                     # can do IPv4 if you are nice to it
+        tmpsocket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         self.socketpool[tmpsocket] = 1
         iosockets.append(tmpsocket)
         return tmpsocket
