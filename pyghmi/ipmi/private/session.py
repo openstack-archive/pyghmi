@@ -685,7 +685,8 @@ class Session(object):
         self.netpacket = struct.pack("!%dB" % len(message), *message)
         #advance idle timer since we don't need keepalive while sending packets
         #out naturally
-        if self in Session.keepalive_sessions and not needskeepalive:
+        if (self in Session.keepalive_sessions and not needskeepalive and
+				not self._customkeepalives):
             Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
                 25 + (random.random() * 4.9)
         self._xmit_packet(retry, delay_xmit=delay_xmit)
