@@ -922,8 +922,8 @@ class Session(object):
         sessionstokeepalive = []
         for session, parms in cls.keepalive_sessions.iteritems():
             if parms['timeout'] < curtime:
-                cls.keepalive_sessions[session]['timeout'] = 25 + \
-                    (random.random() * 4.9)
+                cls.keepalive_sessions[session]['timeout'] = \
+                    _monotonic_time() + 25 + (random.random() * 4.9)
                 sessionstokeepalive.append(session)
         for session in sessionstokeepalive:
             session._keepalive()
