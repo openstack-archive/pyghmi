@@ -572,7 +572,9 @@ class Session(object):
         #order of data on the network
         while retry and self.lastresponse is None:
             Session.wait_for_rsp(timeout=timeout)
-        return self.lastresponse
+        lastresponse = self.lastresponse
+        self.incommand = False
+        return lastresponse
 
     def _send_ipmi_net_payload(self, netfn, command, data, bridge_request=None,
                                retry=True, delay_xmit=None):
@@ -1326,7 +1328,6 @@ class Session(object):
             self.send_payload(payload=nextpayload,
                               payload_type=nextpayloadtype,
                               retry=retry)
-        self.incommand = False
         self.ipmicallback(response)
 
     def _timedout(self):
@@ -1337,7 +1338,6 @@ class Session(object):
         if self.timeout > self.maxtimeout:
             response = {'error': 'timeout'}
             self.ipmicallback(response)
-            self.incommand = False
             self.nowait = False
             self._mark_broken()
             return
