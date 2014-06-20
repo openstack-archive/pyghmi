@@ -785,12 +785,21 @@ class Session(object):
                                     data=[self.privlevel])
 
     def _got_priv_level(self, response):
-        mysuffix = " while requesting privelege level %d for %s" % (
-            self.privlevel, self.userid)
-        errstr = get_ipmi_error(response, suffix=mysuffix)
-        if errstr:
-            self.onlogon({'error': errstr})
-            return
+        if response['code']:
+            if response['code'] in (0x80, 0x81) and self.privlevel == 4:
+                # some implementations will let us get this far,
+                # but suddenly get skiddish.  Try again in such a case
+                self.privlevel = 3
+                self.logged = 1
+                self.logout()
+                self._relog()
+                return
+            mysuffix = " while requesting privelege level %d for %s" % (
+                self.privlevel, self.userid)
+            errstr = get_ipmi_error(response, suffix=mysuffix)
+            if errstr:
+                self.onlogon({'error': errstr})
+                return
         self.logged = 1
         Session.keepalive_sessions[self] = {}
         Session.keepalive_sessions[self]['ipmisession'] = self
@@ -1165,7 +1174,7 @@ class Session(object):
         if data[0] != self.rmcptag:  # ignore mismatched tags for retry logic
             return -9
         if data[1] != 0:  # if not successful, consider next move
-            if data[1] == 9 and self.privlevel == 4:
+            if data[1] in (9, 0xd) and self.privlevel == 4:
                 # Here the situation is likely that the peer didn't want
                 # us to use Operator.  Degrade to operator and try again
                 self.privlevel = 3
