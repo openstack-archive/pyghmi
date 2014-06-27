@@ -683,4 +683,4 @@ if __name__ == "__main__":  # test code
             continue
         reading = sdr.sensors[number].decode_sensor_reading(rsp['data'])
         if reading is not None:
-            print repr(reading)
+            print (repr(reading))
