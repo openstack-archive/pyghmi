@@ -80,9 +80,9 @@ sensor_type_codes = {
 }
 
 # This is from table 42-2
-#For severity, we really have very little to go on in this case
-#Optimistically assume 'warning' when generic sensors have something
-#to assert
+#digital discrete poses a challenge from a health perspective.  So far all
+#observed ones are no more or less 'healthy' by being asserted or not asserted
+#for example asserting that an add-on is installed
 
 discrete_type_offsets = {
     2: {
@@ -106,7 +106,7 @@ discrete_type_offsets = {
         },
         1: {
             'desc': 'Asserted',
-            'severity': const.Health.Warning,
+            'severity': const.Health.Ok,
         },
     },
     4: {
