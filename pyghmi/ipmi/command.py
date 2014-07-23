@@ -128,12 +128,13 @@ class Command(object):
         BIOS or UEFI fail to honor it. This is usually only applicable to the
         next reboot.
 
+        :raises: IpmiException on an error.
         :returns: dict --The response will be provided in the return as a dict
         """
         response = self.raw_command(netfn=0, command=9, data=(5, 0, 0))
         # interpret response per 'get system boot options'
         if 'error' in response:
-            return response
+            raise exc.IpmiException(response['error'])
         # this should only be invoked for get system boot option complying to
         # ipmi spec and targeting the 'boot flags' parameter
         assert (response['command'] == 9 and
@@ -231,6 +232,7 @@ class Command(object):
                          should BIOS boot and offers no "don't care" option.
                          In practice, this flag not being set does not preclude
                          UEFI boot on any system I've encountered.
+        :raises: IpmiException on an error.
         :returns: dict or True -- If callback is not provided, the response
         """
         if bootdev not in boot_devices:
@@ -241,7 +243,7 @@ class Command(object):
         # Set System Boot Options is netfn=0, command=8, data
         response = self.raw_command(netfn=0, command=8, data=(3, 8))
         if 'error' in response:
-            return response
+            raise exc.IpmiException(response['error'])
         bootflags = 0x80
         if uefiboot:
             bootflags |= 1 << 5
@@ -252,7 +254,7 @@ class Command(object):
         data = (5, bootflags, bootdevnum, 0, 0, 0)
         response = self.raw_command(netfn=0, command=8, data=data)
         if 'error' in response:
-            return response
+            raise exc.IpmiException(response['error'])
         return {'bootdev': bootdev}
 
     def raw_command(self, netfn, command, bridge_request=(), data=(),
