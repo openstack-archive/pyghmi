@@ -145,7 +145,7 @@ class Command(object):
             return {'bootdev': 'default'}
         else:  # will consult data2 of the boot flags parameter for the data
             bootnum = (response['data'][3] & 0b111100) >> 2
-            bootdev = boot_devices[bootnum]
+            bootdev = boot_devices.get(bootnum)
             if bootdev:
                 return {'bootdev': bootdev}
             else:
