@@ -142,14 +142,17 @@ class Command(object):
                 (response['data'][1] & 0b1111111) == 5)
         if (response['data'][1] & 0b10000000 or
                 not response['data'][2] & 0b10000000):
-            return {'bootdev': 'default'}
+            return {'bootdev': 'default', 'persistent': True}
         else:  # will consult data2 of the boot flags parameter for the data
+            persistent = False
+            if response['data'][2] & 0b1000000:
+                persistent = True
             bootnum = (response['data'][3] & 0b111100) >> 2
             bootdev = boot_devices.get(bootnum)
             if bootdev:
-                return {'bootdev': bootdev}
+                return {'bootdev': bootdev, 'persistent': persistent}
             else:
-                return {'bootdev': bootnum}
+                return {'bootdev': bootnum, 'persistent': persistent}
 
     def set_power(self, powerstate, wait=False):
         """Request power state change
