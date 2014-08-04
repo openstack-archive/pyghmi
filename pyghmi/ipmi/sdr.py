@@ -243,10 +243,11 @@ class SDREntry(object):
     external code to pay attention to this class.
     """
 
-    def __init__(self, entrybytes, reportunsupported=False):
+    def __init__(self, entrybytes, ipmicmd, reportunsupported=False):
         # ignore record id for now, we only care about the sensor number for
         # moment
         self.reportunsupported = reportunsupported
+        self.ipmicmd = ipmicmd
         if entrybytes[2] != 0x51:
             # only recognize '1.5', the only version defined at time of writing
             raise NotImplementedError
@@ -364,7 +365,7 @@ class SDREntry(object):
             # factors on the fly.
             # the formula could apply if we bother with nominal
             # reading interpretation
-            self.decode_formula(entry)
+            self.decode_formula(entry[19:25])
 
     def _decode_state(self, state):
         mapping = ipmiconst.discrete_type_offsets
@@ -451,12 +452,23 @@ class SDREntry(object):
                 output['states'].append(upper + " non-recoverable threshold")
         return SensorReading(output, self.unit_suffix)
 
+    def _set_tmp_formula(self, value):
+        rsp = self.ipmicmd.raw_command(netfn=4, command=0x23,
+                                       data=(self.sensor_number, value))
+        # skip next reading field, not used in on-demand situation
+        self.decode_formula(rsp['data'][1:])
+
     def decode_value(self, value):
         # Take the input value and return meaningful value
-        if self.linearization == 0x70:  # direct calling code to get factors
+        if self.linearization > 11:  # direct calling code to get factors
+            # for now, we will get the factors on demand
+            # the facility is engineered such that at construction
+            # time the entire BMC table should be fetchable in a reasonable
+            # fashion.  However for now opt for retrieving rows as needed
+            # rather than tracking all that information for a relatively
             #TODO(jbjohnso): implement get sensor reading factors support for
             #non linear sensor
-            raise NotImplementedError("Need to do get sensor reading factors")
+            self._set_tmp_formula(value)
         # time to compute the pre-linearization value.
         decoded = float((value * self.m + self.b) *
                         (10 ** self.resultexponent))
@@ -489,17 +501,17 @@ class SDREntry(object):
 
     def decode_formula(self, entry):
         self.m = \
-            twos_complement(entry[19] + ((entry[20] & 0b11000000) << 2), 10)
-        self.tolerance = entry[20] & 0b111111
+            twos_complement(entry[0] + ((entry[1] & 0b11000000) << 2), 10)
+        self.tolerance = entry[1] & 0b111111
         self.b = \
-            twos_complement(entry[21] + ((entry[22] & 0b11000000) << 2), 10)
-        self.accuracy = (entry[22] & 0b111111) + \
-            (entry[23] & 0b11110000) << 2
-        self.accuracyexp = (entry[23] & 0b1100) >> 2
-        self.direction = entry[23] & 0b11
+            twos_complement(entry[2] + ((entry[3] & 0b11000000) << 2), 10)
+        self.accuracy = (entry[3] & 0b111111) + \
+            (entry[4] & 0b11110000) << 2
+        self.accuracyexp = (entry[4] & 0b1100) >> 2
+        self.direction = entry[4] & 0b11
             #0 = n/a, 1 = input, 2 = output
-        self.resultexponent = twos_complement((entry[24] & 0b11110000) >> 4, 4)
-        bexponent = twos_complement(entry[24] & 0b1111, 4)
+        self.resultexponent = twos_complement((entry[5] & 0b11110000) >> 4, 4)
+        bexponent = twos_complement(entry[5] & 0b1111, 4)
         # might as well do the math to 'b' now rather than wait for later
         self.b = self.b * (10**bexponent)
 
@@ -651,7 +663,7 @@ class SDR(object):
         return self.sensors.iterkeys()
 
     def add_sdr(self, sdrbytes):
-        newent = SDREntry(sdrbytes)
+        newent = SDREntry(sdrbytes, self.ipmicmd)
         if newent.sdrtype == TYPE_SENSOR:
             id = newent.sensor_number
             if id in self.sensors:
