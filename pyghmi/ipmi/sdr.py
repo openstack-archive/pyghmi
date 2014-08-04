@@ -453,7 +453,7 @@ class SDREntry(object):
 
     def decode_value(self, value):
         # Take the input value and return meaningful value
-        if self.linearization == 0x70:  # direct calling code to get factors
+        if self.linearization > 11:  # direct calling code to get factors
             #TODO(jbjohnso): implement get sensor reading factors support for
             #non linear sensor
             raise NotImplementedError("Need to do get sensor reading factors")
