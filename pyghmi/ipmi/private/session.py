@@ -345,6 +345,7 @@ class Session(object):
         self.privlevel = 4
         self.maxtimeout = 3  # be aggressive about giving up on initial packet
         self.incommand = False
+        self.nameonly = 16  # default to name only lookups in RAKP exchange
         self.initialized = True
         self.cleaningup = False
         self.lastpayload = None
@@ -1159,7 +1160,7 @@ class Session(object):
             list(struct.unpack("4B",
                  struct.pack("<I", self.pendingsessionid))) +\
             list(struct.unpack("16B", self.randombytes)) +\
-            [self.privlevel, 0, 0] +\
+            [self.nameonly | self.privlevel, 0, 0] +\
             [userlen] +\
             list(struct.unpack("%dB" % userlen, self.userid))
         self.sessioncontext = "EXPECTINGRAKP2"
@@ -1197,7 +1198,7 @@ class Session(object):
         userlen = len(self.userid)
         hmacdata = struct.pack("<II", localsid, self.pendingsessionid) +\
             self.randombytes + self.remoterandombytes + self.remoteguid +\
-            struct.pack("2B", self.privlevel, userlen) +\
+            struct.pack("2B", self.nameonly | self.privlevel, userlen) +\
             self.userid
         expectedhash = hmac.new(self.password, hmacdata, hashlib.sha1).digest()
         givenhash = struct.pack("%dB" % len(data[40:]), *data[40:])
@@ -1209,7 +1210,8 @@ class Session(object):
         # to store the keys
         self.sik = hmac.new(self.kg,
                             self.randombytes + self.remoterandombytes +
-                            struct.pack("2B", self.privlevel, userlen) +
+                            struct.pack("2B", self.nameonly | self.privlevel,
+                                        userlen) +
                             self.userid, hashlib.sha1).digest()
         self.k1 = hmac.new(self.sik, '\x01' * 20, hashlib.sha1).digest()
         self.k2 = hmac.new(self.sik, '\x02' * 20, hashlib.sha1).digest()
@@ -1225,7 +1227,8 @@ class Session(object):
             list(struct.unpack("4B", struct.pack("<I", self.pendingsessionid)))
         hmacdata = self.remoterandombytes +\
             struct.pack("<I", self.localsid) +\
-            struct.pack("2B", self.privlevel, len(self.userid)) +\
+            struct.pack("2B", self.nameonly | self.privlevel,
+                        len(self.userid)) +\
             self.userid
         authcode = hmac.new(self.password, hmacdata, hashlib.sha1).digest()
         payload += list(struct.unpack("%dB" % len(authcode), authcode))
