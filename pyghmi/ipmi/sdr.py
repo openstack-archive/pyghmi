@@ -327,10 +327,19 @@ class SDREntry(object):
             # 1: generic threshold based
             # 0x6f: discrete sensor-specific from table 42-3, sensor offsets
             # all others per table 42-2, generic discrete
-        self.numeric_format = (entry[15] & 0b11000000) >> 6
-        # the spec technically reserves numeric_format for compact sensor
-        # numeric, but common treatment won't break currently
+        # numeric format is one of:
         # 0 - unsigned, 1 - 1s complement, 2 - 2s complement, 3 - ignore number
+        # compact records are supposed to always write it as '3', presumably
+        # to allow for the concept of a compact record with a numeric format
+        # even though numerics are not allowed today.  Some implementations
+        # violate the spec and do something other than 3 today.  Tolerate
+        # the violation under the assumption that things are not so hard up
+        # that there will ever be a need for compact sensors supporting numeric
+        # values
+        if self.rectype == 2:
+            self.numeric_format = 3
+        else:
+            self.numeric_format = (entry[15] & 0b11000000) >> 6
         self.sensor_rate = sensor_rates[(entry[15] & 0b111000) >> 3]
         self.unit_mod = ""
         if (entry[15] & 0b110) == 0b10:  # unit1 by unit2
