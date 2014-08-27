@@ -27,6 +27,7 @@ import select
 import socket
 import struct
 import threading
+import traceback
 
 from Crypto.Cipher import AES
 
@@ -109,10 +110,16 @@ def _ioworker():
             workitem = ioqueue.popleft()
             # structure is function, args, list to append to ,event to set
             if isinstance(workitem[1], tuple):  # positional arguments
-                workitem[2].append(workitem[0](*workitem[1]))
+                try:
+                    workitem[2].append(workitem[0](*workitem[1]))
+                except:
+                    traceback.print_exc()
                 workitem[3].set()
             elif isinstance(workitem[1], dict):
-                workitem[2].append(workitem[0](**workitem[1]))
+                try:
+                    workitem[2].append(workitem[0](**workitem[1]))
+                except:
+                    traceback.print_exc()
                 workitem[3].set()
             elif workitem[0] == 'wait':
                 if len(rdylist) > 0:
@@ -139,7 +146,10 @@ def _io_apply(function, args):
 def _io_sendto(mysocket, packet, sockaddr):
     #Want sendto to act reasonably sane..
     mysocket.setblocking(1)
-    mysocket.sendto(packet, sockaddr)
+    try:
+        mysocket.sendto(packet, sockaddr)
+    except:
+        pass
 
 
 def _io_recvfrom(mysocket, size):
