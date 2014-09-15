@@ -944,7 +944,9 @@ class Session(object):
         sessionstodel = []
         sessionstokeepalive = []
         for session, parms in cls.keepalive_sessions.iteritems():
-            if parms['timeout'] < curtime:
+            # if the session is busy inside a command, defer invoking keepalive
+            # until incommand is no longer the case
+            if parms['timeout'] < curtime and not session.incommand:
                 cls.keepalive_sessions[session]['timeout'] = \
                     _monotonic_time() + 25 + (random.random() * 4.9)
                 sessionstokeepalive.append(session)
