@@ -182,8 +182,13 @@ class Console(object):
         """
         self.ipmi_session.unregister_keepalive(self.keepaliveid)
         if self.activated:
-            self.ipmi_session.raw_command(netfn=6, command=0x49,
-                                          data=(1, 1, 0, 0, 0, 0))
+            try:
+                self.ipmi_session.raw_command(netfn=6, command=0x49,
+                                              data=(1, 1, 0, 0, 0, 0))
+            except exc.IpmiException:
+                # if underlying ipmi session is not working, then
+                # run with the implicit success
+                pass
 
     def send_data(self, data):
         if self.broken:
