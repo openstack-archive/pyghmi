@@ -1007,7 +1007,15 @@ class Session(object):
             else:
                 kaids = list(self._customkeepalives.keys())
                 for keepalive in kaids:
-                    cmd, callback = self._customkeepalives[keepalive]
+                    try:
+                        cmd, callback = self._customkeepalives[keepalive]
+                    except TypeError:
+                        # raw_command made customkeepalives None
+                        break
+                    except KeyError:
+                        # raw command ultimately caused a keepalive to
+                        # deregister
+                        continue
                     callback(self.raw_command(**cmd))
         except exc.IpmiException:
             self._mark_broken()
