@@ -1403,11 +1403,6 @@ class Session(object):
         self.nowait = False
 
     def _xmit_packet(self, retry=True, delay_xmit=None):
-        if not self.nowait:  # if we are retrying, we really need to get the
-                            # packet out and get our timeout updated
-            Session.wait_for_rsp(timeout=0, callout=False)  # take opportunity
-                                                 # to drain the socket queue if
-                                                 # applicable
         if self.sequencenumber:  # seq number of zero will be left alone, it is
                                 # special, otherwise increment
             self.sequencenumber += 1
