@@ -551,6 +551,21 @@ class Session(object):
             response['error'] = errorstr
         self.lastresponse = response
 
+    def _isincommand(self):
+        if self.incommand:
+            stillin = self.incommand - _monotonic_time()
+            if stillin > 0:
+                return stillin
+        return 0
+
+    def _getmaxtimeout(self):
+        cumulativetime = 0
+        incrementtime = self.timeout
+        while incrementtime < self.maxtimeout:
+            cumulativetime += incrementtime
+            incrementtime += 1
+        return cumulativetime + 1
+
     def raw_command(self,
                     netfn,
                     command,
@@ -560,11 +575,11 @@ class Session(object):
                     delay_xmit=None):
         if not self.logged:
             raise exc.IpmiException('Session no longer connected')
-        while self.incommand:
-            Session.wait_for_rsp()
+        while self._isincommand():
+            Session.wait_for_rsp(self._isincommand())
         if not self.logged:
             raise exc.IpmiException('Session no longer connected')
-        self.incommand = True
+        self.incommand = _monotonic_time() + self._getmaxtimeout()
         self.lastresponse = None
         self.ipmicallback = self._generic_callback
         self._send_ipmi_net_payload(netfn, command, data,
@@ -946,7 +961,7 @@ class Session(object):
         for session, parms in cls.keepalive_sessions.iteritems():
             # if the session is busy inside a command, defer invoking keepalive
             # until incommand is no longer the case
-            if parms['timeout'] < curtime and not session.incommand:
+            if parms['timeout'] < curtime and not session._isincommand():
                 cls.keepalive_sessions[session]['timeout'] = \
                     _monotonic_time() + 25 + (random.random() * 4.9)
                 sessionstokeepalive.append(session)
