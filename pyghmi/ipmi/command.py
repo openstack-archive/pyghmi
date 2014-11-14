@@ -145,14 +145,21 @@ class Command(object):
             return {'bootdev': 'default', 'persistent': True}
         else:  # will consult data2 of the boot flags parameter for the data
             persistent = False
+            uefimode = False
             if response['data'][2] & 0b1000000:
                 persistent = True
+            if response['data'][2] & 0b100000:
+                uefimode = True
             bootnum = (response['data'][3] & 0b111100) >> 2
             bootdev = boot_devices.get(bootnum)
             if bootdev:
-                return {'bootdev': bootdev, 'persistent': persistent}
+                return {'bootdev': bootdev,
+                        'persistent': persistent,
+                        'uefimode': uefimode}
             else:
-                return {'bootdev': bootnum, 'persistent': persistent}
+                return {'bootdev': bootnum,
+                        'persistent': persistent,
+                        'uefimode': uefimode}
 
     def set_power(self, powerstate, wait=False):
         """Request power state change
