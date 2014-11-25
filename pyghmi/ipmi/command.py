@@ -300,6 +300,39 @@ class Command(object):
         powerstate = 'on' if (response['data'][0] & 1) else 'off'
         return {'powerstate': powerstate}
 
+    def set_identify(self, on=True, duration=None):
+        """Request identify light
+
+        Request the identify light to turn off, on for a duration,
+        or on indefinitely.  Other than error exceptions,
+
+        :param on: Set to True to force on or False to force off
+        :param duration: Set if wanting to request turn on for a duration
+                         rather than indefinitely on
+        """
+        if duration is not None:
+            duration = int(duration)
+            if duration > 255:
+                duration = 255
+            if duration < 0:
+                duration = 0
+            response = self.raw_command(netfn=0, command=4, data=[duration])
+            if 'error' in response:
+                raise exc.IpmiException(response['error'])
+            return
+        forceon = 0
+        if on:
+            forceon = 1
+        if self.ipmi_session.ipmiversion < 2.0:
+            # ipmi 1.5 made due with just one byte, make best effort
+            # to imitate indefinite as close as possible
+            identifydata = [255 * forceon]
+        else:
+            identifydata = [0, forceon]
+        response = self.raw_command(netfn=0, command=4, data=identifydata)
+        if 'error' in response:
+            raise exc.IpmiException(response['error'])
+
     def get_health(self):
         """Summarize health of managed system
 
