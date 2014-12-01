@@ -877,6 +877,16 @@ class Session(object):
                                         command=0x38,
                                         data=[0x8e, self.privlevel])
 
+    def _handle_channel_auth_cap(self, request):
+        """Handle incoming channel authentication capabilities request
+
+        This is used when serving as an IPMI target to service client
+        requests for client authentication capabilities
+        """
+
+
+
+
     def login(self):
         self.logontries = 5
         self._initsession()
