@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2013 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -269,12 +270,13 @@ class Session(object):
     def _initsessions(cls):
         atexit.register(cls._cleanup)
 
-    def _assignsocket(self):
+    @classmethod
+    def _assignsocket(cls, server=None):
         global iothread
         global iothreadready
         global iosockets
         if iothread is None:
-            self._initsessions()
+            cls._initsessions()
             initevt = threading.Event()
             iothreadwaiters.append(initevt)
             iothread = threading.Thread(target=_ioworker)
@@ -288,17 +290,22 @@ class Session(object):
         # seek for the least used socket.  As sessions close, they may free
         # up slots in seemingly 'full' sockets.  This scheme allows those
         # slots to be recycled
-        sorted_candidates = sorted(self.socketpool.iteritems(),
-                                   key=operator.itemgetter(1))
+        sorted_candidates = None
+        if server is None:
+            sorted_candidates = sorted(cls.socketpool.iteritems(),
+                                       key=operator.itemgetter(1))
         if sorted_candidates and sorted_candidates[0][1] < MAX_BMCS_PER_SOCKET:
-            self.socketpool[sorted_candidates[0][0]] += 1
+            cls.socketpool[sorted_candidates[0][0]] += 1
             return sorted_candidates[0][0]
         # we need a new socket
         tmpsocket = _io_apply(socket.socket,
                               (socket.AF_INET6, socket.SOCK_DGRAM))  # INET6
                                     # can do IPv4 if you are nice to it
         tmpsocket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
-        self.socketpool[tmpsocket] = 1
+        if server is None:
+            cls.socketpool[tmpsocket] = 1
+        else:
+            tmpsocket.bind(server)
         iosockets.append(tmpsocket)
         return tmpsocket
 
@@ -356,6 +363,7 @@ class Session(object):
         self.maxtimeout = 3  # be aggressive about giving up on initial packet
         self.incommand = False
         self.nameonly = 16  # default to name only lookups in RAKP exchange
+        self.servermode = False
         self.initialized = True
         self.cleaningup = False
         self.lastpayload = None
@@ -507,7 +515,8 @@ class Session(object):
                                    # we are always the requestor for now
         seqincrement = 7  # IPMI spec forbids gaps bigger then 7 in seq number.
                        # Risk the taboo rather than violate the rules
-        while ((netfn, command, self.seqlun) in self.tabooseq and
+        while (not self.servermode and
+                (netfn, command, self.seqlun) in self.tabooseq and
                self.tabooseq[(netfn, command, self.seqlun)] and seqincrement):
             self.tabooseq[(self.expectednetfn, command, self.seqlun)] -= 1
                      # Allow taboo to eventually expire after a few rounds
@@ -526,7 +535,8 @@ class Session(object):
         else:
             rqaddr = self.rqaddr
             rsaddr = constants.IPMI_BMC_ADDRESS
-
+        if self.servermode:
+            rsaddr = self.clientaddr
         #figure 13-4, first two bytes are rsaddr and
         # netfn, for non-bridge request, rsaddr is always 0x20 since we are
         # addressing BMC while rsaddr is specified forbridge request
@@ -542,7 +552,8 @@ class Session(object):
             tail_csum = _checksum(*payload[3:])
             payload.append(tail_csum)
 
-        self._add_request_entry((self.expectednetfn, self.seqlun, command))
+        if not self.servermode:
+            self._add_request_entry((self.expectednetfn, self.seqlun, command))
         return payload
 
     def _generic_callback(self, response):
@@ -602,8 +613,17 @@ class Session(object):
         self.incommand = False
         return lastresponse
 
-    def _send_ipmi_net_payload(self, netfn, command, data, bridge_request=None,
-                               retry=True, delay_xmit=None):
+    def _send_ipmi_net_payload(self, netfn=None, command=None, data=[], code=0,
+                               bridge_request=None,
+                               retry=None, delay_xmit=None):
+        if retry is None:
+            retry = not self.servermode
+        if self.servermode:
+            data = [code] + data
+            if netfn is None:
+                netfn = self.clientnetfn
+            if command is None:
+                command = self.clientcommand
         ipmipayload = self._make_ipmi_payload(netfn, command, bridge_request,
                                               data)
         payload_type = constants.payload_types['ipmi']
@@ -889,6 +909,7 @@ class Session(object):
                 rdata = _io_apply(_io_recvfrom, (mysocket, 3000))
                 if rdata is None:
                     break
+                rdata = rdata + (mysocket,)
                 queue.append(rdata)
 
     @classmethod
@@ -953,8 +974,8 @@ class Session(object):
             pktqueue = collections.deque([])
             cls.pulltoqueue(iosockets, pktqueue)
             while len(pktqueue):
-                (data, sockaddr) = pktqueue.popleft()
-                cls._route_ipmiresponse(sockaddr, data)
+                (data, sockaddr, mysocket) = pktqueue.popleft()
+                cls._route_ipmiresponse(sockaddr, data, mysocket)
                 cls.pulltoqueue(iosockets, pktqueue)
         sessionstodel = []
         sessionstokeepalive = []
@@ -1036,14 +1057,16 @@ class Session(object):
             self._mark_broken()
 
     @classmethod
-    def _route_ipmiresponse(cls, sockaddr, data):
+    def _route_ipmiresponse(cls, sockaddr, data, mysocket):
         if not (data[0] == '\x06' and data[2:4] == '\xff\x07'):  # not ipmi
             return
         try:
             cls.bmc_handlers[sockaddr]._handle_ipmi_packet(data,
                                                            sockaddr=sockaddr)
         except KeyError:
-            pass
+            # check if we have a server attached to the target socket
+            if mysocket in cls.bmc_handlers:
+                cls.bmc_handlers[mysocket].sessionless_data(data, sockaddr)
 
     def _handle_ipmi_packet(self, data, sockaddr=None):
         if self.sockaddr is None and sockaddr is not None:
@@ -1089,16 +1112,33 @@ class Session(object):
         else:
             return  # unrecognized data, assume evil
 
+    def _got_rakp1(self, data):
+        # stub, client sessions ignore rakp2
+        pass
+
+    def _got_rakp3(self, data):
+        #stub, client sessions ignore rakp3
+        pass
+
+    def _got_rmcp_openrequest(self, data):
+        pass
+
     def _handle_ipmi2_packet(self, rawdata):
         data = list(struct.unpack("%dB" % len(rawdata), rawdata))
                     #now need mutable array
         ptype = data[5] & 0b00111111
         # the first 16 bytes are header information as can be seen in 13-8 that
         # we will toss out
-        if ptype == 0x11:  # rmcp+ response
+        if ptype == 0x10:
+            return self._got_rmcp_openrequest(data[16:])
+        elif ptype == 0x11:  # rmcp+ response
             return self._got_rmcp_response(data[16:])
+        elif ptype == 0x12:
+            return self._got_rakp1(data[16:])
         elif ptype == 0x13:
             return self._got_rakp2(data[16:])
+        elif ptype == 0x14:
+            return self._got_rakp3(data[16:])
         elif ptype == 0x15:
             return self._got_rakp4(data[16:])
         elif ptype == 0 or ptype == 1:  # good old ipmi payload or sol
@@ -1265,6 +1305,7 @@ class Session(object):
             struct.pack("2B", self.nameonly | self.privlevel,
                         len(self.userid)) +\
             self.userid
+
         authcode = hmac.new(self.password, hmacdata, hashlib.sha1).digest()
         payload += list(struct.unpack("%dB" % len(authcode), authcode))
         self.send_payload(
@@ -1318,6 +1359,13 @@ class Session(object):
         # For now, skip the checksums since we are in LAN only,
         # TODO(jbjohnso): if implementing other channels, add checksum checks
         # here
+        if self.servermode:
+            self.seqlun = payload[4]
+            self.clientaddr = payload[3]
+            self.clientnetfn = (payload[1] >> 2) + 1
+            self.clientcommand = payload[5]
+            self._parse_payload(payload)
+            return
         entry = (payload[1] >> 2, payload[4], payload[5])
         if self._lookup_request_entry(entry):
             self._remove_request_entry(entry)
@@ -1353,8 +1401,9 @@ class Session(object):
         self.expectednetfn = 0x1ff  # bigger than one byte means it can never
                                     # match the one byte value by mistake
         self.expectedcmd = 0x1ff
-        self.seqlun += 4  # prepare seqlun for next transmit
-        self.seqlun &= 0xff  # when overflowing, wrap around
+        if not self.servermode:
+            self.seqlun += 4  # prepare seqlun for next transmit
+            self.seqlun &= 0xff  # when overflowing, wrap around
         Session.waiting_sessions.pop(self, None)
         self.lastpayload = None  # render retry mechanism utterly incapable of
                                  # doing anything, though it shouldn't matter
@@ -1365,11 +1414,15 @@ class Session(object):
         # ^^ remove header of rsaddr/netfn/lun/checksum/rq/seq/lun
         del payload[-1]  # remove the trailing checksum
         response['command'] = payload[0]
-        response['code'] = payload[1]
-        del payload[0:2]
-        response['data'] = payload
+        if self.servermode:
+            del payload[0:1]
+            response['data'] = payload
+        else:
+            response['code'] = payload[1]
+            del payload[0:2]
+            response['data'] = payload
         self.timeout = initialtimeout + (0.5 * random.random())
-        if len(self.pendingpayloads) > 0:
+        if not self.servermode and len(self.pendingpayloads) > 0:
             (nextpayload, nextpayloadtype, retry) = \
                 self.pendingpayloads.popleft()
             self.send_payload(payload=nextpayload,
