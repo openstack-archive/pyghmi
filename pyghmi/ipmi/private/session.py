@@ -269,12 +269,13 @@ class Session(object):
     def _initsessions(cls):
         atexit.register(cls._cleanup)
 
-    def _assignsocket(self):
+    @classmethod
+    def _assignsocket(cls, server=None):
         global iothread
         global iothreadready
         global iosockets
         if iothread is None:
-            self._initsessions()
+            cls._initsessions()
             initevt = threading.Event()
             iothreadwaiters.append(initevt)
             iothread = threading.Thread(target=_ioworker)
@@ -288,17 +289,22 @@ class Session(object):
         # seek for the least used socket.  As sessions close, they may free
         # up slots in seemingly 'full' sockets.  This scheme allows those
         # slots to be recycled
-        sorted_candidates = sorted(self.socketpool.iteritems(),
-                                   key=operator.itemgetter(1))
+        sorted_candidates = None
+        if server is None:
+            sorted_candidates = sorted(cls.socketpool.iteritems(),
+                                       key=operator.itemgetter(1))
         if sorted_candidates and sorted_candidates[0][1] < MAX_BMCS_PER_SOCKET:
-            self.socketpool[sorted_candidates[0][0]] += 1
+            cls.socketpool[sorted_candidates[0][0]] += 1
             return sorted_candidates[0][0]
         # we need a new socket
         tmpsocket = _io_apply(socket.socket,
                               (socket.AF_INET6, socket.SOCK_DGRAM))  # INET6
                                     # can do IPv4 if you are nice to it
         tmpsocket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
-        self.socketpool[tmpsocket] = 1
+        if server is None:
+            cls.socketpool[tmpsocket] = 1
+        else:
+            tmpsocket.bind(server)
         iosockets.append(tmpsocket)
         return tmpsocket
 
@@ -889,6 +895,7 @@ class Session(object):
                 rdata = _io_apply(_io_recvfrom, (mysocket, 3000))
                 if rdata is None:
                     break
+                rdata = rdata + (mysocket,)
                 queue.append(rdata)
 
     @classmethod
@@ -953,8 +960,8 @@ class Session(object):
             pktqueue = collections.deque([])
             cls.pulltoqueue(iosockets, pktqueue)
             while len(pktqueue):
-                (data, sockaddr) = pktqueue.popleft()
-                cls._route_ipmiresponse(sockaddr, data)
+                (data, sockaddr, mysocket) = pktqueue.popleft()
+                cls._route_ipmiresponse(sockaddr, data, mysocket)
                 cls.pulltoqueue(iosockets, pktqueue)
         sessionstodel = []
         sessionstokeepalive = []
@@ -1036,14 +1043,16 @@ class Session(object):
             self._mark_broken()
 
     @classmethod
-    def _route_ipmiresponse(cls, sockaddr, data):
+    def _route_ipmiresponse(cls, sockaddr, data, mysocket):
         if not (data[0] == '\x06' and data[2:4] == '\xff\x07'):  # not ipmi
             return
         try:
             cls.bmc_handlers[sockaddr]._handle_ipmi_packet(data,
                                                            sockaddr=sockaddr)
         except KeyError:
-            pass
+            # check if we have a server attached to the target socket
+            if mysocket in cls.bmc_handlers:
+                cls.bmc_handlers[mysocket].sessionless_data(data, sockaddr)
 
     def _handle_ipmi_packet(self, data, sockaddr=None):
         if self.sockaddr is None and sockaddr is not None:
@@ -1089,16 +1098,34 @@ class Session(object):
         else:
             return  # unrecognized data, assume evil
 
+    def _got_rakp1(self, data):
+        # stub, client sessions ignore rakp2
+        pass
+
+    def _got_rakp3(self, data):
+        #stub, client sessions ignore rakp3
+        pass
+
+    def _got_rmcp_openrequest(self, data):
+        pass
+
     def _handle_ipmi2_packet(self, rawdata):
         data = list(struct.unpack("%dB" % len(rawdata), rawdata))
                     #now need mutable array
         ptype = data[5] & 0b00111111
         # the first 16 bytes are header information as can be seen in 13-8 that
         # we will toss out
-        if ptype == 0x11:  # rmcp+ response
+        print repr(ptype)
+        if ptype == 0x10:
+            return self._got_rmcp_openrequest(data[16:])
+        elif ptype == 0x11:  # rmcp+ response
             return self._got_rmcp_response(data[16:])
+        elif ptype == 0x12:
+            return self._got_rakp1(data[16:])
         elif ptype == 0x13:
             return self._got_rakp2(data[16:])
+        elif ptype == 0x14:
+            return self._got_rakp3(data)
         elif ptype == 0x15:
             return self._got_rakp4(data[16:])
         elif ptype == 0 or ptype == 1:  # good old ipmi payload or sol
