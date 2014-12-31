@@ -78,7 +78,7 @@ try:
     inputthread.daemon = True
     inputthread.start()
     sol.main_loop()
-except:
+except Exception:
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
     termios.tcsetattr(sys.stdin, termios.TCSANOW, tcattr)
