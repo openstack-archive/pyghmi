@@ -1,0 +1,9 @@
+Verified+2: Jenkins
+Code-Review+2: Devananda van der Veen <devananda.vdv@gmail.com>
+Workflow+1: Devananda van der Veen <devananda.vdv@gmail.com>
+Code-Review+1: Josh Gachnang <josh@pcsforeducation.com>
+Submitted-by: Jenkins
+Submitted-at: Wed, 31 Dec 2014 00:29:06 +0000
+Reviewed-on: https://review.openstack.org/144546
+Project: stackforge/pyghmi
+Branch: refs/heads/master
