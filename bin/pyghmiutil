@@ -25,12 +25,14 @@ import string
 import sys
 
 from pyghmi.ipmi import command
-password = os.environ['IPMIPASSWORD']
-os.environ['IPMIPASSWORD'] = ""
-if (len(sys.argv) < 3):
+
+if (len(sys.argv) < 3) or 'IPMIPASSWORD' not in os.environ:
     print "Usage:"
     print " IPMIPASSWORD=password %s bmc username <cmd> <optarg>" % sys.argv[0]
     sys.exit(1)
+
+password = os.environ['IPMIPASSWORD']
+os.environ['IPMIPASSWORD'] = ""
 bmc = sys.argv[1]
 userid = sys.argv[2]
 args = None
