@@ -365,3 +365,16 @@ class Command(object):
                     continue
                 raise Exception(rsp['error'])
             yield self._sdr.sensors[sensor].decode_sensor_reading(rsp['data'])
+
+    def get_sensor_descriptions(self):
+        """Get available sensor names
+
+        Iterates over the available sensor descriptions
+
+        :returns: Iterator of dicts describing each sensor
+        """
+        if self._sdr is None:
+            self._sdr = sdr.SDR(self)
+        for sensor in self._sdr.get_sensor_numbers():
+            yield {'name': self._sdr.sensors[sensor].name,
+                   'type': self._sdr.sensors[sensor].sensor_type}
