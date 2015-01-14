@@ -42,6 +42,7 @@ boot_devices = {
     3: 'safe',
     5: 'optical',
     6: 'setup',
+    15: 'floppy',
     0: 'default'
 }
 
