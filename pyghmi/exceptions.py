@@ -23,7 +23,9 @@ class PyghmiException(Exception):
 
 
 class IpmiException(PyghmiException):
-    pass
+    def __init__(self, text='', code=0):
+        super(IpmiException, self).__init__(text)
+        self.ipmicode = code
 
 
 class InvalidParameterValue(PyghmiException):

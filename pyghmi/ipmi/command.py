@@ -363,7 +363,7 @@ class Command(object):
             if self._sdr.sensors[sensor].name == sensorname:
                 rsp = self.raw_command(command=0x2d, netfn=4, data=(sensor,))
                 if 'error' in rsp:
-                    raise Exception(rsp['error'])
+                    raise exc.IpmiException(rsp['error'], rsp['code'])
                 return self._sdr.sensors[sensor].decode_sensor_reading(
                     rsp['data'])
         raise Exception('Sensor not found: ' + sensorname)
