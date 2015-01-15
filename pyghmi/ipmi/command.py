@@ -348,6 +348,26 @@ class Command(object):
                 summary['badreadings'].append(reading)
         return summary
 
+    def get_sensor_reading(self, sensorname):
+        """Get a sensor reading by name
+
+        Returns a single decoded sensor reading per the name
+        passed in
+
+        :param sensorname:  Name of the desired sensor
+        :returns: sdr.SensorReading object
+        """
+        if self._sdr is None:
+            self._sdr = sdr.SDR(self)
+        for sensor in self._sdr.get_sensor_numbers():
+            if self._sdr.sensors[sensor].name == sensorname:
+                rsp = self.raw_command(command=0x2d, netfn=4, data=(sensor,))
+                if 'error' in rsp:
+                    raise Exception(rsp['error'])
+                return self._sdr.sensors[sensor].decode_sensor_reading(
+                    rsp['data'])
+        raise Exception('Sensor not found: ' + sensorname)
+
     def get_sensor_data(self):
         """Get sensor reading objects
 
