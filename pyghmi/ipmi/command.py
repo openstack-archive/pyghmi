@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2013 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -363,7 +364,7 @@ class Command(object):
             if self._sdr.sensors[sensor].name == sensorname:
                 rsp = self.raw_command(command=0x2d, netfn=4, data=(sensor,))
                 if 'error' in rsp:
-                    raise Exception(rsp['error'])
+                    raise exc.IpmiException(rsp['error'], rsp['code'])
                 return self._sdr.sensors[sensor].decode_sensor_reading(
                     rsp['data'])
         raise Exception('Sensor not found: ' + sensorname)

@@ -2,6 +2,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2013 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +24,9 @@ class PyghmiException(Exception):
 
 
 class IpmiException(PyghmiException):
-    pass
+    def __init__(self, text='', code=0):
+        super(IpmiException, self).__init__(text)
+        self.ipmicode = code
 
 
 class InvalidParameterValue(PyghmiException):
