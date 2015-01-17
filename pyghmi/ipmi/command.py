@@ -164,7 +164,7 @@ class Command(object):
                         'uefimode': uefimode}
 
     def set_power(self, powerstate, wait=False):
-        """Request power state change
+        """Request power state change (helper)
 
         :param powerstate:
                             * on -- Request system turn on
@@ -225,7 +225,7 @@ class Command(object):
                     bootdev,
                     persist=False,
                     uefiboot=False):
-        """Set boot device to use on next reboot
+        """Set boot device to use on next reboot (helper)
 
         :param bootdev:
                         *network -- Request network boot
@@ -399,3 +399,547 @@ class Command(object):
         for sensor in self._sdr.get_sensor_numbers():
             yield {'name': self._sdr.sensors[sensor].name,
                    'type': self._sdr.sensors[sensor].sensor_type}
+
+    def set_channel_access(self, channel=14, access_update_mode='non_volatile',
+                           alerting=False, per_msg_auth=False,
+                           user_level_auth=False, access_mode='always',
+                           privilege_update_mode='non_volatile',
+                           privilege_level='administrator'):
+        """Set channel access
+
+        :param channel: number [1:7]
+
+        :param access_update_mode:
+            dont_change  = don't set or change Channel Access
+            non_volatile = set non-volatile Channel Access
+            volatile     = set volatile (active) setting of Channel Access
+
+        :param alerting: PEF Alerting Enable/Disable
+        True  = enable PEF Alerting
+        False = disable PEF Alerting on this channel
+                (Alert Immediate command can still be used to generate alerts)
+
+        :param per_msg_auth: Per-message Authentication
+        True  = enable
+        False = disable Per-message Authentication. [Authentication required to
+                activate any session on this channel, but authentication not
+                used on subsequent packets for the session.]
+
+        :param user_level_auth: User Level Authentication Enable/Disable.
+        True  = enable User Level Authentication. All User Level commands are
+            to be authenticated per the Authentication Type that was
+            negotiated when the session was activated.
+        False = disable User Level Authentication. Allow User Level commands to
+            be executed without being authenticated.
+            If the option to disable User Level Command authentication is
+            accepted, the BMC will accept packets with Authentication Type
+            set to None if they contain user level commands.
+            For outgoing packets, the BMC returns responses with the same
+            Authentication Type that was used for the request.
+
+        :param access_mode: Access Mode for IPMI messaging
+        (PEF Alerting is enabled/disabled separately from IPMI messaging)
+        disabled = disabled for IPMI messaging
+        pre_boot = pre-boot only channel only available when system is in a
+                powered down state or in BIOS prior to start of boot.
+        always   = channel always available regardless of system mode.
+                BIOS typically dedicates the serial connection to the BMC.
+        shared   = same as always available, but BIOS typically leaves the
+                serial port available for software use.
+
+        :param privilege_update_mode: Channel Privilege Level Limit.
+            This value sets the maximum privilege level
+            that can be accepted on the specified channel.
+            dont_change  = don't set or change channel Privilege Level Limit
+            non_volatile = non-volatile Privilege Level Limit according
+            volatile     = volatile setting of Privilege Level Limit
+
+        :param privilege_level: Channel Privilege Level Limit
+            * reserved      = unused
+            * callback
+            * user
+            * operator
+            * administrator
+            * proprietary   = used by OEM
+        """
+        data = []
+        data.append(channel & 0b00001111)
+        access_update_modes = {
+            'dont_change': 0,
+            'non_volatile': 1,
+            'volatile': 2,
+            #'reserved': 3
+        }
+        b = 0
+        b |= (access_update_modes[access_update_mode] << 6) & 0b11000000
+        if alerting:
+            b |= 0b00100000
+        if per_msg_auth:
+            b |= 0b00010000
+        if user_level_auth:
+            b |= 0b00001000
+        access_modes = {
+            'disabled': 0,
+            'pre_boot': 1,
+            'always': 2,
+            'shared': 3,
+        }
+        b |= access_modes[access_mode] & 0b00000111
+        data.append(b)
+        b = 0
+        privilege_update_modes = {
+            'dont_change': 0,
+            'non_volatile': 1,
+            'volatile': 2,
+            #'reserved': 3
+        }
+        b |= (privilege_update_modes[privilege_update_mode] << 6) & 0b11000000
+        privilege_levels = {
+            'reserved': 0,
+            'callback': 1,
+            'user': 2,
+            'operator': 3,
+            'administrator': 4,
+            'proprietary': 5,
+            # 'no_access': 0x0F,
+        }
+        b |= privilege_levels[privilege_level] & 0b00000111
+        data.append(b)
+        response = self.raw_command(netfn=0x06, command=0x40, data=data)
+        if 'error' in response:
+            raise Exception(response['error'])
+        return True
+
+    def get_channel_access(self, channel=14, read_mode='volatile'):
+        """Get channel access
+
+        :param channel: number [1:7]
+        :param read_mode:
+        non_volatile  = get non-volatile Channel Access
+        volatile      = get present volatile (active) setting of Channel Access
+
+        :return: A Python dict with the following keys/values:
+          {
+            - alerting:
+            - per_msg_auth:
+            - user_level_auth:
+            - access_mode:{
+                0: 'disabled',
+                1: 'pre_boot',
+                2: 'always',
+                3: 'shared'
+              }
+            - privilege_level: {
+                1: 'callback',
+                2: 'user',
+                3: 'operator',
+                4: 'administrator',
+                5: 'proprietary',
+              }
+           }
+        """
+        data = []
+        data.append(channel & 0b00001111)
+        b = 0
+        read_modes = {
+            'non_volatile': 1,
+            'volatile': 2,
+        }
+        b |= (read_modes[read_mode] << 6) & 0b11000000
+        data.append(b)
+
+        response = self.raw_command(netfn=0x06, command=0x41, data=data)
+        if 'error' in response:
+            raise Exception(response['error'])
+
+        data = response['data']
+        if len(data) != 2:
+            raise Exception('expecting 2 data bytes')
+
+        r = {}
+        r['alerting'] = data[0] & 0b10000000 > 0
+        r['per_msg_auth'] = data[0] & 0b01000000 > 0
+        r['user_level_auth'] = data[0] & 0b00100000 > 0
+        access_modes = {
+            0: 'disabled',
+            1: 'pre_boot',
+            2: 'always',
+            3: 'shared'
+        }
+        r['access_mode'] = access_modes[data[0] & 0b00000011]
+        privilege_levels = {
+            0: 'reserved',
+            1: 'callback',
+            2: 'user',
+            3: 'operator',
+            4: 'administrator',
+            5: 'proprietary',
+            #0x0F: 'no_access'
+        }
+        r['privilege_level'] = privilege_levels[data[1] & 0b00001111]
+        return r
+
+    def get_channel_info(self, channel=14):
+        """Get channel info
+
+        :param channel: number [1:7]
+
+        :return:
+        session_support:
+            no_session: channel is session-less
+            single: channel is single-session
+            multi: channel is multi-session
+            auto: channel is session-based (channel could alternate between
+                single- and multi-session operation, as can occur with a
+                serial/modem channel that supports connection mode auto-detect)
+        """
+        data = []
+        data.append(channel & 0b00001111)
+        response = self.raw_command(netfn=0x06, command=0x42, data=data)
+        if 'error' in response:
+            raise Exception(response['error'])
+        data = response['data']
+        if len(data) != 9:
+            raise Exception('expecting 10 data bytes got: {0}'.format(data))
+        r = {}
+        r['Actual channel'] = data[0] & 0b00000111
+        channel_medium_types = {
+            0: 'reserved',
+            1: 'IPMB',
+            2: 'ICMB v1.0',
+            3: 'ICMB v0.9',
+            4: '802.3 LAN',
+            5: 'Asynch. Serial/Modem (RS-232)',
+            6: 'Other LAN',
+            7: 'PCI SMBus',
+            8: 'SMBus v1.0/1.1',
+            9: 'SMBus v2.0',
+            0x0a: 'reserved for USB 1.x',
+            0x0b: 'reserved for USB 2.x',
+            0x0c: 'System Interface (KCS, SMIC, or BT)',
+            ## 60h-7Fh: OEM
+            ## all other  reserved
+        }
+        t = data[1] & 0b01111111
+        if t in channel_medium_types:
+            r['Channel Medium type'] = channel_medium_types[t]
+        else:
+            r['Channel Medium type'] = 'OEM {:02X}'.format(t)
+        r['5-bit Channel IPMI Messaging Protocol Type'] = data[2] & 0b00001111
+        session_supports = {
+            0: 'no_session',
+            1: 'single',
+            2: 'multi',
+            3: 'auto'
+        }
+        r['session_support'] = session_supports[(data[3] & 0b11000000) >> 6]
+        r['active_session_count'] = data[3] & 0b00111111
+        r['Vendor ID'] = [data[4], data[5], data[6]]
+        r['Auxiliary Channel Info'] = [data[7], data[8]]
+        return r
+
+    def set_user_access(self, uid, channel=14, callback=False, link_auth=True,
+                        ipmi_msg=True, privilege_level='administrator'):
+        """Set user access
+
+        :param uid: user number [1:16]
+
+        :param channel: number [1:7]
+
+        :parm callback: User Restricted to Callback
+        False = User Privilege Limit is determined by the User Privilege Limit
+            parameter, below, for both callback and non-callback connections.
+        True  = User Privilege Limit is determined by the User Privilege Limit
+            parameter for callback connections, but is restricted to Callback
+            level for non-callback connections. Thus, a user can only initiate
+            a Callback when they 'call in' to the BMC, but once the callback
+            connection has been made, the user could potentially establish a
+            session as an Operator.
+
+        :param link_auth: User Link authentication
+        enable/disable (used to enable whether this
+        user's name and password information will be used for link
+        authentication, e.g. PPP CHAP) for the given channel. Link
+        authentication itself is a global setting for the channel and is
+        enabled/disabled via the serial/modem configuration parameters.
+
+        :param ipmi_msg: User IPMI Messaginge:
+        (used to enable/disable whether
+        this user's name and password information will be used for IPMI
+        Messaging. In this case, 'IPMI Messaging' refers to the ability to
+        execute generic IPMI commands that are not associated with a
+        particular payload type. For example, if IPMI Messaging is disabled for
+        a user, but that user is enabled for activatallow_authing the SOL
+        payload type, then IPMI commands associated with SOL and session
+        management, such as Get SOL Configuration Parameters and Close Session
+        are available, but generic IPMI commands such as Get SEL Time are
+        unavailable.)
+
+        :param privilege_level:
+        User Privilege Limit. (Determines the maximum privilege level that the
+        user is allowed to switch to on the specified channel.)
+            * callback
+            * user
+            * operator
+            * administrator
+            * proprietary
+            * no_access
+        """
+        b = 0b10000000
+        if callback:
+            b |= 0b01000000
+        if link_auth:
+            b |= 0b00100000
+        if ipmi_msg:
+            b |= 0b00010000
+        b |= channel & 0b00001111
+        privilege_levels = {
+            'reserved': 0,
+            'callback': 1,
+            'user': 2,
+            'operator': 3,
+            'administrator': 4,
+            'proprietary': 5,
+            'no_access': 0x0F,
+        }
+        data = [b, uid & 0b00111111,
+                privilege_levels[privilege_level] & 0b00001111]
+        response = self.raw_command(netfn=0x06, command=0x43, data=data)
+        if 'error' in response:
+            raise Exception(response['error'])
+        return True
+
+    def get_user_access(self, uid, channel=14):
+        """Get user access
+
+        :param uid: user number [1:16]
+        :param channel: number [1:7]
+
+        :return:
+        channel_info:
+            max_user_count = maximum number of user IDs on this channel
+            enabled_users = count of User ID slots presently in use
+            users_with_fixed_names = count of user IDs with fixed names
+
+        access:
+            callback
+            link_auth
+            ipmi_msg
+            privilege_level: [reserved, callback, user,
+                              operatorm administrator, proprietary, no_access]
+        """
+        ## user access available during call-in or callback direct connection
+        data = [channel, uid]
+        response = self.raw_command(netfn=0x06, command=0x44, data=data)
+        if 'error' in response:
+            raise Exception(response['error'])
+        data = response['data']
+        if len(data) != 4:
+            raise Exception('expecting 4 data bytes')
+        r = {'channel_info': {}, 'access': {}}
+        r['channel_info']['max_user_count'] = data[0]
+        r['channel_info']['enabled_users'] = data[1] & 0b00111111
+        r['channel_info']['users_with_fixed_names'] = data[2] & 0b00111111
+        r['access']['callback'] = (data[3] & 0b01000000) != 0
+        r['access']['link_auth'] = (data[3] & 0b00100000) != 0
+        r['access']['ipmi_msg'] = (data[3] & 0b00010000) != 0
+        privilege_levels = {
+            0: 'reserved',
+            1: 'callback',
+            2: 'user',
+            3: 'operator',
+            4: 'administrator',
+            5: 'proprietary',
+            0x0F: 'no_access'
+        }
+        r['access']['privilege_level'] = privilege_levels[data[3] & 0b00001111]
+        return r
+
+    def set_user_name(self, uid, name):
+        """Set user name
+
+        :param uid: user number [1:16]
+        :param name: username (limit of 16bytes)
+        """
+        data = [uid]
+        if len(name) > 16:
+            raise Exception('name must be less than or = 16 chars')
+        name = name.ljust(16, "\x00")
+        data.extend([ord(x) for x in name])
+        response = self.raw_command(netfn=0x06, command=0x45, data=data)
+        if 'error' in response:
+            raise Exception(response['error'])
+        return True
+
+    def get_user_name(self, uid, return_none_on_error=True):
+        """Get user name
+
+        :param uid: user number [1:16]
+        :param return_none_on_error: return None on error
+            TODO: investigate return code on error
+        """
+        response = self.raw_command(netfn=0x06, command=0x46, data=(uid,))
+        if 'error' in response:
+            if return_none_on_error:
+                return None
+            raise Exception(response['error'])
+        name = None
+        if 'data' in response:
+            data = response['data']
+            if len(data) == 16:
+                # convert int array to string
+                n = ''.join(chr(data[i]) for i in range(0, len(data)))
+                # remove padded \x00 chars
+                n = n.rstrip("\x00")
+                if len(n) > 0:
+                    name = n
+        return name
+
+    def set_user_password(self, uid, mode='set_password', password=None):
+        """Set user password and (modes)
+
+        :param uid: id number of user.  see: get_names_uid()['name']
+
+        :param mode:
+            disable       = disable user connections
+            enable        = enable user connections
+            set_password  = set or ensure password
+            test_password = test password is correct
+
+        :param password: max 16 char string
+            (optional when mode is [disable or enable])
+
+        :return:
+            True on success
+            when mode = test_password, return False on bad password
+        """
+        mode_mask = {
+            'disable': 0,
+            'enable': 1,
+            'set_password': 2,
+            'test_password': 3
+        }
+        data = [uid, mode_mask[mode]]
+        if password:
+            password = str(password)
+            if len(password) > 16:
+                raise Exception('password has limit of 16 chars')
+            password = password.ljust(16, "\x00")
+            data.extend([ord(x) for x in password])
+        response = self.raw_command(netfn=0x06, command=0x47, data=data)
+        if 'error' in response:
+            if mode == 'test_password':
+                # return false if password test failed
+                return False
+            raise Exception(response['error'])
+        return True
+
+    def get_channel_max_user_count(self, channel=14):
+        """Get max users in channel (helper)
+
+        :param channel: number [1:7]
+        :return: int -- often 16
+        """
+        access = self.get_user_access(channel=channel, uid=1)
+        return access['channel_info']['max_user_count']
+
+    def get_user(self, uid, channel=14):
+        """Get user (helper)
+
+        :param uid: user number [1:16]
+        :param channel: number [1:7]
+
+        :return:
+            name: (str)
+            uid: (int)
+            channel: (int)
+            access:
+                callback (bool)
+                link_auth (bool)
+                ipmi_msg (bool)
+                privilege_level: (str)[callback, user, operatorm administrator,
+                                       proprietary, no_access]
+        """
+        name = self.get_user_name(uid)
+        access = self.get_user_access(uid, channel)
+        data = {'name': name, 'uid': uid, 'channel': channel,
+                'access': access['access']}
+        return data
+
+    def get_name_uids(self, name, channel=14):
+        """get list of users (helper)
+
+        :param channel: number [1:7]
+
+        :return: list of users
+        """
+        uid_list = []
+        max_ids = self.get_channel_max_user_count(channel)
+        for uid in range(1, max_ids):
+            if name == self.get_user_name(uid=uid):
+                uid_list.append(uid)
+        return uid_list
+
+    def get_users(self, channel=14):
+        """get list of users and channel access information (helper)
+
+        :param channel: number [1:7]
+
+        :return:
+            name: (str)
+            uid: (int)
+            channel: (int)
+            access:
+                callback (bool)
+                link_auth (bool)
+                ipmi_msg (bool)
+                privilege_level: (str)[callback, user, operatorm administrator,
+                                       proprietary, no_access]
+        """
+        names = {}
+        max_ids = self.get_channel_max_user_count(channel)
+        for uid in range(1, max_ids):
+            name = self.get_user_name(uid=uid)
+            if name is not None:
+                names[uid] = self.get_user(uid=uid, channel=channel)
+        return names
+
+    def create_user(self, uid, name, password, channel=14, callback=False,
+                    link_auth=True, ipmi_msg=True,
+                    privilege_level='administrator'):
+        """create/ensure a user is created with provided settings (helper)
+
+        :param privilege_level:
+            User Privilege Limit. (Determines the maximum privilege level that
+            the user is allowed to switch to on the specified channel.)
+            * callback
+            * user
+            * operator
+            * administrator
+            * proprietary
+            * no_access
+        """
+        # current user might be trying to update.. dont disable
+        # set_user_password(uid, password, mode='disable')
+        self.set_user_name(uid, name)
+        self.set_user_access(uid, channel, callback=callback,
+                             link_auth=link_auth, ipmi_msg=ipmi_msg,
+                             privilege_level=privilege_level)
+        self.set_user_password(uid, password=password)
+        self.set_user_password(uid, mode='enable', password=password)
+        return True
+
+    def user_delete(self, uid, channel=14):
+        """Delete user (helper)
+
+        :param uid: user number [1:16]
+        :param channel: number [1:7]
+        """
+        self.set_user_password(uid, mode='disable', password=None)
+        self.set_user_name(uid, '')
+        # TODO(steveweber) perhaps should set user access on all channels
+        # so new users dont get extra access
+        self.set_user_access(uid, channel=channel, callback=False,
+                             link_auth=False, ipmi_msg=False,
+                             privilege_level='no_access')
+        return True
