@@ -1142,6 +1142,10 @@ command_completion_codes = {
         0x83: "Cannot activate payload with encryption",
         0x84: "Cannot activate payload without encryption",
     },
+    (6, 0x47): {  # set user password
+        0x80: "Password test failed. Password does not match stored value",
+        0x81: "Password test failed. Wrong password size was used"
+    },
 }
 
 ipmi_completion_codes = {
