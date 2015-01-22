@@ -1174,4 +1174,5 @@ ipmi_completion_codes = {
     0xd5: "Command not supported in present state",
     0xd6: "Cannot execute command because subfunction disabled or unavailable",
     0xff: "Unspecified",
+    0xffff: "Timeout",  # not ipmi, but used internally
 }

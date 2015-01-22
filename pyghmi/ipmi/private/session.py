@@ -1436,7 +1436,7 @@ class Session(object):
         self.nowait = True
         self.timeout += 1
         if self.timeout > self.maxtimeout:
-            response = {'error': 'timeout'}
+            response = {'error': 'timeout', 'code': 0xffff}
             self.ipmicallback(response)
             self.nowait = False
             self._mark_broken()

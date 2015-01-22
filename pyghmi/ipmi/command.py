@@ -384,7 +384,7 @@ class Command(object):
             if 'error' in rsp:
                 if rsp['code'] == 203:  # Sensor does not exist, optional dev
                     continue
-                raise Exception(rsp['error'])
+                raise exc.IpmiException(rsp['error'], code=rsp['code'])
             yield self._sdr.sensors[sensor].decode_sensor_reading(rsp['data'])
 
     def get_sensor_descriptions(self):
