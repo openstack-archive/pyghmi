@@ -998,6 +998,9 @@ class Session(object):
                                               # to avoid confusing the for loop
         for session in sessionstodel:
             cls.waiting_sessions.pop(session, None)
+        # one loop iteration to make sure recursion doesn't induce redundant
+        # timeouts
+        for session in sessionstodel:
             session._timedout()
         return len(cls.waiting_sessions)
 
@@ -1474,11 +1477,6 @@ class Session(object):
         if self.sequencenumber:  # seq number of zero will be left alone, it is
                                 # special, otherwise increment
             self.sequencenumber += 1
-        if retry:
-            Session.waiting_sessions[self] = {}
-            Session.waiting_sessions[self]['ipmisession'] = self
-            Session.waiting_sessions[self]['timeout'] = self.timeout + \
-                _monotonic_time()
         if delay_xmit is not None:
             Session.waiting_sessions[self]['timeout'] = delay_xmit + \
                 _monotonic_time()
@@ -1506,6 +1504,12 @@ class Session(object):
             except socket.gaierror:
                 raise exc.IpmiException(
                     "Unable to transmit to specified address")
+        if retry:
+            Session.waiting_sessions[self] = {}
+            Session.waiting_sessions[self]['ipmisession'] = self
+            Session.waiting_sessions[self]['timeout'] = self.timeout + \
+                _monotonic_time()
+
 
     def logout(self):
         if not self.logged:
