@@ -325,7 +325,11 @@ class Console(object):
             #Why not put pending data into the ack? because it's rare
             #and might be hard to decide what to do in the context of
             #retry situation
-            self.send_payload(ackpayload, retry=False)
+            try:
+                self.send_payload(ackpayload, retry=False)
+            except exc.IpmiException:
+                #if the session is broken, then close the SOL session
+                self.close()
         if self.myseq != 0 and ackseq == self.myseq:  # the bmc has something
                                                       # to say about last xmit
             self.awaitingack = False
