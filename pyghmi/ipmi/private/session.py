@@ -16,7 +16,6 @@
 # limitations under the License.
 # This represents the low layer message framing portion of IPMI
 
-import atexit
 import collections
 import fcntl
 import hashlib
@@ -60,77 +59,88 @@ MAX_BMCS_PER_SOCKET = 64  # no more than this many BMCs will share a socket
                          # value, leading to fewer filehandles
 
 
-def _ioworker():
-    global iothreadready
-    global selectbreak
-    global selectdeadline
-    selectbreak = os.pipe()
-    fcntl.fcntl(selectbreak[0], fcntl.F_SETFL, os.O_NONBLOCK)
-    iowaiters = []
-    timeout = 300
-    iothreadready = True
-    while running:
-        while iothreadwaiters:
-            waiter = iothreadwaiters.pop()
-            waiter.set()
-        if timeout < 0:
-            timeout = 0
-        selectdeadline = _monotonic_time() + timeout
-        if ignoresockets:
-            mysockets = [selectbreak[0]]
-            for pendingsocket in iosockets:
-                if pendingsocket not in ignoresockets:
-                    mysockets.append(pendingsocket)
-        else:
-            mysockets = iosockets + [selectbreak[0]]
-        tmplist, _, _ = select.select(mysockets, (), (), timeout)
-        # pessimistically move out the deadline
-        # doing it this early (before ioqueue is evaluated)
-        # this avoids other threads making a bad assumption
-        # about not having to break into the select
-        selectdeadline = _monotonic_time() + 300
-        rdylist = []
-        for handle in tmplist:
-            if handle is selectbreak[0]:
-                try:  # flush all requests to interrupt that may be pending
-                    while True:
-                        os.read(handle, 1)
-                except OSError:
-                    # this means an EWOULDBLOCK occurred, ignore that as that
-                    # was the endgame
-                    pass
-            else:
-                ignoresockets.add(handle)
-                rdylist.append(handle)
-        for w in iowaiters:
-            w[2].append(tuple(rdylist))
-            w[3].set()
-        iowaiters = []
-        timeout = 300
-        while ioqueue:
-            workitem = ioqueue.popleft()
-            # structure is function, args, list to append to ,event to set
-            if isinstance(workitem[1], tuple):  # positional arguments
-                try:
-                    workitem[2].append(workitem[0](*workitem[1]))
-                except Exception:
-                    traceback.print_exc()
-                workitem[3].set()
-            elif isinstance(workitem[1], dict):
-                try:
-                    workitem[2].append(workitem[0](**workitem[1]))
-                except Exception:
-                    traceback.print_exc()
-                workitem[3].set()
-            elif workitem[0] == 'wait':
-                if len(rdylist) > 0:
-                    workitem[2].append(tuple(rdylist))
-                    workitem[3].set()
+def define_worker():
+    class _IOWorker(threading.Thread):
+        def join(self):
+            global selectbreak
+            Session._cleanup()
+            self.running = False
+            os.write(selectbreak[1], '1')
+            super(_IOWorker, self).join()
+
+        def run(self):
+            self.running = True
+            global iothreadready
+            global selectbreak
+            global selectdeadline
+            selectbreak = os.pipe()
+            fcntl.fcntl(selectbreak[0], fcntl.F_SETFL, os.O_NONBLOCK)
+            iowaiters = []
+            timeout = 300
+            iothreadready = True
+            while self.running:
+                while iothreadwaiters:
+                    waiter = iothreadwaiters.pop()
+                    waiter.set()
+                if timeout < 0:
+                    timeout = 0
+                selectdeadline = _monotonic_time() + timeout
+                if ignoresockets:
+                    mysockets = [selectbreak[0]]
+                    for pendingsocket in iosockets:
+                        if pendingsocket not in ignoresockets:
+                            mysockets.append(pendingsocket)
                 else:
-                    ltimeout = workitem[1] - _monotonic_time()
-                    if ltimeout < timeout:
-                        timeout = ltimeout
-                    iowaiters.append(workitem)
+                    mysockets = iosockets + [selectbreak[0]]
+                tmplist, _, _ = select.select(mysockets, (), (), timeout)
+                # pessimistically move out the deadline
+                # doing it this early (before ioqueue is evaluated)
+                # this avoids other threads making a bad assumption
+                # about not having to break into the select
+                selectdeadline = _monotonic_time() + 300
+                rdylist = []
+                for handle in tmplist:
+                    if handle is selectbreak[0]:
+                        try:  # flush all pending requests
+                            while True:
+                                os.read(handle, 1)
+                        except OSError:
+                            # this means an EWOULDBLOCK, ignore that as that
+                            # was the endgame
+                            pass
+                    else:
+                        ignoresockets.add(handle)
+                        rdylist.append(handle)
+                for w in iowaiters:
+                    w[2].append(tuple(rdylist))
+                    w[3].set()
+                iowaiters = []
+                timeout = 300
+                while ioqueue:
+                    workitem = ioqueue.popleft()
+                    # order: function, args, list to append to , event to set
+                    if isinstance(workitem[1], tuple):  # positional arguments
+                        try:
+                            workitem[2].append(workitem[0](*workitem[1]))
+                        except Exception:
+                            traceback.print_exc()
+                        workitem[3].set()
+                    elif isinstance(workitem[1], dict):
+                        try:
+                            workitem[2].append(workitem[0](**workitem[1]))
+                        except Exception:
+                            traceback.print_exc()
+                        workitem[3].set()
+                    elif workitem[0] == 'wait':
+                        if len(rdylist) > 0:
+                            workitem[2].append(tuple(rdylist))
+                            workitem[3].set()
+                        else:
+                            ltimeout = workitem[1] - _monotonic_time()
+                            if ltimeout < timeout:
+                                timeout = ltimeout
+                            iowaiters.append(workitem)
+    return _IOWorker
 
 
 def _io_apply(function, args):
@@ -260,15 +270,9 @@ class Session(object):
 
     @classmethod
     def _cleanup(cls):
-        global running
         for session in cls.bmc_handlers.itervalues():
             session.cleaningup = True
             session.logout()
-        running = False
-
-    @classmethod
-    def _initsessions(cls):
-        atexit.register(cls._cleanup)
 
     @classmethod
     def _assignsocket(cls, server=None):
@@ -276,11 +280,10 @@ class Session(object):
         global iothreadready
         global iosockets
         if iothread is None:
-            cls._initsessions()
             initevt = threading.Event()
             iothreadwaiters.append(initevt)
-            iothread = threading.Thread(target=_ioworker)
-            iothread.daemon = True
+            _IOWorker = define_worker()
+            iothread = _IOWorker()
             iothread.start()
             initevt.wait()
         elif not iothreadready:
