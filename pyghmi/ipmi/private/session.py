@@ -1481,6 +1481,8 @@ class Session(object):
                                 # special, otherwise increment
             self.sequencenumber += 1
         if delay_xmit is not None:
+            Session.waiting_sessions[self] = {}
+            Session.waiting_sessions[self]['ipmisession'] = self
             Session.waiting_sessions[self]['timeout'] = delay_xmit + \
                 _monotonic_time()
             return  # skip transmit, let retry timer do it's thing
