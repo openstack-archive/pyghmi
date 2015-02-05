@@ -87,6 +87,7 @@ class Command(object):
         self.onlogon = onlogon
         self.bmc = bmc
         self._sdr = None
+        self._mfgid = None
         if onlogon is not None:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,
@@ -121,6 +122,24 @@ class Command(object):
         :param timeout: Maximum number of seconds before returning
         """
         return session.Session.wait_for_rsp(timeout=timeout)
+
+    def get_configuration_(self):
+        self.identify_oem()
+    def identify_oem(self):
+        if self._mfgid is not None:
+            return
+        rsp = self.raw_command(netfn=6, command=1)
+        print repr(rsp)
+        rspdata = rsp['data']
+        self.deviceid = rspdata[0]
+        self.devicerev = rspdata[1] & 0b1111
+        self.fwrev = ((rspdata[2] & 0b1111111) << 8) | rspdata[3]
+        self._mfgid = rspdata[6] + (rspdata[7] << 8) + (rspdata[8] << 16)
+        self.prodid = rspdata[9] + (rspdata[10] << 8)
+        if len(rspdata) > 11:
+            self.auxfirm = rspdata[11:]
+        else:
+            self.auxfirm = None
 
     def get_bootdev(self):
         """Get current boot device override information.

@@ -1,0 +1,418 @@
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2015 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Based on code in TianoCompress.c:
+# Copyright (c) 2013, Intel Corporation. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# * Redistributions of source code must retain the above copyright
+#  notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+#  notice, this list of conditions and the following disclaimer in
+#  the documentation and/or other materials provided with the
+#  distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+# COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+
+# This file handles the rather peculiar EFI twist on deflate algorithm
+# as is used by some firmware related routines
+
+# Special thanks to Matthew Garrett for some reference code that helped with
+# understanding the format.  Some code may appear quite similar to his.
+# A good rule is if it looks ugly, it was Jarrod Johnson, if it looks clever,
+# probably Matthew Garrett
+
+
+from array import array
+import struct
+
+
+def bitmask(numbits):
+    return (1 << numbits) - 1
+
+
+# lookup table to speedup crc caclulation ~8x
+crctable = array('H', [0, 49345, 49537, 320, 49921, 960, 640, 49729, 50689,
+                       1728, 1920, 51009, 1280, 50625, 50305, 1088, 52225,
+                       3264, 3456, 52545, 3840, 53185, 52865, 3648, 2560,
+                       51905, 52097, 2880, 51457, 2496, 2176, 51265, 55297,
+                       6336, 6528, 55617, 6912, 56257, 55937, 6720, 7680,
+                       57025, 57217, 8000, 56577, 7616, 7296, 56385, 5120,
+                       54465, 54657, 5440, 55041, 6080, 5760, 54849, 53761,
+                       4800, 4992, 54081, 4352, 53697, 53377, 4160, 61441,
+                       12480, 12672, 61761, 13056, 62401, 62081, 12864, 13824,
+                       63169, 63361, 14144, 62721, 13760, 13440, 62529, 15360,
+                       64705, 64897, 15680, 65281, 16320, 16000, 65089, 64001,
+                       15040, 15232, 64321, 14592, 63937, 63617, 14400, 10240,
+                       59585, 59777, 10560, 60161, 11200, 10880, 59969, 60929,
+                       11968, 12160, 61249, 11520, 60865, 60545, 11328, 58369,
+                       9408, 9600, 58689, 9984, 59329, 59009, 9792, 8704,
+                       58049, 58241, 9024, 57601, 8640, 8320, 57409, 40961,
+                       24768, 24960, 41281, 25344, 41921, 41601, 25152, 26112,
+                       42689, 42881, 26432, 42241, 26048, 25728, 42049, 27648,
+                       44225, 44417, 27968, 44801, 28608, 28288, 44609, 43521,
+                       27328, 27520, 43841, 26880, 43457, 43137, 26688, 30720,
+                       47297, 47489, 31040, 47873, 31680, 31360, 47681, 48641,
+                       32448, 32640, 48961, 32000, 48577, 48257, 31808, 46081,
+                       29888, 30080, 46401, 30464, 47041, 46721, 30272, 29184,
+                       45761, 45953, 29504, 45313, 29120, 28800, 45121, 20480,
+                       37057, 37249, 20800, 37633, 21440, 21120, 37441, 38401,
+                       22208, 22400, 38721, 21760, 38337, 38017, 21568, 39937,
+                       23744, 23936, 40257, 24320, 40897, 40577, 24128, 23040,
+                       39617, 39809, 23360, 39169, 22976, 22656, 38977, 34817,
+                       18624, 18816, 35137, 19200, 35777, 35457, 19008, 19968,
+                       36545, 36737, 20288, 36097, 19904, 19584, 35905, 17408,
+                       33985, 34177, 17728, 34561, 18368, 18048, 34369, 33281,
+                       17088, 17280, 33601, 16640, 33217, 32897, 16448])
+
+
+class BitArray(object):
+    # a helper class to manage buffer as a bitfield
+    def __init__(self, srcbuffer):
+        self._data = srcbuffer
+        self._bitidx = 0
+
+    def shift(self, count):
+        shifted = 0
+        while count:
+            curbitsleft = 8 - self._bitidx
+            curdata = self._data[0] & bitmask(curbitsleft)
+            if curbitsleft >= count:
+                shifted <<= count
+                shifted |= curdata >> (curbitsleft - count)
+                self._bitidx += count
+                count = 0
+            else:
+                shifted <<= curbitsleft
+                shifted |= curdata
+                count -= curbitsleft
+                self._bitidx += curbitsleft
+            if self._bitidx >= 8:
+                self._bitidx = 0
+                del self._data[0]
+        return shifted
+
+
+def load_huffman_syms(src, symscountbits, zeroskipidx):
+    symscount = src.shift(symscountbits)
+    if symscount == 0:
+        v = src.shift(symscountbits)
+        huffsyms = [[v, 1, 0], [v, 1, 1]]
+    else:
+        huffsyms = []
+        idx = 0
+        while idx < symscount:
+            bitlen = src.shift(3)
+            if bitlen == 7:
+                while src.shift(1):
+                    bitlen += 1
+            if bitlen != 0:
+                huffsyms += ([idx, bitlen, None],)
+            idx += 1
+            if idx == zeroskipidx:
+                idx += src.shift(2)
+        huffsyms = sorted(huffsyms, key=lambda length: length[1])
+        huffsyms[0][2] = 0
+        for idx in xrange(1, len(huffsyms)):
+            huffsyms[idx][2] = (huffsyms[idx-1][2] + 1) << (
+                huffsyms[idx][1] - huffsyms[idx-1][1])
+    return huffsyms
+
+
+def build_huffman_tree(huffsyms):
+    hufftree = [None, None]
+    for huffsym in huffsyms:
+        symbol = huffsym[0]
+        bitlen = huffsym[1]
+        huffcode = huffsym[2]
+        if bitlen == 0:
+            continue
+        huffsubtree = hufftree
+        for bit in xrange(0, bitlen):
+            lr = huffcode & (1 << (bitlen - bit - 1)) != 0
+            if bit < bitlen - 1:
+                if huffsubtree[lr] is None:
+                    huffsubtree[lr] = [None, None]
+                huffsubtree = huffsubtree[lr]
+            else:
+                huffsubtree[lr] = symbol
+    return hufftree
+
+
+def huffman_decode(hufftree, srcdata):
+    while type(hufftree) == list:
+        hufftree = hufftree[srcdata.shift(1)]
+    return hufftree
+
+
+def load_clen_huffman_syms(srcdata, extra_hufftree):
+    symscount = srcdata.shift(9)
+    if symscount == 0:
+        v = srcdata.shift(9)
+        huffsyms = [[v, 1, 0], [v, 1, 1]]
+    else:
+        huffsyms = []
+        idx = 0
+        while idx < symscount:
+            bitlen = huffman_decode(extra_hufftree, srcdata)
+            if bitlen == 1:
+                idx += srcdata.shift(4) + 2
+                bitlen = 0
+            elif bitlen == 2:
+                idx += srcdata.shift(9) + 19
+                bitlen = 0
+            elif bitlen != 0:
+                bitlen -= 2
+            if bitlen != 0:
+                huffsyms += ([idx, bitlen, None], )
+            idx += 1
+    # sort by bit length
+    huffsyms = sorted(huffsyms, key=lambda length: length[1])
+    # allocate huffman codes
+    huffsyms[0][2] = 0
+    for idx in xrange(1, len(huffsyms)):
+        huffsyms[idx][2] = (
+            huffsyms[idx-1][2] + 1) << (huffsyms[idx][1] - huffsyms[idx-1][1])
+    return huffsyms
+
+
+def decompress(source):
+    _, remaining = struct.unpack('<II', str(source[:8]))
+    srcdata = BitArray(bytearray(source[8:]))
+    dstdata = bytearray()
+    blocksize = 0
+    clen_hufftree = None
+    pset_hufftree = None
+    while remaining:
+        if blocksize == 0:  # no current block, get ready for next block
+            blocksize = srcdata.shift(16)  # I guess this part is big endian
+            extra_hufftree = build_huffman_tree(
+                load_huffman_syms(srcdata, 5, 3))
+            clen_hufftree = build_huffman_tree(
+                load_clen_huffman_syms(srcdata, extra_hufftree))
+            pset_hufftree = build_huffman_tree(
+                load_huffman_syms(srcdata, 5, -1))
+        c = huffman_decode(clen_hufftree, srcdata)
+        blocksize -= 1
+        if c < 256:
+            dstdata.append(c)
+            remaining -= 1
+        else:
+            data_length = (c & 0xff) + 3
+            pos_bitlen = huffman_decode(pset_hufftree, srcdata)
+            data_offset = pos_bitlen
+            if pos_bitlen > 1:
+                data_offset = (
+                    1 << (pos_bitlen - 1)) + srcdata.shift(pos_bitlen - 1)
+            data_idx = len(dstdata) - data_offset - 1
+            for i in xrange(0, data_length):
+                dstdata.append(dstdata[data_idx+i])
+            if data_length == 0:
+                raise Exception('no')
+            remaining -= data_length
+    return dstdata
+
+
+class Eficompressor(object):
+    windowsize = 524288
+    max_hash_val = (3 * windowsize + (windowsize / 512 + 1) * 255)
+    mbufsize = 16384
+    maxmatch = 256
+    nc = 510
+    np = 20
+
+    def __init__(self):
+        self.mlevel = array('B', (0 for _ in xrange(self.windowsize + 256)))
+        self.mchildcnt = array('B', (0 for _ in xrange(self.windowsize + 256)))
+        self.mposition = array('L', (0 for _ in xrange(self.windowsize + 256)))
+        self.mparent = array('L', (0 for _ in xrange(self.windowsize * 2)))
+        self.mprev = array('L', (0 for _ in xrange(self.windowsize * 2)))
+        self.mnext = array('L', (0 for _ in xrange(self.max_hash_val + 1)))
+        self.mbuf = array('B', (0 for _ in xrange(self.mbufsize)))
+        self.mtext = array('B', (0 for _ in xrange(self.windowsize * 2 + 256)))
+        self.mcfreq = array('H', (0 for _ in xrange(1019)))
+        self.mavail = 0
+        self.mcfreq = array('H', (0 for _ in xrange(2 * self.nc - 1)))
+        self.mpfreq = array('H', (0 for _ in xrange(2 * self.np - 1)))
+        self.mmatchlen = 0
+        self.srcdata = None
+        self.outputpos = 0
+        self.outputmask = 0
+        self.mmatchpos = 0
+        self.mremainder = 0
+        self.mpos = 0
+        self.crc = 0
+
+    def initslide(self):
+        for i in xrange(self.windowsize, self.windowsize + 255):
+            self.mlevel[i] = 1
+        # for i in xrange(windowsize, windowsize * 2):
+        #     mparent[i] = 0
+        self.mavail = 1
+        for i in xrange(1, self.windowsize - 1):
+            self.mnext[i] = i + 1
+        self.mnext[self.windowsize - 1] = 0
+        # for i in xrange(windowsize * 2, max_hash_val):
+        #     mnext[i] = 0
+
+    def update_crc16(self, data):
+        for datum in data:
+            self.crc = crctable[(self.crc ^ datum) & 0xff] ^ (self.crc >> 8)
+
+    def readsrc(self, start, amount):
+        self.mtext[start:] = self.srcdata[:amount]
+        datalen = len(self.srcdata[:amount])
+        self.srcdata = self.srcdata[amount:]
+        self.update_crc16(self.mtext[start:])
+        return datalen
+
+    def child(self, nodeq, charc):
+        noder = self.mnext[nodeq + (charc << 10) + self.windowsize * 2]
+        self.mparent[0] = nodeq
+        while self.mparent[noder] != nodeq:
+            noder = self.mnext[noder]
+        return noder
+
+    def makechild(self, parent, charc, child):
+        node1 = parent + (charc << 10) + self.windowsize * 2
+        node2 = self.mnext[node1]
+        self.mnext[node1] = child
+        self.mnext[child] = node2
+        self.mprev[node2] = child
+        self.mprev[child] = node1
+        self.mparent[child] = parent
+        self.mchildcnt[parent] += 1
+
+    def split(self, old):
+        new = self.mavail
+        self.mavail = self.mnext[new]
+        self.mchildcnt[new] = 0
+        tempnode = self.mprev[old]
+        self.mnext[new] = tempnode
+        self.mprev[tempnode] = new
+        self.mparent[new] = self.mparent[old]
+        self.mlevel[new] = self.mmatchlen
+        self.mposition[new] = self.mpos
+        self.makechild(new, self.mtext[self.mmatchpos + self.mmatchlen], old)
+        self.makechild(new, self.mtext[self.mpos + self.mmatchlen], self.mpos)
+
+    def insertnode(self):
+        if self.mmatchlen >= 4:
+            self.mmatchlen -= 1
+            noder = self.mmatchpos + 1 | self.windowsize
+            nodeq = self.mparent[noder]
+            while nodeq == 0:
+                noder = self.mnext[noder]
+                nodeq = self.mparent[noder]
+            while self.mlevel[nodeq] >= self.mmatchlen:
+                noder = nodeq
+                nodeq = self.mparent[noder]
+            nodet = nodeq
+            while self.mposition[nodet] < 0:
+                self.mposition[nodet] = self.mpos
+                nodet = self.mparent[nodet]
+            if nodet < self.windowsize:
+                self.mposition[nodet] = self.mpos | 0x80000000
+        else:
+            nodeq = self.mtext[self.mpos] + self.windowsize
+            charc = self.mtext[self.mpos + 1]
+            noder = self.child(nodeq, charc)
+            if not noder:
+                self.makechild(nodeq, charc, self.mpos)
+                self.mmatchlen = 1
+                return
+            self.mmatchlen = 2
+        while True:
+            if noder >= self.windowsize:
+                index2 = self.maxmatch
+                self.mmatchpos = noder
+            else:
+                index2 = self.mlevel[noder]
+                self.mmatchpos = self.mposition[noder] & ~0x80000000
+            if self.mmatchpos >= self.mpos:
+                self.mmatchpos -= self.windowsize
+            t1 = self.mpos + self.mmatchlen
+            t2 = self.mmatchpos + self.mmatchlen
+            while self.mmatchlen < index2:
+                if self.mtext[t1] != self.mtext[t2]:
+                    self.split(noder)
+                    return
+                self.mmatchlen += 1
+                t1 += 1
+                t2 += 1
+            if self.mmatchlen >= self.maxmatch:
+                break
+            self.mposition[noder] = self.mpos
+            nodeq = noder
+            noder = self.child(nodeq, self.mtext[t1])
+            if not noder:
+                self.makechild(nodeq, self.mtext[t1], self.mpos)
+                return
+            self.mmatchlen += 1
+        nodet = self.mprev[noder]
+        self.mprev[self.mpos] = nodet
+        self.mnext[nodet] = self.mpos
+        nodet = self.mnext[noder]
+        self.mnext[self.mpos] = nodet
+        self.mprev[nodet] = self.mpos
+        self.mparent[self.mpos] = nodeq
+        self.mparent[noder] = 0
+        self.mnext[noder] = self.mpos
+
+    def getnextmatch(self):
+        self.mremainder -= 1
+        self.mpos += 1
+        if self.mpos == self.windowsize * 2:
+            self.mtext[:self.windowsize + self.maxmatch] = self.mtext[windowsize:]
+            number = self.readsrc(self.windowsize + self.maxmatch, self.windowsize)
+            self.mremainder += number
+            self.mpos = self.windowsize
+        self.deletenode()
+        self.insertnode()
+
+
+    def compress(self, srcdata):
+        self.crc = 0
+        self.mmatchpos = 0
+        self.initslide()
+        self.srcdata = srcdata
+        self.mremainder = self.readsrc(
+            self.windowsize, self.windowsize + self.maxmatch)
+        self.mmatchlen = 0
+        self.mpos = self.windowsize
+        self.insertnode()
+        if self.mmatchlen > self.mremainder:
+            self.mmatchlen = self.mremainder
+        while self.mremainder > 0:
+            lastmatchlen = self.mmatchlen
+            lastmatchpos = self.mmatchpos
+            self.getnextmatch()
+
