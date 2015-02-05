@@ -1,0 +1,240 @@
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2015 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# This file handles the rather peculiar EFI twist on deflate algorithm
+# as is used by some firmware related routines
+
+# Special thanks to Matthew Garrett for some reference code that helped with
+# understanding the format.  Some code may appear quite similar to his.
+# A good rule is if it looks ugly, it was Jarrod Johnson, if it looks clever,
+# probably Matthew Garrett
+import struct
+
+
+def bitmask(numbits):
+    return (1 << numbits) - 1
+
+
+class BitArray(object):
+    # a helper class to manage buffer as a bitfield
+    def __init__(self, srcbuffer):
+        self._data = srcbuffer
+        self._bitidx = 0
+
+    def shift(self, count):
+        shifted = 0
+        while count:
+            curbitsleft = 8 - self._bitidx
+            curdata = self._data[0] & bitmask(curbitsleft)
+            if curbitsleft >= count:
+                shifted <<= count
+                shifted |= curdata >> (curbitsleft - count)
+                self._bitidx += count
+                count = 0
+            else:
+                shifted <<= curbitsleft
+                shifted |= curdata
+                count -= curbitsleft
+                self._bitidx += curbitsleft
+            if self._bitidx >= 8:
+                self._bitidx = 0
+                del self._data[0]
+        return shifted
+
+
+def load_huffman_syms(src, symscountbits, zeroskipidx):
+    symscount = src.shift(symscountbits)
+    if symscount == 0:
+        v = src.shift(symscountbits)
+        huffsyms = [[v, 1, 0], [v, 1, 1]]
+    else:
+        huffsyms = []
+        idx = 0
+        while idx < symscount:
+            bitlen = src.shift(3)
+            if bitlen == 7:
+                while src.shift(1):
+                    bitlen += 1
+            if bitlen != 0:
+                huffsyms += ([idx, bitlen, None],)
+            idx += 1
+            if idx == zeroskipidx:
+                idx += src.shift(2)
+        huffsyms = sorted(huffsyms, key=lambda length: length[1])
+        huffsyms[0][2] = 0
+        for idx in xrange(1, len(huffsyms)):
+            huffsyms[idx][2] = (huffsyms[idx-1][2] + 1) << (
+                huffsyms[idx][1] - huffsyms[idx-1][1])
+    return huffsyms
+
+
+def build_huffman_tree(huffsyms):
+    hufftree = [None, None]
+    for huffsym in huffsyms:
+        symbol = huffsym[0]
+        bitlen = huffsym[1]
+        huffcode = huffsym[2]
+        if bitlen == 0:
+            continue
+        huffsubtree = hufftree
+        for bit in xrange(0, bitlen):
+            lr = huffcode & (1 << (bitlen - bit - 1)) != 0
+            if bit < bitlen - 1:
+                if huffsubtree[lr] is None:
+                    huffsubtree[lr] = [None, None]
+                huffsubtree = huffsubtree[lr]
+            else:
+                huffsubtree[lr] = symbol
+    return hufftree
+
+
+def huffman_decode(hufftree, srcdata):
+    while type(hufftree) == list:
+        hufftree = hufftree[srcdata.shift(1)]
+    return hufftree
+
+
+def load_clen_huffman_syms(srcdata, extra_hufftree):
+    symscount = srcdata.shift(9)
+    if symscount == 0:
+        v = srcdata.shift(9)
+        huffsyms = [[v, 1, 0], [v, 1, 1]]
+    else:
+        huffsyms = []
+        idx = 0
+        while idx < symscount:
+            bitlen = huffman_decode(extra_hufftree, srcdata)
+            if bitlen == 1:
+                idx += srcdata.shift(4) + 2
+                bitlen = 0
+            elif bitlen == 2:
+                idx += srcdata.shift(9) + 19
+                bitlen = 0
+            elif bitlen != 0:
+                bitlen -= 2
+            if bitlen != 0:
+                huffsyms += ([idx, bitlen, None], )
+            idx += 1
+    # sort by bit length
+    huffsyms = sorted(huffsyms, key=lambda length: length[1])
+    # allocate huffman codes
+    huffsyms[0][2] = 0
+    for idx in xrange(1, len(huffsyms)):
+        huffsyms[idx][2] = (
+            huffsyms[idx-1][2] + 1) << (huffsyms[idx][1] - huffsyms[idx-1][1])
+    return huffsyms
+
+
+def decompress(source):
+    _, remaining = struct.unpack('<II', str(source[:8]))
+    srcdata = BitArray(bytearray(source[8:]))
+    dstdata = bytearray()
+    blocksize = 0
+    while remaining:
+        if blocksize == 0:  # no current block, get ready for next block
+            blocksize = srcdata.shift(16)  # I guess this part is big endian
+            extra_hufftree = build_huffman_tree(
+                load_huffman_syms(srcdata, 5, 3))
+            clen_hufftree = build_huffman_tree(
+                load_clen_huffman_syms(srcdata, extra_hufftree))
+            pset_hufftree = build_huffman_tree(
+                load_huffman_syms(srcdata, 5, -1))
+        c = huffman_decode(clen_hufftree, srcdata)
+        blocksize -= 1
+        if c < 256:
+            dstdata.append(c)
+            remaining -= 1
+        else:
+            data_length = (c & 0xff) + 3
+            pos_bitlen = huffman_decode(pset_hufftree, srcdata)
+            data_offset = pos_bitlen
+            if pos_bitlen > 1:
+                data_offset = (
+                    1 << (pos_bitlen - 1)) + srcdata.shift(pos_bitlen - 1)
+            data_idx = len(dstdata) - data_offset - 1
+            for i in xrange(0, data_length):
+                dstdata.append(dstdata[data_idx+i])
+            if data_length == 0:
+                raise Exception('no')
+            remaining -= data_length
+    return dstdata
+
+
+crctable = bytearray(b'\x00\x00\xc1\xc0\x81\xc1@\x01\x01\xc3\xc0\x03\x80'
+                     '\x02A\xc2\x01\xc6\xc0\x06\x80\x07A\xc7\x00\x05\xc1'
+                     '\xc5\x81\xc4@\x04\x01\xcc\xc0\x0c\x80\rA\xcd\x00\x0f'
+                     '\xc1\xcf\x81\xce@\x0e\x00\n\xc1\xca\x81\xcb@\x0b\x01'
+                     '\xc9\xc0\t\x80\x08A\xc8\x01\xd8\xc0\x18\x80\x19A\xd9'
+                     '\x00\x1b\xc1\xdb\x81\xda@\x1a\x00\x1e\xc1\xde\x81'
+                     '\xdf@\x1f\x01\xdd\xc0\x1d\x80\x1cA\xdc\x00\x14\xc1'
+                     '\xd4\x81\xd5@\x15\x01\xd7\xc0\x17\x80\x16A\xd6\x01'
+                     '\xd2\xc0\x12\x80\x13A\xd3\x00\x11\xc1\xd1\x81\xd0@'
+                     '\x10\x01\xf0\xc00\x801A\xf1\x003\xc1\xf3\x81\xf2@2'
+                     '\x006\xc1\xf6\x81\xf7@7\x01\xf5\xc05\x804A\xf4\x00<'
+                     '\xc1\xfc\x81\xfd@=\x01\xff\xc0?\x80>A\xfe\x01\xfa'
+                     '\xc0:\x80;A\xfb\x009\xc1\xf9\x81\xf8@8\x00(\xc1\xe8'
+                     '\x81\xe9@)\x01\xeb\xc0+\x80*A\xea\x01\xee\xc0.\x80/A'
+                     '\xef\x00-\xc1\xed\x81\xec@,\x01\xe4\xc0$\x80%A\xe5'
+                     '\x00\'\xc1\xe7\x81\xe6@&\x00"\xc1\xe2\x81\xe3@#\x01'
+                     '\xe1\xc0!\x80 A\xe0\x01\xa0\xc0`\x80aA\xa1\x00c\xc1'
+                     '\xa3\x81\xa2@b\x00f\xc1\xa6\x81\xa7@g\x01\xa5\xc0e'
+                     '\x80dA\xa4\x00l\xc1\xac\x81\xad@m\x01\xaf\xc0o\x80nA'
+                     '\xae\x01\xaa\xc0j\x80kA\xab\x00i\xc1\xa9\x81\xa8@h'
+                     '\x00x\xc1\xb8\x81\xb9@y\x01\xbb\xc0{\x80zA\xba\x01'
+                     '\xbe\xc0~\x80\x7fA\xbf\x00}\xc1\xbd\x81\xbc@|\x01'
+                     '\xb4\xc0t\x80uA\xb5\x00w\xc1\xb7\x81\xb6@v\x00r\xc1'
+                     '\xb2\x81\xb3@s\x01\xb1\xc0q\x80pA\xb0\x00P\xc1\x90'
+                     '\x81\x91@Q\x01\x93\xc0S\x80RA\x92\x01\x96\xc0V\x80WA'
+                     '\x97\x00U\xc1\x95\x81\x94@T\x01\x9c\xc0\\\x80]A\x9d'
+                     '\x00_\xc1\x9f\x81\x9e@^\x00Z\xc1\x9a\x81\x9b@[\x01'
+                     '\x99\xc0Y\x80XA\x98\x01\x88\xc0H\x80IA\x89\x00K\xc1'
+                     '\x8b\x81\x8a@J\x00N\xc1\x8e\x81\x8f@O\x01\x8d\xc0M'
+                     '\x80LA\x8c\x00D\xc1\x84\x81\x85@E\x01\x87\xc0G\x80FA'
+                     '\x86\x01\x82\xc0B\x80CA\x83\x00A\xc1\x81\x81\x80')
+
+
+class Eficompressor(object):
+    windowsize = 524288
+    max_hash_val = (3 * WNDSIZ + (WNDSIZ / 512 + 1) * UINT8_MAX)
+    mbufsize = 16384
+
+    def __init__(self):
+        self.mlevel = array('B', (0 for _ in xrange(self.windowsize + 256)))
+        self.mchildcnt = array('B', (0 for _ in xrange(self.windowsize + 256)))
+        self.mposition = array('L', (0 for _ in xrange(self.windowsize + 256)))
+        self.mparent = array('L', (0 for _ in xrange(self.windowsize * 2)))
+        self.mprev = array('L', (0 for _ in xrange(self.windowsize * 2)))
+        self.mnext = array('L', (0 for _ in xrange(self.max_hash_val + 1)))
+        self.mbuf = array('B', (0 for _ in xrange(self.mbufsize)))
+        self.mavail = 0
+
+    def initslide():
+        for i in xrange(self.windowsize, self.windowsize + 255):
+            mlevel[i] = 1
+        #for i in xrange(windowsize, windowsize * 2):
+        #    mparent[i] = 0
+        self.mavail = 1
+        for i in xrange(1, windowsize - 1):
+            mnext[i] = i + 1
+        mnext[windowsize - 1] = 0
+        for i in xrange(windowsize * 2, max_hash_val):
+            mnext[i] = 0
+
+
+
+def compress(srcdata):
+
