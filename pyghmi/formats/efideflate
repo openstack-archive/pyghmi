@@ -1,0 +1,160 @@
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2015 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# This file handles the rather peculiar EFI twist on deflate algorithm
+# as is used by some firmware related routines
+
+# Special thanks to Matthew Garrett for some reference code that helped with
+# understanding the format.  Some code may appear quite similar to his.
+# A good rule is if it looks ugly, it was Jarrod Johnson, if it looks clever,
+# probably Matthew Garrett
+import struct
+
+
+def bitmask(numbits):
+    return (1 << numbits) - 1
+
+
+class BitArray(object):
+    # a helper class to manage buffer as a bitfield
+    def __init__(self, srcbuffer):
+        self._data = srcbuffer
+        self._bitidx = 0
+
+    def shift(self, count):
+        shifted = 0
+        while count:
+            curbitsleft = 8 - self._bitidx
+            curdata = self._data[0] & bitmask(curbitsleft)
+            if curbitsleft >= count:
+                shifted <<= count
+                shifted |= curdata >> (curbitsleft - count)
+                self._bitidx += count
+                count = 0
+            else:
+                shifted <<= curbitsleft
+                shifted |= curdata
+                count -= curbitsleft
+                self._bitidx += count
+            if self._bitidx >= 8:
+                self._bitidx = 0
+                del self._data[0]
+        return shifted
+
+
+def load_huffman_syms(src, symscountbits, zeroskipidx):
+    symscount = src.shift(symscountbits)
+    if symscount == 0:
+        v = src.shift(symscountbits)
+        huffsyms = [[v, 1, 0], [v, 1, 1]]
+    else:
+        huffsyms = []
+        idx = 0
+        while idx < symscount:
+            bitlen = src.shift(3)
+            if bitlen == 7:
+                while src.shift(1):
+                    bitlen += 1
+            if bitlen != 0:
+                huffsyms += ([idx, bitlen, None],)
+            idx += 1
+            if idx == zeroskipidx:
+                idx += src.shift(2)
+        huffsyms = sorted(huffsyms, key=lambda length: length[1])
+        huffsyms[0][2] = 0
+        for idx in xrange(1, len(huffsyms)):
+            huffsyms[idx][2] = (huffsyms[idx-1][2] + 1) << (
+                huffsyms[idx][1] - huffsyms[idx-1][1])
+    return huffsyms
+
+
+def build_huffman_tree(huffsyms):
+    hufftree = [None, None]
+    for huffsym in huffsyms:
+        symbol = huffsym[0]
+        bitlen = huffsym[1]
+        huffcode = huffsym[2]
+        if bitlen == 0:
+            continue
+        huffsubtree = hufftree
+        for bit in xrange(0, bitlen):
+            lr = huffcode & (1 << (bitlen - bit - 1)) != 0
+            if bit < bitlen - 1:
+                if huffsubtree[lr] is None:
+                    huffsubtree[lr] = [None, None]
+                huffsubtree = huffsubtree[lr]
+            else:
+                huffsubtree[lr] = symbol
+    return hufftree
+
+
+def huffman_decode(hufftree, srcdata):
+    while type(hufftree) == list:
+        hufftree = hufftree[srcdata.shift(1)]
+    return hufftree
+
+
+def load_clen_huffman_syms(srcdata, extra_hufftree):
+    huffsyms = None
+    symscount = srcdata.shift(9)
+    if symscount == 0:
+        v = srcdata.shift(9)
+        huffsyms = [[v, 1, 0], [v, 1, 1]]
+    else:
+        huffsyms = []
+        idx = 0
+        while idx < symscount:
+            bitlen = huffman_decode(extra_hufftree, src)
+            if bitlen == 1:
+                idx += srcdata.shift(4) + 2
+                bitlen = 0
+            elif bitlen == 2:
+                idx += srcdata.shift(0) + 19
+                bitlen = 0
+            elif bitlen != 0:
+                bitlen -= 2
+            if bitlen != 0:
+                huffsyms += ([idx, bitlen, None], )
+            idx += 1
+    # sort by bit length
+    huffsyms = sorted(huffsyms, key=lambda length: length[1])
+    # allocate huffman codes
+    huffsyms[0][2] = 0
+    for idx in xrange(1, len(huffsyms)):
+        huffsyms[idx][2] = (
+            huffsyms[idx-1][2] + 1) << (huffsyms[idx][1] - huffsyms[idx-1][1])
+    return huffsyms
+
+
+def decompress(source):
+    _, remaining = struct.unpack('<II', source[:8])
+    srcdata = BitArray(bytearray(source[8:]))
+    dstdata = bytearray()
+    blocksize = 0
+    clen_hufftree = None
+    pset_hufftree = None
+    while remaining:
+        if blocksize == 0:  # no current block, get ready for next block
+            blocksize = srcdata.shift(16)  # I guess this part is big endian
+            extra_hufftree = build_huffman_tree(
+                load_huffman_syms(srcdata, 5, 3))
+            clen_hufftree = build_huffman_tree(
+                load_clen_huffman_syms(srcdata, extra_hufftree))
+            #RESUME HERE...
+
+
+
