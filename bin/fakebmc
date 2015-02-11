@@ -26,13 +26,14 @@ __author__ = 'jjohnson2@lenovo.com'
 # # ipmitool -I lanplus -U admin -P password -H 127.0.0.1 mc reset cold
 # Sent cold reset command to MC
 # (fakebmc exits)
+import argparse
 import pyghmi.ipmi.bmc as bmc
 import sys
 
 
 class FakeBmc(bmc.Bmc):
-    def __init__(self, authdata):
-        super(FakeBmc, self).__init__(authdata)
+    def __init__(self, authdata, port):
+        super(FakeBmc, self).__init__(authdata, port)
         self.powerstate = 'off'
         self.bootdevice = 'default'
 
@@ -68,5 +69,15 @@ class FakeBmc(bmc.Bmc):
         self.powerstate = 'off'
 
 if __name__ == '__main__':
-        mybmc = FakeBmc({'admin': 'password'})
-        mybmc.listen()
+    parser = argparse.ArgumentParser(
+        prog='fakebmc',
+        description='Pretend to be a BMC',
+    )
+    parser.add_argument('--port',
+                        dest='port',
+                        type=int,
+                        default=623,
+                        help='Port to listen on; defaults to 623')
+    args = parser.parse_args()
+    mybmc = FakeBmc({'admin': 'password'}, port=args.port)
+    mybmc.listen()
