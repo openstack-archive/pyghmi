@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+# Copyright 2015 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Written by pmartini2, but mostly a clone of fakebmc, written by jjohnson2
+__author__ = 'pmartini2@bloomberg.net'
+
+# This is a simple, but working proof of concept of using pyghmi.ipmi.bmc to
+# control a VM
+
+import argparse
+import pyghmi.ipmi.bmc as bmc
+import sys
+import virtualbox
+
+
+class VboxBmcError(Exception):
+    pass
+
+
+class VboxBmc(bmc.Bmc):
+    """A class to provide an IPMI interface to the VirtualBox APIs."""
+
+    def __init__(self, authdata, vmname, port, headless):
+        super(VboxBmc, self).__init__(authdata, port)
+        self.vmname = vmname
+        self.headless = headless
+        self.vbox = virtualbox.VirtualBox()
+        try:
+            self.vm = self.vbox.find_machine(vmname)
+        except virtualbox.library.VBoxErrorObjectNotFound:
+            raise VboxBmcError('Could not find an instance by that name')
+        # This is hairy; there are a variety of states other than off and on
+
+    def cold_reset(self):
+        # Reset of the BMC, not managed system, here we will exit the demo
+        print 'shutting down in response to BMC cold reset request'
+        sys.exit(0)
+
+    def get_power_state(self):
+        if self.vm.state < virtualbox.library.MachineState.running:
+            return 'off'
+        else:
+            return 'on'
+
+    def power_off(self):
+        self.vm.create_session().console.power_down()
+
+    def power_on(self):
+        if self.get_power_state() == 'on':
+            # d5 is command not valid in present state;
+            # VBox will not like a start when its already started
+            return 0xd5
+        if self.headless:
+            self.vm.launch_vm_process(None, 'headless')
+        else:
+            self.vm.launch_vm_process()
+
+    def power_reset(self):
+        self.vm.create_session().console.reset()
+
+    def power_shutdown(self):
+        self.vm.create_session().console.power_button()
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        prog='vboxbmc',
+        description='Pretend to be a BMC',
+    )
+    parser.add_argument('--port',
+                        dest='port',
+                        type=int,
+                        default=623,
+                        help='Port to listen on; defaults to 623')
+    parser.add_argument('--vmname',
+                        dest='vmname',
+                        required=True,
+                        help='The name of the VirtualBox instance to manage')
+    parser.add_argument('--headless',
+                        action='store_true',
+                        dest='headless',
+                        default=False,
+                        help='Start the VM in headless mode')
+    args = parser.parse_args()
+    try:
+        mybmc = VboxBmc({'admin': 'password'},
+                        vmname=args.vmname,
+                        port=args.port,
+                        headless=args.headless)
+        mybmc.listen()
+    except VboxBmcError as e:
+        print "Error: {text}".format(text=e)

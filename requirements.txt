@@ -1,1 +1,2 @@
 pycrypto>=2.6
+pyvbox>=0.2.0
