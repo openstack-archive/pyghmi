@@ -1,1 +1,2 @@
 pycrypto>=2.6
+libvirt-python>=1.2.5 # Only for bin/virshbmc; version to match global

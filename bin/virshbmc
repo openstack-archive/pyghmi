@@ -1,0 +1,90 @@
+#!/usr/bin/env python
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Written by pmartini2, but mostly a clone of fakebmc, written by jjohnson2
+__author__ = 'pmartini2@bloomberg.net'
+
+# This is a simple, but working proof of concept of using pyghmi.ipmi.bmc to
+# control a VM
+
+import argparse
+import libvirt
+import pyghmi.ipmi.bmc as bmc
+import sys
+
+
+class LibvirtBmc(bmc.Bmc):
+    """A class to provide an IPMI interface to the VirtualBox APIs."""
+
+    def __init__(self, authdata, hypervisor, domain, port):
+        super(LibvirtBmc, self).__init__(authdata, port)
+        # Rely on libvirt to throw on bad data
+        self.conn = libvirt.open(hypervisor)
+        self.domain = self.conn.lookupByName(domain)
+
+    def cold_reset(self):
+        # Reset of the BMC, not managed system, here we will exit the demo
+        print 'shutting down in response to BMC cold reset request'
+        sys.exit(0)
+
+    def get_power_state(self):
+        if self.domain.isActive():
+            return 'on'
+        else:
+            return 'off'
+
+    def power_off(self):
+        if not self.domain.isActive():
+            return 0xd5  # Not valid in this state
+        self.domain.destroy()
+
+    def power_on(self):
+        if self.domain.isActive():
+            return 0xd5  # Not valid in this state
+        self.domain.create()
+
+    def power_reset(self):
+        if not self.domain.isActive():
+            return 0xd5  # Not valid in this state
+        self.domain.reset()
+
+    def power_shutdown(self):
+        if not self.domain.isActive():
+            return 0xd5  # Not valid in this state
+        self.domain.shutdown()
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        prog='virshbmc',
+        description='Pretend to be a BMC and proxy to virsh',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument('--port',
+                        dest='port',
+                        type=int,
+                        default=623,
+                        help='(UDP) port to listen on')
+    parser.add_argument('--connect',
+                        dest='hypervisor',
+                        default='qemu:///system',
+                        help='The hypervisor to connect to')
+    parser.add_argument('--domain',
+                        dest='domain',
+                        required=True,
+                        help='The name of the domain to manage')
+    args = parser.parse_args()
+    mybmc = LibvirtBmc({'admin': 'password'},
+                       hypervisor=args.hypervisor,
+                       domain=args.domain,
+                       port=args.port)
+    mybmc.listen()
