@@ -336,7 +336,7 @@ class Session(object):
                 self = cls.bmc_handlers[sockaddr]
                 if (self.bmc == bmc and self.userid == userid and
                         self.password == password and self.kgo == kg and
-                        self.logged):
+                        (self.logged or self.logging)):
                     trueself = self
                 else:
                     del cls.bmc_handlers[sockaddr]
@@ -404,7 +404,7 @@ class Session(object):
             self.socket = self._assignsocket()
         self.login()
         if not self.async:
-            while not self.logged:
+            while self.logging and not self.logged:
                 Session.wait_for_rsp()
 
     def _mark_broken(self):
@@ -412,6 +412,7 @@ class Session(object):
         # deregister our keepalive facility
         Session.keepalive_sessions.pop(self, None)
         Session.waiting_sessions.pop(self, None)
+        self.logging = False
         if self.logged:
             self.logged = 0  # mark session as busted
             self._customkeepalives = None
@@ -460,6 +461,7 @@ class Session(object):
         #                 do not forsee a reason to adjust
         self.rqaddr = 0x81
 
+        self.logging = True
         self.logged = 0
         # NOTE(jbjohnso): when we confirm a working sockaddr, put it here to
         #                 skip getaddrinfo
@@ -850,6 +852,7 @@ class Session(object):
                 self.onlogon({'error': errstr})
                 return
         self.logged = 1
+        self.logging = False
         Session.keepalive_sessions[self] = {}
         Session.keepalive_sessions[self]['ipmisession'] = self
         Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
@@ -1528,6 +1531,7 @@ class Session(object):
         # stop trying for a keepalive,
         Session.keepalive_sessions.pop(self, None)
         self.logged = 0
+        self.logging = False
         self._customkeepalives = None
         self.nowait = False
         self.socketpool[self.socket] -= 1
