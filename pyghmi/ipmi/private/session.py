@@ -143,6 +143,9 @@ def define_worker():
     return _IOWorker
 
 
+pktqueue = collections.deque([])
+
+
 def _io_apply(function, args):
     global selectbreak
     evt = threading.Event()
@@ -161,6 +164,16 @@ def _io_sendto(mysocket, packet, sockaddr):
         mysocket.sendto(packet, sockaddr)
     except Exception:
         pass
+
+
+def _io_graball(mysockets):
+        for mysocket in mysockets:
+            while True:
+                rdata = _io_recvfrom(mysocket, 3000)
+                if rdata is None:
+                    break
+                rdata = rdata + (mysocket,)
+                pktqueue.append(rdata)
 
 
 def _io_recvfrom(mysocket, size):
@@ -261,7 +274,6 @@ class Session(object):
     keepalive_sessions = {}
     peeraddr_to_nodes = {}
     iterwaiters = []
-    pktqueue = collections.deque([])
     #NOTE(jbjohnso):
     #socketpool is a mapping of sockets to usage count
     socketpool = {}
@@ -910,16 +922,6 @@ class Session(object):
         self._get_channel_auth_cap()
 
     @classmethod
-    def pulltoqueue(cls, mysockets, queue):
-        for mysocket in mysockets:
-            while True:
-                rdata = _io_apply(_io_recvfrom, (mysocket, 3000))
-                if rdata is None:
-                    break
-                rdata = rdata + (mysocket,)
-                queue.append(rdata)
-
-    @classmethod
     def wait_for_rsp(cls, timeout=None, callout=True):
         """IPMI Session Event loop iteration
 
@@ -978,11 +980,11 @@ class Session(object):
         if timeout is None:
             return 0
         if _poller(timeout=timeout):
-            cls.pulltoqueue(iosockets, cls.pktqueue)
-            while len(cls.pktqueue):
-                (data, sockaddr, mysocket) = cls.pktqueue.popleft()
+            _io_apply(_io_graball, (iosockets, ))
+            while len(pktqueue):
+                (data, sockaddr, mysocket) = pktqueue.popleft()
                 cls._route_ipmiresponse(sockaddr, data, mysocket)
-                cls.pulltoqueue(iosockets, cls.pktqueue)
+                _io_apply(_io_graball, (iosockets, ))
         sessionstodel = []
         sessionstokeepalive = []
         for session, parms in cls.keepalive_sessions.iteritems():
