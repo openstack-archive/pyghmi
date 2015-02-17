@@ -196,7 +196,97 @@ discrete_type_offsets = {
             'desc': 'Enabled',
             'severity': const.Health.Ok,
         },
-    }
+    },
+    0xa: {
+        0: {
+            'desc': 'Running',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'In Test',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Power off',
+            'severity': const.Health.Ok,
+        },
+        3: {
+            'desc': 'Online',
+            'severity': const.Health.Ok,
+        },
+        4: {
+            'desc': 'Offline',
+            'severity': const.Health.Critical,
+        },
+        5: {
+            'desc': 'Off duty',
+            'severity': const.Health.Ok,
+        },
+        6: {
+            'desc': 'Degraded',
+            'severity': const.Health.Critical,
+        },
+        7: {
+            'desc': 'Power Save',
+            'severity': const.Health.Ok,
+        },
+        8: {
+            'desc': 'Install Error',
+            'severity': const.Health.Critical,
+        },
+    },
+    0xb: {
+        0: {
+            'desc': 'Redundant',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Not Redundant',
+            'severity': const.Health.Warning,
+        },
+        2: {
+            'desc': 'Redundancy degraded',
+            'severity': const.Health.Warning,
+        },
+        3: {
+            'desc': 'Not Redundant',
+            'severity': const.Health.Warning,
+        },
+        4: {
+            'desc': 'Not Redundant',
+            'severity': const.Health.Warning,
+        },
+        5: {
+            'desc': 'Degraded',
+            'severity': const.Health.Critical,
+        },
+        6: {
+            'desc': 'Redundancy degraded',
+            'severity': const.Health.Warning,
+        },
+        7: {
+            'desc': 'Redundancy degraded',
+            'severity': const.Health.Warning,
+        },
+    },
+    0xc: {
+        0: {
+            'desc': 'ACPI D0',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'ACPI D1',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'ACPI D2',
+            'severity': const.Health.Ok,
+        },
+        3: {
+            'desc': 'ACPI D3',
+            'severity': const.Health.Ok,
+        },
+    },
 }
 
 sensor_type_offsets = {
