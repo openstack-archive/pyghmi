@@ -261,6 +261,7 @@ class Session(object):
     keepalive_sessions = {}
     peeraddr_to_nodes = {}
     iterwaiters = []
+    pktqueue = collections.deque([])
     #NOTE(jbjohnso):
     #socketpool is a mapping of sockets to usage count
     socketpool = {}
@@ -977,12 +978,11 @@ class Session(object):
         if timeout is None:
             return 0
         if _poller(timeout=timeout):
-            pktqueue = collections.deque([])
-            cls.pulltoqueue(iosockets, pktqueue)
-            while len(pktqueue):
-                (data, sockaddr, mysocket) = pktqueue.popleft()
+            cls.pulltoqueue(iosockets, cls.pktqueue)
+            while len(cls.pktqueue):
+                (data, sockaddr, mysocket) = cls.pktqueue.popleft()
                 cls._route_ipmiresponse(sockaddr, data, mysocket)
-                cls.pulltoqueue(iosockets, pktqueue)
+                cls.pulltoqueue(iosockets, cls.pktqueue)
         sessionstodel = []
         sessionstokeepalive = []
         for session, parms in cls.keepalive_sessions.iteritems():
