@@ -250,7 +250,7 @@ discrete_type_offsets = {
         },
         3: {
             'desc': 'Not Redundant',
-            'severity': const.Health.Warning,
+            'severity': const.Health.Ok,
         },
         4: {
             'desc': 'Not Redundant',
