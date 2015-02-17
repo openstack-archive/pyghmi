@@ -677,12 +677,12 @@ class SDR(object):
         if newent.sdrtype == TYPE_SENSOR:
             id = newent.sensor_number
             if id in self.sensors:
-                raise exc.BmcErrorException("Duplicate sensor number " + id)
+                raise exc.BmcErrorException("Duplicate sensor number %d" % id)
             self.sensors[id] = newent
         elif newent.sdrtype == TYPE_FRU:
             id = newent.fru_number
             if id in self.fru:
-                raise exc.BmcErrorException("Duplicate FRU identifier " + id)
+                raise exc.BmcErrorException("Duplicate FRU identifier %d" % id)
             self.fru[id] = newent
 
     def decode_aux(self, auxdata):
