@@ -1271,7 +1271,8 @@ class Session(object):
             struct.pack("2B", self.nameonly | self.privlevel, userlen) +\
             self.userid
         expectedhash = hmac.new(self.password, hmacdata, hashlib.sha1).digest()
-        givenhash = struct.pack("%dB" % len(data[40:]), *data[40:])
+        hashlen = len(expectedhash)
+        givenhash = struct.pack("%dB" % hashlen, *data[40:hashlen + 40])
         if givenhash != expectedhash:
             self.sessioncontext = "FAILED"
             self.onlogon({'error': "Incorrect password provided"})
@@ -1337,7 +1338,8 @@ class Session(object):
             self.remoteguid
         expectedauthcode = hmac.new(self.sik, hmacdata,
                                     hashlib.sha1).digest()[:12]
-        authcode = struct.pack("%dB" % len(data[8:]), *data[8:])
+        aclen = len(expectedauthcode)
+        authcode = struct.pack("%dB" % aclen, *data[8:aclen + 8])
         if authcode != expectedauthcode:
             self.onlogon({'error': "Invalid RAKP4 integrity code (wrong Kg?)"})
             return
