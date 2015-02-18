@@ -67,13 +67,14 @@ def define_worker():
             super(_IOWorker, self).join()
 
         def run(self):
-            self.running = True
             global iothreadready
             global selectbreak
             global selectdeadline
+            global ioevent
+            ioevent = threading.Event()
+            self.running = True
             selectbreak = os.pipe()
             fcntl.fcntl(selectbreak[0], fcntl.F_SETFL, os.O_NONBLOCK)
-            iowaiters = []
             timeout = 300
             iothreadready = True
             while iothreadwaiters:
@@ -98,9 +99,9 @@ def define_worker():
                     # this means an EWOULDBLOCK, ignore that as that
                     # was the endgame
                     pass
-                for w in iowaiters:
-                    w[3].set()
-                iowaiters = []
+                if pktqueue:
+                    ioevent.set()
+                    ioevent.clear()
                 timeout = 300
                 while ioqueue:
                     workitem = ioqueue.popleft()
@@ -118,17 +119,21 @@ def define_worker():
                             traceback.print_exc()
                         workitem[3].set()
                     elif workitem[0] == 'wait':
-                        if pktqueue:
-                            workitem[3].set()
-                        else:
+                        if not pktqueue:
                             ltimeout = workitem[1] - _monotonic_time()
                             if ltimeout < timeout:
                                 timeout = ltimeout
-                            iowaiters.append(workitem)
     return _IOWorker
 
 
 pktqueue = collections.deque([])
+
+
+def _io_wait(timeout):
+    ioqueue.append(('wait', timeout))
+    if selectdeadline >= timeout:
+        os.write(selectbreak[1], '1')
+    ioevent.wait()
 
 
 def _io_apply(function, args):
@@ -185,7 +190,7 @@ def _monotonic_time():
 def _poller(timeout=0):
     if pktqueue:
         return True
-    _io_apply('wait', timeout + _monotonic_time())
+    _io_wait(timeout + _monotonic_time())
     return pktqueue
 
 
