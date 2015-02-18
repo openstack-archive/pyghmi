@@ -1476,8 +1476,7 @@ class Session(object):
                 _monotonic_time()
             return  # skip transmit, let retry timer do it's thing
         if self.sockaddr:
-            _io_apply(_io_sendto,
-                      (self.socket, self.netpacket, self.sockaddr))
+            _io_sendto(self.socket, self.netpacket, self.sockaddr)
         else:  # he have not yet picked a working sockaddr for this connection,
               # try all the candidates that getaddrinfo provides
             self.allsockaddrs = []
@@ -1493,8 +1492,7 @@ class Session(object):
                         sockaddr = (newhost, sockaddr[1], 0, 0)
                     self.allsockaddrs.append(sockaddr)
                     Session.bmc_handlers[sockaddr] = self
-                    _io_apply(_io_sendto, (self.socket,
-                              self.netpacket, sockaddr))
+                    _io_sendto(self.socket, self.netpacket, sockaddr)
             except socket.gaierror:
                 raise exc.IpmiException(
                     "Unable to transmit to specified address")
