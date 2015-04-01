@@ -705,7 +705,7 @@ class Command(object):
             'no_access': 0x0F,
         }
         data = [b, uid & 0b00111111,
-                privilege_levels[privilege_level] & 0b00001111]
+                privilege_levels[privilege_level] & 0b00001111, 0]
         response = self.raw_command(netfn=0x06, command=0x43, data=data)
         if 'error' in response:
             raise Exception(response['error'])
