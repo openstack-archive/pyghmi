@@ -269,9 +269,6 @@ class SDREntry(object):
             self.sdrtype = TYPE_UNKNOWN   # assume undefined
             self.oem_decode(entrybytes[5:])
         elif self.reportunsupported:
-            #will remove once I see it stop being thrown for now
-            #perhaps need some explicit mode to check for
-            #unsupported things, but make do otherwise
             raise NotImplementedError
         else:
             self.sdrtype = TYPE_UNKNOWN
@@ -301,6 +298,7 @@ class SDREntry(object):
         self.sdrtype = TYPE_FRU
         self.fru_name = self.tlv_decode(entry[10], entry[11:])
         self.fru_number = entry[1]
+        self.fru_logical = (entry[2] & 0b10000000) == 0b10000000
 
     def association_decode(self, entry):
         # table 43-4 Entity Associaition Record
