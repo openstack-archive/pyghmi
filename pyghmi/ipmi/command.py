@@ -19,6 +19,7 @@
 import pyghmi.constants as const
 import pyghmi.exceptions as exc
 
+import pyghmi.ipmi.fru as fru
 from pyghmi.ipmi.private import session
 import pyghmi.ipmi.sdr as sdr
 
@@ -336,6 +337,28 @@ class Command(object):
         response = self.raw_command(netfn=0, command=4, data=identifydata)
         if 'error' in response:
             raise exc.IpmiException(response['error'])
+
+    def get_inventory(self):
+        """Retrieve inventory of system
+
+        Retrieve inventory of the targeted system.  This frequently includes
+        serial numbers, sometimes hardware addresses, sometimes memory modules
+        This function will retrieve whatever the underlying platform provides
+        and apply some structure.  Keys will be the names as described in
+        the SDR (e.g. 'DIMM 1',  'CPU 2') and the values will be FRU objects
+        as described in pyghmi.ipmi.fru
+        """
+        if self._sdr is None:
+            self._sdr = sdr.SDR(self)
+        for fruid in self._sdr.fru:
+            try:
+                print "going for {0}".format(self._sdr.fru[fruid].fru_name)
+                print repr(fru.FRU(ipmicmd=self, fruid=fruid))
+            except exc.IpmiException as ie:
+                if ie.ipmicode == 203:
+                    continue
+                raise
+
 
     def get_health(self):
         """Summarize health of managed system
