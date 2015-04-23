@@ -22,6 +22,7 @@ import pyghmi.exceptions as exc
 import pyghmi.ipmi.fru as fru
 from pyghmi.ipmi.private import session
 import pyghmi.ipmi.sdr as sdr
+import struct
 
 
 boot_devices = {
@@ -88,6 +89,7 @@ class Command(object):
         self.onlogon = onlogon
         self.bmc = bmc
         self._sdr = None
+        self._oem = None
         if onlogon is not None:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,
@@ -122,6 +124,28 @@ class Command(object):
         :param timeout: Maximum number of seconds before returning
         """
         return session.Session.wait_for_rsp(timeout=timeout)
+
+    def oem_init(self):
+        """Initialize the command object for OEM capabilities
+
+        A number of capabilities are either totally OEM defined or
+        else augmented somehow by knowledge of the OEM.  This
+        method does an interrogation to identify the OEM.
+
+        """
+        if self._oem:
+            return
+        response = self.raw_command(netfn=6, command=1)
+        if 'error' in response:
+            raise exc.IpmiException(response['error'], code=response['code'])
+        self._oem = {
+            'deviceid': response['data'][0],
+            'device_revision': response['data'][1] & 0b1111,
+            'manufacturer_id': struct.unpack(
+                '<I', struct.pack('3B', *response['data'][6:9]) + '\x00')[0],
+            'product_id': struct.unpack(
+                '<H', struct.pack('2B', *response['data'][9:11]))[0],
+        }
 
     def get_bootdev(self):
         """Get current boot device override information.
