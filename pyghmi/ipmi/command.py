@@ -20,8 +20,10 @@ import pyghmi.constants as const
 import pyghmi.exceptions as exc
 
 import pyghmi.ipmi.fru as fru
+from pyghmi.ipmi.oem.lookup import get_oem_handler
 from pyghmi.ipmi.private import session
 import pyghmi.ipmi.sdr as sdr
+import struct
 
 
 boot_devices = {
@@ -88,6 +90,7 @@ class Command(object):
         self.onlogon = onlogon
         self.bmc = bmc
         self._sdr = None
+        self._oem = None
         if onlogon is not None:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,
@@ -122,6 +125,28 @@ class Command(object):
         :param timeout: Maximum number of seconds before returning
         """
         return session.Session.wait_for_rsp(timeout=timeout)
+
+    def oem_init(self):
+        """Initialize the command object for OEM capabilities
+
+        A number of capabilities are either totally OEM defined or
+        else augmented somehow by knowledge of the OEM.  This
+        method does an interrogation to identify the OEM.
+
+        """
+        if self._oem:
+            return
+        response = self.raw_command(netfn=6, command=1)
+        if 'error' in response:
+            raise exc.IpmiException(response['error'], code=response['code'])
+        self._oem = get_oem_handler({
+            'device_id': response['data'][0],
+            'device_revision': response['data'][1] & 0b1111,
+            'manufacturer_id': struct.unpack(
+                '<I', struct.pack('3B', *response['data'][6:9]) + '\x00')[0],
+            'product_id': struct.unpack(
+                '<H', struct.pack('2B', *response['data'][9:11]))[0],
+        }, self)
 
     def get_bootdev(self):
         """Get current boot device override information.
@@ -358,14 +383,22 @@ class Command(object):
         serial numbers, sometimes hardware addresses, sometimes memory modules
         This function will retrieve whatever the underlying platform provides
         and apply some structure.  Iterating over the return yields tuples
-        of a name for the inventoried item and
+        of a name for the inventoried item and dictionary of descriptions
+        or None for items not present.
         """
-        yield ("System", fru.FRU(ipmicmd=self, fruid=0).info)
+        self.oem_init()
+        zerofru = fru.FRU(ipmicmd=self).info
+        if zerofru is not None:
+            zerofru = self._oem.process_fru(zerofru)
+        yield ("System", zerofru)
         if self._sdr is None:
             self._sdr = sdr.SDR(self)
         for fruid in self._sdr.fru:
-            yield (self._sdr.fru[fruid].fru_name, fru.FRU(
-                ipmicmd=self, fruid=fruid, sdr=self._sdr.fru[fruid]).info)
+            fruinf = fru.FRU(
+                ipmicmd=self, fruid=fruid, sdr=self._sdr.fru[fruid]).info
+            if fruinf is not None:
+                fruinf = self._oem.process_fru(fruinf)
+            yield (self._sdr.fru[fruid].fru_name, fruinf)
 
     def get_health(self):
         """Summarize health of managed system
