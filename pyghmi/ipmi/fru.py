@@ -133,7 +133,6 @@ class FRU(object):
                 self.fetch_fru(fruid)
             except iexc.IpmiException as ie:
                 if ie.ipmicode == 203:
-                    self.info = 'Not Present'
                     return
             self.parsedata()
         else:
@@ -170,7 +169,7 @@ class FRU(object):
                 chunksize += 2
                 continue
             elif 'error' in response:
-                raise iexc.IpmiException(response['error'])
+                raise iexc.IpmiException(response['error'], response['code'])
             self.rawfru.extend(response['data'][1:])
             offset += response['data'][0]
             if offset + chunksize > frusize:
@@ -204,7 +203,7 @@ class FRU(object):
         currtlv = self.databytes[offset]
         currlen = currtlv & 0b111111
         currtype = (currtlv & 0b11000000) >> 6
-        retinfo = self.databytes[offset + 1:offset + currlen]
+        retinfo = self.databytes[offset + 1:offset + currlen + 1]
         newoffset = offset + currlen + 1
         if currlen == 0:
             return None, newoffset
@@ -213,9 +212,15 @@ class FRU(object):
             return retinfo, newoffset
         elif currtype == 3:  # text string
             if lang == 0:
-                retinfo = retinfo.decode('utf-8')
+                try:
+                    retinfo = retinfo.decode('utf-8')
+                except UnicodeDecodeError:
+                    pass
             else:
-                retinfo = retinfo.decode('utf-16le')
+                try:
+                    retinfo = retinfo.decode('utf-16le')
+                except UnicodeDecodeError:
+                    pass
             retinfo = retinfo.replace('\x00', '')
             return retinfo, newoffset
         elif currtype == 1:  # BCD 'plus'
@@ -237,9 +242,9 @@ class FRU(object):
             raise iexc.BmcErrorException("Invallid/Unsupported chassis area")
         inf = self.info
         # ignore length field, just process the data
-        inf['chassis_type'] = enclosure_types[self.databytes[offset + 2]]
-        inf['chassis_part_number'], offset = self._decode_tlv(offset + 3)
-        inf['chassis_serial'], offset = self._decode_tlv(offset)
+        inf['Chassis type'] = enclosure_types[self.databytes[offset + 2]]
+        inf['Chassis part number'], offset = self._decode_tlv(offset + 3)
+        inf['Chassis serial number'], offset = self._decode_tlv(offset)
         inf['chassis_extra'] = []
         while self.databytes[offset] != 0xc1:
             fielddata, offset = self._decode_tlv(offset)
@@ -253,12 +258,12 @@ class FRU(object):
             raise iexc.BmcErrorException("Invalid/Unsupported board info area")
         inf = self.info
         language = self.databytes[offset + 2]
-        inf['board_mfg_date'] = decode_fru_date(
+        inf['Board manufacture date'] = decode_fru_date(
             self.databytes[offset + 3:offset + 6])
-        inf['board_manufacturer'], offset = self._decode_tlv(offset + 6)
-        inf['board_product'], offset = self._decode_tlv(offset, language)
-        inf['board_serial'], offset = self._decode_tlv(offset, language)
-        inf['board_model'], offset = self._decode_tlv(offset, language)
+        inf['Board manufacturer'], offset = self._decode_tlv(offset + 6)
+        inf['Board product name'], offset = self._decode_tlv(offset, language)
+        inf['Board serial number'], offset = self._decode_tlv(offset, language)
+        inf['Board model'], offset = self._decode_tlv(offset, language)
         _, offset = self._decode_tlv(offset, language)  # decode but discard
         inf['board_extra'] = []
         while self.databytes[offset] != 0xc1:
@@ -271,13 +276,13 @@ class FRU(object):
             return
         inf = self.info
         language = self.databytes[offset + 2]
-        inf['product_manufacturer'], offset = self._decode_tlv(offset + 3,
-                                                               language)
-        inf['product_name'], offset = self._decode_tlv(offset, language)
-        inf['product_model'], offset = self._decode_tlv(offset, language)
-        inf['product_version'], offset = self._decode_tlv(offset, language)
-        inf['product_serial'], offset = self._decode_tlv(offset, language)
-        inf['product_asset'], offset = self._decode_tlv(offset, language)
+        inf['Manufacturer'], offset = self._decode_tlv(offset + 3,
+                                                       language)
+        inf['Product name'], offset = self._decode_tlv(offset, language)
+        inf['Model'], offset = self._decode_tlv(offset, language)
+        inf['Hardware Version'], offset = self._decode_tlv(offset, language)
+        inf['Serial Number'], offset = self._decode_tlv(offset, language)
+        inf['Asset Number'], offset = self._decode_tlv(offset, language)
         _, offset = self._decode_tlv(offset, language)
         inf['product_extra'] = []
         while self.databytes[offset] != 0xc1:
