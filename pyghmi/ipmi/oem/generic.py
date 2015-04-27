@@ -40,5 +40,7 @@ class OEMHandler(object):
         ordered lists that their expectations are not broken by an update
         """
         # In the generic case, just pass through
+        if fru is None:
+            return fru
         fru['oem_parser'] = None
         return fru

@@ -376,6 +376,22 @@ class Command(object):
         for fruid in self._sdr.fru:
             yield self._sdr.fru[fruid].fru_name
 
+    def get_inventory_of_component(self, component):
+        """Retrieve inventory of a component
+
+        Retrieve detailed inventory information for only the requested
+        component.
+        """
+        self.oem_init()
+        if component == 'System':
+            return self._oem.process_fru(fru.FRU(ipmicmd=self).info)
+        if self._sdr is None:
+            self._sdr = sdr.SDR(self)
+        for fruid in self._sdr.fru:
+            if self._sdr.fru[fruid].fru_name == component:
+                return self._oem.process_fru(fru.FRU(
+                    ipmicmd=self, fruid=fruid, sdr=self._sdr.fru[fruid]).info)
+
     def get_inventory(self):
         """Retrieve inventory of system
 

@@ -24,6 +24,8 @@ class OEMHandler(generic.OEMHandler):
         self.oemid = oemid
 
     def process_fru(self, fru):
+        if fru is None:
+            return fru
         if (self.oemid['manufacturer_id'] == 19046 and
                 self.oemid['device_id'] == 32):
             fru['oem_parser'] = 'lenovo'
