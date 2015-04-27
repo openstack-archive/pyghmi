@@ -246,9 +246,17 @@ class FRU(object):
         inf['Chassis part number'], offset = self._decode_tlv(offset + 3)
         inf['Chassis serial number'], offset = self._decode_tlv(offset)
         inf['chassis_extra'] = []
-        while self.databytes[offset] != 0xc1:
-            fielddata, offset = self._decode_tlv(offset)
-            inf['chassis_extra'].append(fielddata)
+        self.extract_extra(inf['chassis_extra'], offset)
+
+    def extract_extra(self, target, offset, language=0):
+        try:
+            while self.databytes[offset] != 0xc1:
+                fielddata, offset = self._decode_tlv(offset, language)
+                target.append(fielddata)
+        except IndexError:
+            # If we overrun the end due to malformed FRU,
+            # return at least what decoded right
+            return
 
     def _parse_board(self):
         offset = 8 * self.databytes[3]
@@ -266,9 +274,7 @@ class FRU(object):
         inf['Board model'], offset = self._decode_tlv(offset, language)
         _, offset = self._decode_tlv(offset, language)  # decode but discard
         inf['board_extra'] = []
-        while self.databytes[offset] != 0xc1:
-            fielddata, offset = self._decode_tlv(offset, language)
-            inf['board_extra'].append(fielddata)
+        self.extract_extra(inf['board_extra'], offset, language)
 
     def _parse_prod(self):
         offset = 8 * self.databytes[4]
@@ -285,9 +291,7 @@ class FRU(object):
         inf['Asset Number'], offset = self._decode_tlv(offset, language)
         _, offset = self._decode_tlv(offset, language)
         inf['product_extra'] = []
-        while self.databytes[offset] != 0xc1:
-            fielddata, offset = self._decode_tlv(offset, language)
-            inf['product_extra'].append(fielddata)
+        self.extract_extra(inf['product_extra'], offset, language)
 
     def __repr__(self):
         return repr(self.info)
