@@ -32,13 +32,13 @@ class OEMHandler(generic.OEMHandler):
             # Thinkserver lays out specific interpretation of the
             # board extra fields
             _, _, wwn1, wwn2, mac1, mac2 = fru['board_extra']
-            if wwn1 != '0000000000000000':
+            if wwn1 not in ('0000000000000000', ''):
                 fru['WWN 1'] = wwn1
-            if wwn2 != '0000000000000000':
+            if wwn2 not in ('0000000000000000', ''):
                 fru['WWN 2'] = wwn2
-            if mac1 != '00:00:00:00:00:00':
+            if mac1 not in ('00:00:00:00:00:00', ''):
                 fru['MAC Address 1'] = mac1
-            if mac2 != '00:00:00:00:00:00':
+            if mac2 not in ('00:00:00:00:00:00', ''):
                 fru['MAC Address 2'] = mac2
             # The product_extra is just UUID, we have that plenty of other ways
             # So for now, leave that portion of the data alone
