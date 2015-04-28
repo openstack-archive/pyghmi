@@ -85,7 +85,7 @@ def unpack6bitascii(inputdata):
         currchar = (currchunk[0] & 0b11000000) >> 6
         currchar |= (currchunk[1] & 0b1111) << 2
         result += chr(0x20 + currchar)
-        currchar = (currchunk[1] & 0b1111000) >> 4
+        currchar = (currchunk[1] & 0b11110000) >> 4
         currchar |= (currchunk[2] & 0b11) << 4
         result += chr(0x20 + currchar)
         currchar = (currchunk[2] & 0b11111100) >> 2
