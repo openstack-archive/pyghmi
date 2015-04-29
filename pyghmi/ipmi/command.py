@@ -22,6 +22,7 @@ import pyghmi.exceptions as exc
 import pyghmi.ipmi.fru as fru
 from pyghmi.ipmi.oem.lookup import get_oem_handler
 from pyghmi.ipmi.private import session
+import pyghmi.ipmi.private.util as pygutil
 import pyghmi.ipmi.sdr as sdr
 import struct
 
@@ -384,13 +385,30 @@ class Command(object):
         """
         self.oem_init()
         if component == 'System':
-            return self._oem.process_fru(fru.FRU(ipmicmd=self).info)
+            return self._get_zero_fru()
         if self._sdr is None:
             self._sdr = sdr.SDR(self)
         for fruid in self._sdr.fru:
             if self._sdr.fru[fruid].fru_name == component:
                 return self._oem.process_fru(fru.FRU(
                     ipmicmd=self, fruid=fruid, sdr=self._sdr.fru[fruid]).info)
+
+    def _get_zero_fru(self):
+        # It is expected that a manufacturer matches SMBIOS to IPMI
+        # get system uuid return data.  If a manufacturer does not
+        # do so, they should handle either deletion or fixup in the
+        # OEM processing pass.  Code optimistically assumes that if
+        # data is returned, than the vendor is properly using it.
+        zerofru = fru.FRU(ipmicmd=self).info
+        if zerofru is None:
+            zerofru = {}
+        guiddata = self.raw_command(netfn=6, command=0x37)
+        if 'error' not in guiddata:
+            zerofru['UUID'] = pygutil.decode_wireformat_uuid(
+                guiddata['data'])
+        if not zerofru:
+            zerofru = None
+        return self._oem.process_fru(zerofru)
 
     def get_inventory(self):
         """Retrieve inventory of system
@@ -403,10 +421,7 @@ class Command(object):
         or None for items not present.
         """
         self.oem_init()
-        zerofru = fru.FRU(ipmicmd=self).info
-        if zerofru is not None:
-            zerofru = self._oem.process_fru(zerofru)
-        yield ("System", zerofru)
+        yield ("System", self._get_zero_fru())
         if self._sdr is None:
             self._sdr = sdr.SDR(self)
         for fruid in self._sdr.fru:

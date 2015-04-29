@@ -15,9 +15,11 @@
 # limitations under the License.
 
 import pyghmi.ipmi.oem.generic as generic
+import pyghmi.ipmi.private.util as util
 
 
 class OEMHandler(generic.OEMHandler):
+    # noinspection PyUnusedLocal
     def __init__(self, oemid, ipmicmd):
         # will need to retain data to differentiate
         # variations.  For example System X versus Thinkserver
@@ -40,8 +42,16 @@ class OEMHandler(generic.OEMHandler):
                 fru['MAC Address 1'] = mac1
             if mac2 not in ('00:00:00:00:00:00', ''):
                 fru['MAC Address 2'] = mac2
-            # The product_extra is just UUID, we have that plenty of other ways
-            # So for now, leave that portion of the data alone
+            # The product_extra field is UUID as the system would present
+            # in DMI.  This is different than the two UUIDs that
+            # it returns for get device and get system uuid...
+            byteguid = fru['product_extra'][0]
+            # It can present itself as claiming to be ASCII when it
+            # is actually raw hex.  As a result it triggers the mechanism
+            # to strip \x00 from the end of text strings.  Work around this
+            # by padding with \x00 to the right if the string is not 16 long
+            byteguid.extend('\x00' * (16 - len(byteguid)))
+            fru['UUID'] = util.decode_wireformat_uuid(byteguid)
             return fru
         else:
             fru['oem_parser'] = None

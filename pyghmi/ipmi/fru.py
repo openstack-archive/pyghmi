@@ -221,7 +221,11 @@ class FRU(object):
                     retinfo = retinfo.decode('utf-16le')
                 except UnicodeDecodeError:
                     pass
-            retinfo = retinfo.replace('\x00', '').strip()
+            # Some things lie about being text.  Do the best we can by
+            # removing trailing spaces and nulls like makes sense for text
+            # and rely on vendors to workaround deviations in their OEM
+            # module
+            retinfo = retinfo.rstrip('\x00 ')
             return retinfo, newoffset
         elif currtype == 1:  # BCD 'plus'
             retdata = ''
@@ -232,8 +236,7 @@ class FRU(object):
             retdata = retdata.strip()
             return retdata, newoffset
         elif currtype == 2:  # 6-bit ascii
-            retinfo = unpack6bitascii(retinfo)
-            retinfo = retinfo.strip()
+            retinfo = unpack6bitascii(retinfo).strip()
             return retinfo, newoffset
 
     def _parse_chassis(self):

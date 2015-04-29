@@ -37,7 +37,7 @@ class OEMHandler(object):
         board/product/chassis_extra_data arrays if 'oem_parser' is None,
         and mask those fields if not None.  It is expected that OEMs leave
         the fields intact so that if client code hard codes around the
-        ordered lists that their expectations are not broken by an update
+        ordered lists that their expectations are not broken by an update.
         """
         # In the generic case, just pass through
         if fru is None:
