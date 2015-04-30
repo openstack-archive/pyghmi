@@ -296,6 +296,31 @@ class Command(object):
             raise exc.IpmiException(response['error'])
         return {'bootdev': bootdev}
 
+    def xraw_command(self, netfn, command, bridge_request=(), data=(),
+                    delay_xmit=None):
+        """Send raw ipmi command to BMC, raising exception on error
+
+        This is identical to raw_command, except it raises exceptions
+        on IPMI errors and returns data as a buffer.  This is the recommend
+        function to use.  The response['data'] being a buffer allows
+        traditional indexed access as well as works nicely with
+        struct.unpack_from when certain data is coming back.
+
+        :param netfn: Net function number
+        :param command: Command value
+        :param bridge_request: The target slave address and channel number for
+                               the bridge request.
+        :param data: Command data as a tuple or list
+        :returns: dict -- The response from IPMI device
+        """
+        rsp = self.ipmi_session.raw_command(netfn=netfn, command=command,
+                                             bridge_request=bridge_request,
+                                             data=data, delay_xmit=delay_xmit)
+        if 'error' in rsp:
+            raise exc.IpmiException(rsp['error'], rsp['code'])
+        rsp['data'] = buffer(bytearray(rsp['data']))
+        return rsp
+
     def raw_command(self, netfn, command, bridge_request=(), data=(),
                     delay_xmit=None):
         """Send raw ipmi command to BMC
