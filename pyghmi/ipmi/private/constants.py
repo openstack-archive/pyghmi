@@ -31,7 +31,7 @@ payload_types = {
     'rakp4': 0x15,
 }
 
-#sensor type codes, table 42-3
+# sensor type codes, table 42-3
 sensor_type_codes = {
     1: 'Temperature',
     2: 'Voltage',
@@ -80,11 +80,70 @@ sensor_type_codes = {
 }
 
 # This is from table 42-2
-#digital discrete poses a challenge from a health perspective.  So far all
-#observed ones are no more or less 'healthy' by being asserted or not asserted
-#for example asserting that an add-on is installed
+# digital discrete poses a challenge from a health perspective.  So far all
+# observed ones are no more or less 'healthy' by being asserted or not asserted
+# for example asserting that an add-on is installed
 
-discrete_type_offsets = {
+generic_type_offsets = {
+    1: {  # threshold based
+        # Some explanation is offered in the specification around 'get sensor
+        # event status' command.  Assertions should indicate the new state
+        # and deassertion should indicate leaving the state.  The 'going high'
+        # and 'going low' do not denote leaving a state.  For example, going
+        # from Lower Critical to Lower Non-Critical would be 'going high'
+        # Will just report the new state rather than the direction from
+        # which things came from, since in a vacuum it is not useful data
+        # and in the context of event log, it should be better discerned
+        # from the pattern of prior events
+        0: {
+            'desc': 'Lower Non-critical',  # - going low',
+            'severity': const.Health.Warning,
+        },
+        1: {
+            'desc': 'Lower Non-critical',  # - going high',
+            'severity': const.Health.Warning,
+        },
+        2: {
+            'desc': 'Lower Critical',  # - going low',
+            'severity': const.Health.Critical,
+        },
+        3: {
+            'desc': 'Lower Critical',  # - going high',
+            'severity': const.Health.Critical,
+        },
+        4: {
+            'desc': 'Lower Non-recoverable',  # - going low
+            'severity': const.Health.Failed,
+        },
+        5: {
+            'desc': 'Lower Non-recoverable',  # - going high
+            'severity': const.Health.Failed,
+        },
+        6: {
+            'desc': 'Upper Non-critical',  # - going low
+            'severity': const.Health.Warning,
+        },
+        7: {
+            'desc': 'Upper Non-critical',  # - going high
+            'severity': const.Health.Warning,
+        },
+        8: {
+            'desc': 'Upper Critical',  # - going low
+            'severity': const.Health.Critical,
+        },
+        9: {
+            'desc': 'Upper Critical',  # - going high
+            'severity': const.Health.Critical,
+        },
+        0xa: {
+            'desc': 'Upper non-recoverable',  # - going low
+            'severity': const.Health.Failed,
+        },
+        0xb: {
+            'desc': 'Upper non-recoverable',  # - going high
+            'severity': const.Health.Failed,
+        },
+    },
     2: {
         0: {
             'desc': 'Idle',
@@ -350,31 +409,31 @@ sensor_type_offsets = {
     },
     7: {
         0: {
-            'desc': 'processor IERR',
+            'desc': 'Processor IERR',
             'severity': const.Health.Failed,
         },
         1: {
-            'desc': 'processor thermal trip',
+            'desc': 'Processor thermal trip',
             'severity': const.Health.Failed,
         },
         2: {
-            'desc': 'processor FRB1/BIST failure',
+            'desc': 'Processor FRB1/BIST failure',
             'severity': const.Health.Failed,
         },
         3: {
-            'desc': 'processor FRB2/Hang in POST failure',
+            'desc': 'Processor FRB2/Hang in POST failure',
             'severity': const.Health.Failed,
         },
         4: {
-            'desc': 'processor FRB3/processor startup failure',
+            'desc': 'Processor FRB3/processor startup failure',
             'severity': const.Health.Failed,
         },
         5: {
-            'desc': 'processor configuration error',
+            'desc': 'Processor configuration error',
             'severity': const.Health.Failed,
         },
         6: {
-            'desc': 'uncorrectable cpu complex error',
+            'desc': 'Uncorrectable cpu complex error',
             'severity': const.Health.Failed,
         },
         7: {
@@ -386,19 +445,19 @@ sensor_type_offsets = {
             'severity': const.Health.Warning,
         },
         9: {
-            'desc': 'processor terminator presence detected',
+            'desc': 'Processor terminator presence detected',
             'severity': const.Health.Ok,
         },
         0xa: {
-            'desc': 'processor throttled',
+            'desc': 'Processor throttled',
             'severity': const.Health.Warning,
         },
         0xb: {
-            'desc': 'uncorrectable machine check exception',
+            'desc': 'Uncorrectable machine check exception',
             'severity': const.Health.Failed,
         },
         0xc: {
-            'desc': 'correctable machine check exception',
+            'desc': 'Correctable machine check exception',
             'severity': const.Health.Warning,
         },
     },
@@ -408,28 +467,28 @@ sensor_type_offsets = {
             'severity': const.Health.Ok,
         },
         1: {
-            'desc': 'power supply failure',
+            'desc': 'Power supply failure',
             'severity': const.Health.Critical,
         },
         2: {
-            'desc': 'power supply predictive failure',
+            'desc': 'Power supply predictive failure',
             'severity': const.Health.Critical,
         },
         3: {
-            'desc': 'power supply input lost',
+            'desc': 'Power supply input lost',
             'severity': const.Health.Critical,
         },
         4: {
-            'desc': 'power supply input out of range or lost',
+            'desc': 'Power supply input out of range or lost',
             'severity': const.Health.Critical,
         },
         5: {
-            'desc': 'power supply input out of range',
+            'desc': 'Power supply input out of range',
             'severity': const.Health.Critical,
         },
         6: {
             # clarified by SEL/PET event data 3
-            'desc': 'power supply configuration error',
+            'desc': 'Power supply configuration error',
             'severity': const.Health.Warning,
         },
         7: {
@@ -439,11 +498,11 @@ sensor_type_offsets = {
     },
     9: {  # power unit
         0: {
-            'desc': 'power off/down',
+            'desc': 'Power off',
             'severity': const.Health.Ok,
         },
         1: {
-            'desc': 'power cycle',
+            'desc': 'Power cycle',
             'severity': const.Health.Ok,
         },
         2: {
@@ -451,19 +510,19 @@ sensor_type_offsets = {
             'severity': const.Health.Warning,
         },
         3: {
-            'desc': 'interlock power down',
+            'desc': 'Interlock power down',
             'severity': const.Health.Ok,
         },
         4: {
-            'desc': 'power input lost',
+            'desc': 'Power input lost',
             'severity': const.Health.Warning,
         },
         5: {
-            'desc': 'soft power control failure',
+            'desc': 'Soft power control failure',
             'severity': const.Health.Failed,
         },
         6: {
-            'desc': 'power unit failure',
+            'desc': 'Power unit failure',
             'severity': const.Health.Critical,
         },
         7: {
@@ -473,27 +532,27 @@ sensor_type_offsets = {
     },
     0xc: {  # memory
         0: {
-            'desc': 'correctable memory error',
+            'desc': 'Correctable memory error',
             'severity': const.Health.Warning,
         },
         1: {
-            'desc': 'uncorrectable memory error',
+            'desc': 'Uncorrectable memory error',
             'severity': const.Health.Failed,
         },
         2: {
-            'desc': 'memory parity',
+            'desc': 'Memory parity',
             'severity': const.Health.Warning,
         },
         3: {
-            'desc': 'memory scrub failed',
+            'desc': 'Memory scrub failed',
             'severity': const.Health.Critical,
         },
         4: {
-            'desc': 'memory device disabled',
+            'desc': 'Memory device disabled',
             'severity': const.Health.Warning,
         },
         5: {
-            'desc': 'correctable memory error logging limit reached',
+            'desc': 'Correctable memory error logging limit reached',
             'severity': const.Health.Critical,
         },
         6: {
@@ -523,35 +582,35 @@ sensor_type_offsets = {
             'severity': const.Health.Ok,
         },
         1: {
-            'desc': 'drive fault',
+            'desc': 'Drive fault',
             'severity': const.Health.Critical,
         },
         2: {
-            'desc': 'predictive drive failure',
+            'desc': 'Predictive drive failure',
             'severity': const.Health.Warning,
         },
         3: {
-            'desc': 'hot spare drive',
+            'desc': 'Hot spare drive',
             'severity': const.Health.Ok,
         },
         4: {
-            'desc': 'drive consitency check in progress',
+            'desc': 'Drive consitency check in progress',
             'severity': const.Health.Ok,
         },
         5: {
-            'desc': 'drive in critical array',
+            'desc': 'Drive in critical array',
             'severity': const.Health.Critical,
         },
         6: {
-            'desc': 'drive in failed array',
+            'desc': 'Drive in failed array',
             'severity': const.Health.Failed,
         },
         7: {
-            'desc': 'rebuild in progress',
+            'desc': 'Rebuild in progress',
             'severity': const.Health.Ok,
         },
         8: {
-            'desc': 'rebuild aborted',
+            'desc': 'Rebuild aborted',
             'severity': const.Health.Critical,
         },
     },
@@ -1103,10 +1162,43 @@ sensor_type_offsets = {
             'severity': const.Health.Ok,
         },
     },
+    0x2c: {  # FRU state
+        0: {
+            'desc': 'Not Installed',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Inactive',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Activation Requested',
+            'severity': const.Health.Ok,
+        },
+        3: {
+            'desc': 'Activation in progress',
+            'severity': const.Health.Ok,
+        },
+        4: {
+            'desc': 'Active',
+            'severity': const.Health.Ok,
+        },
+        5: {
+            'desc': 'Deactivation requested',
+            'severity': const.Health.Ok,
+        },
+        6: {
+            'desc': 'Deactivation in progress',
+            'severity': const.Health.Ok,
+        },
+        7: {
+            'desc': 'Communication Lost',
+            'severity': const.Health.Warning,
+        },
+    },
 }
 
-
-#entity ids from table 43-13 entity id codes
+# entity ids from table 43-13 entity id codes
 entity_ids = {
     0x0: 'unspecified',
     0x1: 'other',
