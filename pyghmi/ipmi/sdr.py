@@ -378,7 +378,7 @@ class SDREntry(object):
             self.decode_formula(entry[19:25])
 
     def _decode_state(self, state):
-        mapping = ipmiconst.discrete_type_offsets
+        mapping = ipmiconst.generic_type_offsets
         try:
             if self.reading_type in mapping:
                 desc = mapping[self.reading_type][state]['desc']
