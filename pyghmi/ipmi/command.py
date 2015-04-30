@@ -24,6 +24,7 @@ from pyghmi.ipmi.oem.lookup import get_oem_handler
 from pyghmi.ipmi.private import session
 import pyghmi.ipmi.private.util as pygutil
 import pyghmi.ipmi.sdr as sdr
+import pyghmi.ipmi.events as sel
 import struct
 
 
@@ -296,6 +297,31 @@ class Command(object):
             raise exc.IpmiException(response['error'])
         return {'bootdev': bootdev}
 
+    def xraw_command(self, netfn, command, bridge_request=(), data=(),
+                     delay_xmit=None):
+        """Send raw ipmi command to BMC, raising exception on error
+
+        This is identical to raw_command, except it raises exceptions
+        on IPMI errors and returns data as a buffer.  This is the recommend
+        function to use.  The response['data'] being a buffer allows
+        traditional indexed access as well as works nicely with
+        struct.unpack_from when certain data is coming back.
+
+        :param netfn: Net function number
+        :param command: Command value
+        :param bridge_request: The target slave address and channel number for
+                               the bridge request.
+        :param data: Command data as a tuple or list
+        :returns: dict -- The response from IPMI device
+        """
+        rsp = self.ipmi_session.raw_command(netfn=netfn, command=command,
+                                            bridge_request=bridge_request,
+                                            data=data, delay_xmit=delay_xmit)
+        if 'error' in rsp:
+            raise exc.IpmiException(rsp['error'], rsp['code'])
+        rsp['data'] = buffer(bytearray(rsp['data']))
+        return rsp
+
     def raw_command(self, netfn, command, bridge_request=(), data=(),
                     delay_xmit=None):
         """Send raw ipmi command to BMC
@@ -363,6 +389,39 @@ class Command(object):
         response = self.raw_command(netfn=0, command=4, data=identifydata)
         if 'error' in response:
             raise exc.IpmiException(response['error'])
+
+    def init_sdr(self):
+        """Initialize SDR
+
+        Do the appropriate action to have a relevant sensor description
+        repository for the current management controller
+        """
+        # For now, return current sdr if it exists and still connected
+        # future, check SDR timestamp for continued relevance
+        # further future, optionally support a cache directory/file
+        # to store cached copies for given device id, product id, mfg id,
+        # sdr timestamp, our data version revision, aux firmware revision,
+        # and oem defined field
+        if self._sdr is None:
+            self._sdr = sdr.SDR(self)
+        return self._sdr
+
+    def get_event_log(self, clear=False):
+        """Retrieve the log of events, optionally clearing
+
+        The contents of the SEL are returned as an iterable.  Timestamps
+        are given as local time, ISO 8601 (whether the target has an accurate
+        clock or not).  Timestamps may be omitted for events that cannot be
+        given a timestamp, leaving only the raw timecode to provide relative
+        time information.  clear set to true will result in the log being
+        cleared as it is returned.  This allows an atomic fetch and clear
+        behavior so that no log entries will be lost between the fetch and
+        clear actions.  There is no 'clear_event_log' function to encourage
+        users to create code that is not at risk for losing events.
+
+        :param clear:  Whether to remove the SEL entries from the target BMC
+        """
+        return sel.EventHandler(self.init_sdr()).fetch_sel(self, clear)
 
     def get_inventory_descriptions(self):
         """Retrieve list of things that could be inventoried
