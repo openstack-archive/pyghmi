@@ -31,7 +31,7 @@ payload_types = {
     'rakp4': 0x15,
 }
 
-#sensor type codes, table 42-3
+# sensor type codes, table 42-3
 sensor_type_codes = {
     1: 'Temperature',
     2: 'Voltage',
@@ -80,9 +80,9 @@ sensor_type_codes = {
 }
 
 # This is from table 42-2
-#digital discrete poses a challenge from a health perspective.  So far all
-#observed ones are no more or less 'healthy' by being asserted or not asserted
-#for example asserting that an add-on is installed
+# digital discrete poses a challenge from a health perspective.  So far all
+# observed ones are no more or less 'healthy' by being asserted or not asserted
+# for example asserting that an add-on is installed
 
 discrete_type_offsets = {
     2: {
@@ -1103,10 +1103,43 @@ sensor_type_offsets = {
             'severity': const.Health.Ok,
         },
     },
+    0x2c: {  # FRU state
+        0: {
+            'desc': 'Not Installed',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Inactive',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Activation Requested',
+            'severity': const.Health.Ok,
+        },
+        3: {
+            'desc': 'Activation in progress',
+            'severity': const.Health.Ok,
+        },
+        4: {
+            'desc': 'Active',
+            'severity': const.Health.Ok,
+        },
+        5: {
+            'desc': 'Deactivation requested',
+            'severity': const.Health.Ok,
+        },
+        6: {
+            'desc': 'Deactivation in progress',
+            'severity': const.Health.Ok,
+        },
+        7: {
+            'desc': 'Communication Lost',
+            'severity': const.Health.Warning,
+        },
+    },
 }
 
-
-#entity ids from table 43-13 entity id codes
+# entity ids from table 43-13 entity id codes
 entity_ids = {
     0x0: 'unspecified',
     0x1: 'other',
