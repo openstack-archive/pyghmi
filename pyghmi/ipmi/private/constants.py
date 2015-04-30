@@ -31,7 +31,7 @@ payload_types = {
     'rakp4': 0x15,
 }
 
-#sensor type codes, table 42-3
+# sensor type codes, table 42-3
 sensor_type_codes = {
     1: 'Temperature',
     2: 'Voltage',
@@ -80,11 +80,70 @@ sensor_type_codes = {
 }
 
 # This is from table 42-2
-#digital discrete poses a challenge from a health perspective.  So far all
-#observed ones are no more or less 'healthy' by being asserted or not asserted
-#for example asserting that an add-on is installed
+# digital discrete poses a challenge from a health perspective.  So far all
+# observed ones are no more or less 'healthy' by being asserted or not asserted
+# for example asserting that an add-on is installed
 
-discrete_type_offsets = {
+generic_type_offsets = {
+    1: {  # threshold based
+        # Some explanation is offered in the specification around 'get sensor
+        # event status' command.  Assertions should indicate the new state
+        # and deassertion should indicate leaving the state.  The 'going high'
+        # and 'going low' do not denote leaving a state.  For example, going
+        # from Lower Critical to Lower Non-Critical would be 'going high'
+        # Will just report the new state rather than the direction from
+        # which things came from, since in a vacuum it is not useful data
+        # and in the context of event log, it should be better discerned
+        # from the pattern of prior events
+        0: {
+            'desc': 'Lower Non-critical',  # - going low',
+            'severity': const.Health.Warning,
+        },
+        1: {
+            'desc': 'Lower Non-critical',  # - going high',
+            'severity': const.Health.Warning,
+        },
+        2: {
+            'desc': 'Lower Critical',  # - going low',
+            'severity': const.Health.Critical,
+        },
+        3: {
+            'desc': 'Lower Critical',  # - going high',
+            'severity': const.Health.Critical,
+        },
+        4: {
+            'desc': 'Lower Non-recoverable',  # - going low
+            'severity': const.Health.Failed,
+        },
+        5: {
+            'desc': 'Lower Non-recoverable',  # - going high
+            'severity': const.Health.Failed,
+        },
+        6: {
+            'desc': 'Upper Non-critical',  # - going low
+            'severity': const.Health.Warning,
+        },
+        7: {
+            'desc': 'Upper Non-critical',  # - going high
+            'severity': const.Health.Warning,
+        },
+        8: {
+            'desc': 'Upper Critical',  # - going low
+            'severity': const.Health.Critical,
+        },
+        9: {
+            'desc': 'Upper Critical',  # - going high
+            'severity': const.Health.Critical,
+        },
+        0xa: {
+            'desc': 'Upper non-recoverable',  # - going low
+            'severity': const.Health.Failed,
+        },
+        0xb: {
+            'desc': 'Upper non-recoverable',  # - going high
+            'severity': const.Health.Failed,
+        },
+    },
     2: {
         0: {
             'desc': 'Idle',
@@ -1103,10 +1162,43 @@ sensor_type_offsets = {
             'severity': const.Health.Ok,
         },
     },
+    0x2c: {  # FRU state
+        0: {
+            'desc': 'Not Installed',
+            'severity': const.Health.Ok,
+        },
+        1: {
+            'desc': 'Inactive',
+            'severity': const.Health.Ok,
+        },
+        2: {
+            'desc': 'Activation Requested',
+            'severity': const.Health.Ok,
+        },
+        3: {
+            'desc': 'Activation in progress',
+            'severity': const.Health.Ok,
+        },
+        4: {
+            'desc': 'Active',
+            'severity': const.Health.Ok,
+        },
+        5: {
+            'desc': 'Deactivation requested',
+            'severity': const.Health.Ok,
+        },
+        6: {
+            'desc': 'Deactivation in progress',
+            'severity': const.Health.Ok,
+        },
+        7: {
+            'desc': 'Communication Lost',
+            'severity': const.Health.Warning,
+        },
+    },
 }
 
-
-#entity ids from table 43-13 entity id codes
+# entity ids from table 43-13 entity id codes
 entity_ids = {
     0x0: 'unspecified',
     0x1: 'other',
