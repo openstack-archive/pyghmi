@@ -303,10 +303,12 @@ def _fix_sel_time(records, ipmicmd):
         record = records[index]
         if 'timecode' not in record or record['timecode'] == 0xffffffff:
             continue
-        if record['event'] == 'Clock time change: After':
+        if (record['event'] == 'Clock time change' and
+                record['event_data'] == 'After'):
             newtimestamp = record['timecode']
             trimindexes.append(index)
-        elif record['event'] == 'Clock time change: Before':
+        elif (record['event'] == 'Clock time change' and
+                record['event_data'] == 'Before'):
             if newtimestamp:
                 if record['timecode'] < 0x20000000:
                     correctearly = True
@@ -351,6 +353,8 @@ def _fix_sel_time(records, ipmicmd):
                     record['timestamp'] = time.strftime(
                         '%Y-%m-%dT%H:%M:%S', time.localtime(
                             time.time() - age))
+    for index in trimindexes:
+        del records[index]
 
 
 class EventHandler(object):
