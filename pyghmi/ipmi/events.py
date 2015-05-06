@@ -303,10 +303,10 @@ def _fix_sel_time(records, ipmicmd):
         record = records[index]
         if 'timecode' not in record or record['timecode'] == 0xffffffff:
             continue
-        if record['description'] == 'Clock time change: After':
+        if record['event'] == 'Clock time change: After':
             newtimestamp = record['timecode']
             trimindexes.append(index)
-        elif record['description'] == 'Clock time change: Before':
+        elif record['event'] == 'Clock time change: Before':
             if newtimestamp:
                 if record['timecode'] < 0x20000000:
                     correctearly = True
@@ -390,14 +390,14 @@ class EventHandler(object):
                 sensor_type, '')
             evreading = ipmiconst.generic_type_offsets.get(
                 event_type, {}).get(evtoffset, {})
-            event['description'] = evreading.get('desc', '')
+            event['event'] = evreading.get('desc', '')
             event['severity'] = evreading.get('severity', pygconst.Health.Ok)
         elif event_type == 0x6f:
             event['entity_type'] = ipmiconst.sensor_type_codes.get(
                 sensor_type, '')
             evreading = ipmiconst.sensor_type_offsets.get(
                 sensor_type, {}).get(evtoffset, {})
-            event['description'] = evreading.get('desc', '')
+            event['event'] = evreading.get('desc', '')
             event['severity'] = evreading.get('severity', pygconst.Health.Ok)
         if event_type == 1:  # threshold
             if byte3type == 1:
@@ -408,8 +408,7 @@ class EventHandler(object):
             additionaldata = decode_eventdata(
                 eventdata[3], evtoffset, event_data, self._sdr)
             if additionaldata:
-                event['description'] = ': '.join((event['description'],
-                                                  additionaldata))
+                event['event_data'] = additionaldata
 
     def _sel_decode(self, origselentry):
         selentry = bytearray(origselentry)
