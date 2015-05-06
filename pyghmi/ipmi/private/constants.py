@@ -1055,7 +1055,7 @@ sensor_type_offsets = {
         },
         2: {
             'desc': 'Disabled',
-            'severity': const.Health.Warning,
+            'severity': const.Health.Ok,
         },
     },
     0x27: {  # LAN heartbeat
