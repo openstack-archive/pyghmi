@@ -172,6 +172,8 @@ class FRU(object):
                 raise iexc.IpmiException(response['error'], response['code'])
             self.rawfru.extend(response['data'][1:])
             offset += response['data'][0]
+            if response['data'][0] == 0:
+                last
             if offset + chunksize > frusize:
                 chunksize = frusize - offset
 
