@@ -47,7 +47,7 @@ sensor_type_codes = {
     0xc: 'Memory',
     0xd: 'Drive Bay',
     0xe: 'POST Memory Resize',
-    0xf: 'System Firmware Progress',
+    0xf: 'System Firmware',
     0x10: 'Event Log Disabled',
     0x11: 'Watchdog',
     0x12: 'System Event',
@@ -74,7 +74,7 @@ sensor_type_codes = {
     0x27: 'LAN',
     0x28: 'Management Subsystem Health',
     0x29: 'Battery',
-    0x2a: 'Session Audit',
+    0x2a: 'Session',
     0x2b: 'Version Change',
     0x2c: 'FRU State',
 }
@@ -98,252 +98,310 @@ generic_type_offsets = {
         0: {
             'desc': 'Lower Non-critical',  # - going low',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Lower Non-critical recovered',
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Lower Non-critical',  # - going high',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
             'desc': 'Lower Critical',  # - going low',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
             'desc': 'Lower Critical',  # - going high',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         4: {
             'desc': 'Lower Non-recoverable',  # - going low
             'severity': const.Health.Failed,
+            'deassertion_severity': const.Health.Ok,
         },
         5: {
             'desc': 'Lower Non-recoverable',  # - going high
             'severity': const.Health.Failed,
+            'deassertion_severity': const.Health.Ok,
         },
         6: {
             'desc': 'Upper Non-critical',  # - going low
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         7: {
             'desc': 'Upper Non-critical',  # - going high
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         8: {
             'desc': 'Upper Critical',  # - going low
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         9: {
             'desc': 'Upper Critical',  # - going high
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         0xa: {
             'desc': 'Upper non-recoverable',  # - going low
             'severity': const.Health.Failed,
+            'deassertion_severity': const.Health.Ok,
         },
         0xb: {
             'desc': 'Upper non-recoverable',  # - going high
             'severity': const.Health.Failed,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     2: {
         0: {
             'desc': 'Idle',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Active',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
             'desc': 'Busy',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     3: {
         0: {
             'desc': 'Deasserted',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Asserted',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     4: {
         0: {
             'desc': 'Predictive Failure deasserted',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Warning,
         },
         1: {
             'desc': 'Predictive Failure',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     5: {
         0: {
             'desc': 'Limit Not Exceeded',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Warning,
         },
         1: {
             'desc': 'Limit Exceeded',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     6: {
         0: {
             'desc': 'Performance Met',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Warning,
         },
         1: {
             'desc': 'Perfermance Lags',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     7: {
         0: {
             'desc': 'Ok',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Warning,
         },
         1: {
             'desc': 'Non-Critical',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
             'desc': 'Critical',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
             'desc': 'Non-recoverable',
             'severity': const.Health.Failed,
+            'deassertion_severity': const.Health.Ok,
         },
         4: {
             'desc': 'Non-Critical',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         5: {
             'desc': 'Critical',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         6: {
             'desc': 'Non-recoverable',
             'severity': const.Health.Failed,
+            'deassertion_severity': const.Health.Ok,
         },
         7: {
             'desc': 'Monitor',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         8: {
             'desc': 'Informational',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     8: {
         0: {
             'desc': 'Absent',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Present',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     9: {
         0: {
             'desc': 'Disabled',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Enabled',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     0xa: {
         0: {
             'desc': 'Running',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'In Test',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
             'desc': 'Power off',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
             'desc': 'Online',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         4: {
             'desc': 'Offline',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         5: {
             'desc': 'Off duty',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         6: {
             'desc': 'Degraded',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         7: {
             'desc': 'Power Save',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         8: {
             'desc': 'Install Error',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     0xb: {
         0: {
             'desc': 'Redundant',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Not Redundant',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
             'desc': 'Redundancy degraded',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
             'desc': 'Not Redundant',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         4: {
             'desc': 'Not Redundant',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         5: {
             'desc': 'Degraded',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         6: {
             'desc': 'Redundancy degraded',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         7: {
             'desc': 'Redundancy degraded',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     0xc: {
         0: {
             'desc': 'ACPI D0',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'ACPI D1',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
             'desc': 'ACPI D2',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
             'desc': 'ACPI D3',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
     },
 }
@@ -351,287 +409,393 @@ generic_type_offsets = {
 sensor_type_offsets = {
     # For the security sensors, we assume if armed,
     # the operator considers these to  be critical situations
+    # Even though many of these would never reasonably be 'deasserted', provide
+    # some language that hypothetically would make sense if it were ever
+    # observed
     5: {
         0: {
-            'desc': 'General Chassis Intrusion',
+            'desc': 'General',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Deasserted',
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
-            'desc': 'Drive Bay intrusion',
+            'desc': 'Drive Bay',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Drive Bay deasserted',
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
-            'desc': 'I/O Card area intrusion',
+            'desc': 'I/O card area',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'I/O card area deasserted',
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
-            'desc': 'Processor area intrusion',
+            'desc': 'Processor area',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Processor area deasserted',
+            'deassertion_severity': const.Health.Ok,
         },
         4: {
-            'desc': 'Lost LAN connection',
+            'desc': 'Lost LAN',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'LAN restored',
+            'deassertion_severity': const.Health.Ok,
         },
         5: {
             'desc': 'Unauthorized dock',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Unauthorized dock deasserted',
+            'deassertion_severity': const.Health.Ok,
         },
         6: {
-            'desc': 'Fan area intrusion',
+            'desc': 'Fan area',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Fan area deasserted',
+            'deassertion_severity': const.Health.Ok,
         },
     },
     6: {
         0: {
             'desc': 'Front Panel Lockout Violation attempt',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Front Panel Lockout deasserted',
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Pre-boot password violation - user',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
+            'deassertion_desc': 'Boot Password violation deasserted',
         },
         2: {
             'desc': 'Pre-boot password violation - setup',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Setup password violation deasserted',
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
             'desc': 'Pre-boot password violation - netboot',
             'severity': const.Health.Critical,
+            'deassertion_desc':
+                'Pre-boot password violation - netboot deasserted',
+            'deassertion_severity': const.Health.Ok,
         },
         4: {
             'desc': 'Pre-boot password violation',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Pre-boot password violation deasserted',
+            'deassertion_severity': const.Health.Ok,
         },
         5: {
             'desc': 'Out-of-band access password violation',
             'severity': const.Health.Critical,
+            'deassertion_desc':
+                'Out-of-band access password violation deasserted',
+            'deassertion_severity': const.Health.Ok,
         },
     },
     7: {
         0: {
-            'desc': 'Processor IERR',
+            'desc': 'Internal Error',
             'severity': const.Health.Failed,
+            'deassertion_desc': 'Internal Error Recovered',
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
-            'desc': 'Processor thermal trip',
+            'desc': 'Thermal trip',
             'severity': const.Health.Failed,
+            'deassertion_desc': 'Thermal trip recovered',
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
-            'desc': 'Processor FRB1/BIST failure',
+            'desc': 'Self test failure',
             'severity': const.Health.Failed,
+            'deassertion_desc': 'Self test recovered',
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
-            'desc': 'Processor FRB2/Hang in POST failure',
+            'desc': 'Hang in POST',
             'severity': const.Health.Failed,
+            'deassertion_desc': 'Hang in POST recovered',
+            'deassertion_severity': const.Health.Ok,
+
         },
         4: {
-            'desc': 'Processor FRB3/processor startup failure',
+            'desc': 'Startup failure',
             'severity': const.Health.Failed,
+            'deassertion_desc': 'Startup recovered',
+            'deassertion_severity': const.Health.Ok,
         },
         5: {
-            'desc': 'Processor configuration error',
+            'desc': 'Configuration error',
             'severity': const.Health.Failed,
+            'deassertion_desc': 'Configuration error recovered',
+            'deassertion_severity': const.Health.Ok,
         },
         6: {
             'desc': 'Uncorrectable cpu complex error',
             'severity': const.Health.Failed,
+            'deassertion_desc': 'Uncorrectable cpu complex error recovered',
+            'deassertion_severity': const.Health.Ok,
         },
         7: {
             'desc': 'Present',
             'severity': const.Health.Ok,
+            'deassertion_desc': 'Absent',
+            'deassertion_severity': const.Health.Ok,
         },
         8: {
             'desc': 'Disabled',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Enabled',
+            'deassertion_severity': const.Health.Ok,
         },
         9: {
-            'desc': 'Processor terminator presence detected',
+            'desc': 'Terminator presence detected',
             'severity': const.Health.Ok,
+            'deassertion_desc': 'Terminator absent',
+            'deassertion_severity': const.Health.Ok,
         },
         0xa: {
-            'desc': 'Processor throttled',
+            'desc': 'Throttled',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Unthrottled',
+            'deassertion_severity': const.Health.Ok,
         },
         0xb: {
             'desc': 'Uncorrectable machine check exception',
             'severity': const.Health.Failed,
+            'deassertion_desc': 'Uncorrectable machine check recovered',
+            'deassertion_severity': const.Health.Ok,
         },
         0xc: {
             'desc': 'Correctable machine check exception',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Correctable machine check recovered',
+            'deassertion_severity': const.Health.Ok,
         },
     },
     8: {  # power supply
         0: {
             'desc': 'Present',
             'severity': const.Health.Ok,
+            'deassertion_desc': 'Absent',
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
-            'desc': 'Power supply failure',
+            'desc': 'Failure',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Recovered',
+            'deassertion_severity': const.Health.Ok,
+
         },
         2: {
-            'desc': 'Power supply predictive failure',
+            'desc': 'Predictive failure',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Predictive failure recovered',
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
-            'desc': 'Power supply input lost',
+            'desc': 'Input lost',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Input restored',
+            'deassertion_severity': const.Health.Ok,
         },
         4: {
-            'desc': 'Power supply input out of range or lost',
+            'desc': 'Input out of range or lost',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Input in range',
+            'deassertion_severity': const.Health.Ok,
         },
         5: {
-            'desc': 'Power supply input out of range',
+            'desc': 'Input out of range',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Input in range',
+            'deassertion_severity': const.Health.Ok,
         },
         6: {
             # clarified by SEL/PET event data 3
-            'desc': 'Power supply configuration error',
+            'desc': 'Configuration error',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Configuration error recovered',
+            'deassertion_severity': const.Health.Ok,
         },
         7: {
             'desc': 'Standby',
             'severity': const.Health.Ok,
+            'deassertion_desc': 'Active',
+            'deassertion_severity': const.Health.Ok,
         },
     },
     9: {  # power unit
         0: {
             'desc': 'Power off',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Power cycle',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
             'desc': '240VA power down',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
             'desc': 'Interlock power down',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         4: {
             'desc': 'Power input lost',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         5: {
             'desc': 'Soft power control failure',
             'severity': const.Health.Failed,
+            'deassertion_severity': const.Health.Ok,
         },
         6: {
             'desc': 'Power unit failure',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         7: {
             'desc': 'power unit predictive failure',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     0xc: {  # memory
         0: {
-            'desc': 'Correctable memory error',
+            'desc': 'Correctable error',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
-            'desc': 'Uncorrectable memory error',
+            'desc': 'Uncorrectable error',
             'severity': const.Health.Failed,
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
-            'desc': 'Memory parity',
+            'desc': 'Parity',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
-            'desc': 'Memory scrub failed',
+            'desc': 'Scrub failed',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         4: {
-            'desc': 'Memory device disabled',
+            'desc': 'Device disabled',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         5: {
             'desc': 'Correctable memory error logging limit reached',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         6: {
             'desc': 'Present',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         7: {
-            'desc': 'memory configuration error',
+            'desc': 'Configuration error',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         8: {
-            'desc': 'spare memory',  # event data 3 available
+            'desc': 'Spare',  # event data 3 available
             'severity': const.Health.Ok,
         },
         9: {
-            'desc': 'memory throttled',
+            'desc': 'Throttled',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         0xa: {
-            'desc': 'critical memory overtemperature',
+            'desc': 'Critical overtemperature',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     0xd: {  # drive bay
         0: {
             'desc': 'Present',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Drive fault',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
             'desc': 'Predictive drive failure',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
             'desc': 'Hot spare drive',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         4: {
             'desc': 'Drive consitency check in progress',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         5: {
             'desc': 'Drive in critical array',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
         6: {
             'desc': 'Drive in failed array',
             'severity': const.Health.Failed,
+            'deassertion_severity': const.Health.Ok,
         },
         7: {
             'desc': 'Rebuild in progress',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
         8: {
             'desc': 'Rebuild aborted',
             'severity': const.Health.Critical,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     0xf: {
         0: {
-            'desc': 'System Firmware boot error',
+            'desc': 'Boot error',
             'severity': const.Health.Failed,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
-            'desc': 'System Firmware hang',
+            'desc': 'Hang',
             'severity': const.Health.Failed,
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
-            'desc': 'System Firmware Progress',
+            'desc': 'Progress',
             'severity': const.Health.Ok,
+            'deassertion_severity': const.Health.Ok,
         },
     },
     0x10: {  # event log disabled
         0: {
             'desc': 'Correctable Memory Error Logging Disabled',
             'severity': const.Health.Warning,
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Specific event logging disabled',
@@ -1048,84 +1212,117 @@ sensor_type_offsets = {
         0: {
             'desc': 'Present',
             'severity': const.Health.Ok,
+            'deassertion_desc': 'Absent',
         },
         1: {
             'desc': 'Absent',
             'severity': const.Health.Ok,
+            'deassertion_desc': 'Present'
         },
         2: {
             'desc': 'Disabled',
             'severity': const.Health.Ok,
+            'deassertion_desc': 'Enabled',
         },
     },
     0x27: {  # LAN heartbeat
         0: {
             'desc': 'Heartbeat lost',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Heartbeat recovered',
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Heartbeat',
             'severity': const.Health.Ok,
+            'deassertion_desc': 'Heartbeat lost',
+            'deassertion_severity': const.Health.Warning,
         },
     },
     0x28: {  # management subsystem health
         0: {
             'desc': 'Sensor access degraded or unavailable',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Sensor access restored',
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
             'desc': 'Controller access degraded or unavailable',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Controller access restored',
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
             'desc': 'Controller Offline',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Controller online',
+            'deassertion_health': const.Health.Ok,
         },
         3: {
             'desc': 'Controller Offline',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Controller online',
+            'deassertion_health': const.Health.Ok,
         },
         4: {
             'desc': 'Sensor Error',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Sensor recovered',
+            'deassertion_severity': const.Health.OK,
         },
         5: {
             'desc': 'FRU Failure',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'FRU recovered',
+            'deassertion_severity': const.Health.OK,
         },
     },
     0x29: {  # battery
         0: {
-            'desc': 'Battery Low',
+            'desc': 'Low',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Battery no longer low',
+            'deassertion_severity': const.Health.OK,
         },
         1: {
-            'desc': 'Battery Failed',
+            'desc': 'Failed',
             # Critical here because typical battery failure
             # does not indicate a 'failed' runtime
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Recovered',
+            'deassertion_severity': const.Health.Ok
         },
         2: {
-            'desc': 'Battery Present',
+            'desc': 'Present',
             'severity': const.Health.Ok,
+            'deassertion_desc': 'Absent',
+            'deassertion_severity': const.Health.Ok,
         },
     },
     0x2a: {  # session audit
         0: {
-            'desc': 'Session activated',
+            'desc': 'Activated',
             'severity': const.Health.Ok,
+            'deassertion_desc': 'Deactivated',
+            'deassertion_severity': const.Health.Ok,
         },
         1: {
-            'desc': 'Session deactivated',
+            'desc': 'Deactivated',
             'severity': const.Health.Ok,
+            'deassertion_desc': 'Activated',
+            'deassertion_severity': const.Health.Ok,
         },
         2: {
-            'desc': 'Invalid username or password',
+            'desc': 'Invalid username/password',
             'severity': const.Health.Warning,
+            'deassertion_desc': 'Valid username/password',
+            'deassertion_severity': const.Health.Ok,
         },
         3: {
             'desc': 'Account disabled due to failure count',
             'severity': const.Health.Critical,
+            'deassertion_desc': 'Account reenabled',
+            'deassertion_severity': const.Health.Ok,
         },
     },
     0x2b: {  # Version Change
