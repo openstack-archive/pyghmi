@@ -376,11 +376,11 @@ class EventHandler(object):
             raise pygexc.PyghmiException(
                 'Unrecognized Event message version {0}'.format(eventdata[2]))
         sensor_type = eventdata[3]
-        event['entity_id'] = eventdata[4]
+        event['component_id'] = eventdata[4]
         try:
-            event['entity'] = self._sdr.sensors[eventdata[4]].name
+            event['component'] = self._sdr.sensors[eventdata[4]].name
         except KeyError:
-            event['entity'] = 'Sensor {0}'.format(eventdata[4])
+            event['component'] = 'Sensor {0}'.format(eventdata[4])
         event['deassertion'] = (eventdata[5] & 0b10000000 == 0b10000000)
         event_data = eventdata[6:]
         event_type = eventdata[5] & 0b1111111
@@ -390,19 +390,19 @@ class EventHandler(object):
             event['triggered_value'] = event_data[1]
         evtoffset = event_data[0] & 0b1111
         if event_type <= 0xc:
-            event['entity_type_id'] = sensor_type
-            event['event_type_id'] = '{0}:{1}'.format(event_type, evtoffset)
+            event['component_type_id'] = sensor_type
+            event['event_id'] = '{0}.{1}'.format(event_type, evtoffset)
             # use generic offset decode for event description
-            event['entity_type'] = ipmiconst.sensor_type_codes.get(
+            event['component_type'] = ipmiconst.sensor_type_codes.get(
                 sensor_type, '')
             evreading = ipmiconst.generic_type_offsets.get(
                 event_type, {}).get(evtoffset, {})
             event['event'] = evreading.get('desc', '')
             event['severity'] = evreading.get('severity', pygconst.Health.Ok)
         elif event_type == 0x6f:
-            event['entity_type_id'] = sensor_type
-            event['event_type_id'] = '{0}:{1}'.format(event_type, evtoffset)
-            event['entity_type'] = ipmiconst.sensor_type_codes.get(
+            event['component_type_id'] = sensor_type
+            event['event_id'] = '{0}.{1}'.format(event_type, evtoffset)
+            event['component_type'] = ipmiconst.sensor_type_codes.get(
                 sensor_type, '')
             evreading = ipmiconst.sensor_type_offsets.get(
                 sensor_type, {}).get(evtoffset, {})
