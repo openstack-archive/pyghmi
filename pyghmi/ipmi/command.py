@@ -421,7 +421,8 @@ class Command(object):
 
         :param clear:  Whether to remove the SEL entries from the target BMC
         """
-        return sel.EventHandler(self.init_sdr()).fetch_sel(self, clear)
+        self.oem_init()
+        return sel.EventHandler(self.init_sdr(), self).fetch_sel(self, clear)
 
     def get_inventory_descriptions(self):
         """Retrieve list of things that could be inventoried

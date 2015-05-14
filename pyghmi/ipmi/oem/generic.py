@@ -27,6 +27,20 @@ class OEMHandler(object):
     def __init__(self, oemid, ipmicmd):
         pass
 
+    def process_event(self, event):
+        """Modify an event according with OEM understanding.
+
+        Given an event, allow an OEM module to augment it.  For example,
+        event data fields can have OEM bytes.  Other times an OEM may wish
+        to apply some transform to some field to suit their conventions.
+        """
+        event['oem_handler'] = None
+        evdata = event['event_data_bytes']
+        if evdata[0] & 0b11000000 == 0b10000000:
+            event['oem_byte2'] = evdata[1]
+        if evdata[0] & 0b110000 == 0b100000:
+            event['oem_byte3'] = evdata[2]
+
     def process_fru(self, fru):
         """Modify a fru entry with OEM understanding.
 
