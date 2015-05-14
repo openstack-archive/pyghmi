@@ -25,6 +25,15 @@ class OEMHandler(generic.OEMHandler):
         # variations.  For example System X versus Thinkserver
         self.oemid = oemid
 
+    def process_event(self, event):
+        evdata = event['event_data_bytes']
+        # For HDD bay events, the event data 2 is the bay, modify
+        # the description to be more specific
+        if (event['event_type_byte'] == 0x6f and
+                (evdata[0] & 0b11000000) == 0b10000000 and
+                event['component_type_id'] == 13):
+            event['component'] += ' {0}'.format(evdata[1])
+
     def process_fru(self, fru):
         if fru is None:
             return fru

@@ -367,8 +367,9 @@ class EventHandler(object):
 
     :param sdr: An SDR object (per pyghmi.ipmi.sdr) matching the target BMC SDR
     """
-    def __init__(self, sdr):
+    def __init__(self, sdr, ipmicmd):
         self._sdr = sdr
+        self._ipmicmd = ipmicmd
 
     def _decode_standard_event(self, eventdata, event):
         # Ignore the generator id for now..
@@ -386,12 +387,14 @@ class EventHandler(object):
                 event['component'] = 'Sensor {0}'.format(eventdata[4])
         event['deassertion'] = (eventdata[5] & 0b10000000 == 0b10000000)
         event_data = eventdata[6:]
+        event['event_data_bytes'] = event_data
         event_type = eventdata[5] & 0b1111111
         byte2type = (event_data[0] & 0b11000000) >> 6
         byte3type = (event_data[0] & 0b110000) >> 4
         if byte2type == 1:
             event['triggered_value'] = event_data[1]
         evtoffset = event_data[0] & 0b1111
+        event['event_type_byte'] = event_type
         if event_type <= 0xc:
             event['component_type_id'] = sensor_type
             event['event_id'] = '{0}.{1}'.format(event_type, evtoffset)
@@ -449,6 +452,9 @@ class EventHandler(object):
             # In this class of OEM message, all bytes are OEM, interpretation
             # is wholly left up to the OEM layer, using the OEM ID of the BMC
             event['oemdata'] = selentry[3:]
+        self._ipmicmd._oem.process_event(event)
+        del event['event_type_byte']
+        del event['event_data_bytes']
         return event
 
     def _fetch_entries(self, ipmicmd, startat, targetlist, rsvid=0):
