@@ -42,16 +42,19 @@ class OEMHandler(generic.OEMHandler):
                 fru['MAC Address 1'] = mac1
             if mac2 not in ('00:00:00:00:00:00', ''):
                 fru['MAC Address 2'] = mac2
+            try:
             # The product_extra field is UUID as the system would present
             # in DMI.  This is different than the two UUIDs that
             # it returns for get device and get system uuid...
-            byteguid = fru['product_extra'][0]
+                byteguid = fru['product_extra'][0]
             # It can present itself as claiming to be ASCII when it
             # is actually raw hex.  As a result it triggers the mechanism
             # to strip \x00 from the end of text strings.  Work around this
             # by padding with \x00 to the right if the string is not 16 long
-            byteguid.extend('\x00' * (16 - len(byteguid)))
-            fru['UUID'] = util.decode_wireformat_uuid(byteguid)
+                byteguid.extend('\x00' * (16 - len(byteguid)))
+                fru['UUID'] = util.decode_wireformat_uuid(byteguid)
+            except (AttributeError, KeyError):
+                pass
             return fru
         else:
             fru['oem_parser'] = None
