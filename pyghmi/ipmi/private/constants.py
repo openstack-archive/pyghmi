@@ -405,7 +405,7 @@ generic_type_offsets = {
         },
         3: {
             'desc': 'Not redundant',  # down to non redundant
-            'severity': const.Health.Warning,
+            'severity': const.Health.Ok,
             'deassertion_desc': 'Redundancy restored',
             'deassertion_severity': const.Health.Ok,
         },
