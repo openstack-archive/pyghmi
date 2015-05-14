@@ -380,7 +380,10 @@ class EventHandler(object):
         try:
             event['component'] = self._sdr.sensors[eventdata[4]].name
         except KeyError:
-            event['component'] = 'Sensor {0}'.format(eventdata[4])
+            if eventdata[4] == 0:
+                event['component'] = 'Unspecified'
+            else:
+                event['component'] = 'Sensor {0}'.format(eventdata[4])
         event['deassertion'] = (eventdata[5] & 0b10000000 == 0b10000000)
         event_data = eventdata[6:]
         event_type = eventdata[5] & 0b1111111
@@ -397,8 +400,14 @@ class EventHandler(object):
                 sensor_type, '')
             evreading = ipmiconst.generic_type_offsets.get(
                 event_type, {}).get(evtoffset, {})
-            event['event'] = evreading.get('desc', '')
-            event['severity'] = evreading.get('severity', pygconst.Health.Ok)
+            if event['deassertion']:
+                event['event'] = evreading.get('deassertion_desc', '')
+                event['severity'] = evreading.get(
+                    'deassertion_severity', pygconst.Health.Ok)
+            else:
+                event['event'] = evreading.get('desc', '')
+                event['severity'] = evreading.get(
+                    'severity', pygconst.Health.Ok)
         elif event_type == 0x6f:
             event['component_type_id'] = sensor_type
             event['event_id'] = '{0}.{1}'.format(event_type, evtoffset)
@@ -406,8 +415,14 @@ class EventHandler(object):
                 sensor_type, '')
             evreading = ipmiconst.sensor_type_offsets.get(
                 sensor_type, {}).get(evtoffset, {})
-            event['event'] = evreading.get('desc', '')
-            event['severity'] = evreading.get('severity', pygconst.Health.Ok)
+            if event['deassertion']:
+                event['event'] = evreading.get('deassertion_desc', '')
+                event['severity'] = evreading.get(
+                    'deassertion_severity', pygconst.Health.Ok)
+            else:
+                event['event'] = evreading.get('desc', '')
+                event['severity'] = evreading.get(
+                    'severity', pygconst.Health.Ok)
         if event_type == 1:  # threshold
             if byte3type == 1:
                 event['threshold_value'] = event_data[2]
