@@ -32,7 +32,7 @@ class OEMHandler(generic.OEMHandler):
         if (event['event_type_byte'] == 0x6f and
                 (evdata[0] & 0b11000000) == 0b10000000 and
                 event['component_type_id'] == 13):
-            event['component'] += ' {0}'.format(evdata[1])
+            event['component'] += ' {0}'.format(evdata[1] & 0b11111)
 
     def process_fru(self, fru):
         if fru is None:
