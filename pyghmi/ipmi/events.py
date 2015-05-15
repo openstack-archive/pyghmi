@@ -382,7 +382,7 @@ class EventHandler(object):
             event['component'] = self._sdr.sensors[eventdata[4]].name
         except KeyError:
             if eventdata[4] == 0:
-                event['component'] = 'Unspecified'
+                event['component'] = None
             else:
                 event['component'] = 'Sensor {0}'.format(eventdata[4])
         event['deassertion'] = (eventdata[5] & 0b10000000 == 0b10000000)
