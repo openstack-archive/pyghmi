@@ -442,7 +442,8 @@ class EventHandler(object):
         event = {}
         if selentry[2] == 2 or (0xc0 <= selentry[2] <= 0xdf):
             # Either standard, or at least the timestamp is standard
-            event['timecode'] = struct.unpack_from('<I', selentry[3:7])[0]
+            event['timecode'] = struct.unpack_from('<I', buffer(selentry[3:7])
+                                                   )[0]
         if selentry[2] == 2:  # ipmi defined standard format
             self._decode_standard_event(selentry[7:], event)
         elif 0xc0 <= selentry[2] <= 0xdf:
@@ -469,7 +470,7 @@ class EventHandler(object):
             except pygexc.IpmiException as pi:
                 if pi.ipmicode == 203:
                     break
-            curr = struct.unpack_from('<H', rsp['data'][:2])[0]
+            curr = struct.unpack_from('<H', buffer(rsp['data'][:2]))[0]
             targetlist.append(self._sel_decode(rsp['data'][2:]))
         return endat
 
