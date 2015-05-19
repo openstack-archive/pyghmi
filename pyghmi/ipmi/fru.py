@@ -132,8 +132,9 @@ class FRU(object):
             try:
                 self.fetch_fru(fruid)
             except iexc.IpmiException as ie:
-                if ie.ipmicode == 203:
+                if ie.ipmicode in (203, 129):
                     return
+                raise
             self.parsedata()
         else:
             raise TypeError('Either rawdata or ipmicmd must be specified')

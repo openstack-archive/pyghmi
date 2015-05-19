@@ -26,6 +26,9 @@ class OEMHandler(generic.OEMHandler):
         self.oemid = oemid
 
     def process_event(self, event):
+        if 'oemdata' in event:
+            event['event'] = 'OEM event: {0}'.format(repr(event['oemdata']))
+            return
         evdata = event['event_data_bytes']
         # For HDD bay events, the event data 2 is the bay, modify
         # the description to be more specific
