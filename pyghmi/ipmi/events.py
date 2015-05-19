@@ -454,8 +454,10 @@ class EventHandler(object):
             # is wholly left up to the OEM layer, using the OEM ID of the BMC
             event['oemdata'] = selentry[3:]
         self._ipmicmd._oem.process_event(event)
-        del event['event_type_byte']
-        del event['event_data_bytes']
+        if 'event_type_byte' in event:
+            del event['event_type_byte']
+        if 'event_data_bytes' in event:
+            del event['event_data_bytes']
         return event
 
     def _fetch_entries(self, ipmicmd, startat, targetlist, rsvid=0):
