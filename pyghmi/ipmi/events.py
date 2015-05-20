@@ -453,7 +453,7 @@ class EventHandler(object):
             # In this class of OEM message, all bytes are OEM, interpretation
             # is wholly left up to the OEM layer, using the OEM ID of the BMC
             event['oemdata'] = selentry[3:]
-        self._ipmicmd._oem.process_event(event)
+        self._ipmicmd._oem.process_event(event, self._ipmicmd, selentry)
         if 'event_type_byte' in event:
             del event['event_type_byte']
         if 'event_data_bytes' in event:

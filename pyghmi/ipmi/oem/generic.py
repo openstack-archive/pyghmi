@@ -27,7 +27,7 @@ class OEMHandler(object):
     def __init__(self, oemid, ipmicmd):
         pass
 
-    def process_event(self, event):
+    def process_event(self, event, ipmicmd, seldata):
         """Modify an event according with OEM understanding.
 
         Given an event, allow an OEM module to augment it.  For example,
