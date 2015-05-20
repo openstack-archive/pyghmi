@@ -303,11 +303,11 @@ def _fix_sel_time(records, ipmicmd):
         record = records[index]
         if 'timecode' not in record or record['timecode'] == 0xffffffff:
             continue
-        if (record['event'] == 'Clock time change' and
+        if ('event' in record and record['event'] == 'Clock time change' and
                 record['event_data'] == 'After'):
             newtimestamp = record['timecode']
             trimindexes.append(index)
-        elif (record['event'] == 'Clock time change' and
+        elif ('event' in record and record['event'] == 'Clock time change' and
                 record['event_data'] == 'Before'):
             if newtimestamp:
                 if record['timecode'] < 0x20000000:
@@ -453,7 +453,7 @@ class EventHandler(object):
             # In this class of OEM message, all bytes are OEM, interpretation
             # is wholly left up to the OEM layer, using the OEM ID of the BMC
             event['oemdata'] = selentry[3:]
-        self._ipmicmd._oem.process_event(event)
+        self._ipmicmd._oem.process_event(event, self._ipmicmd, selentry)
         if 'event_type_byte' in event:
             del event['event_type_byte']
         if 'event_data_bytes' in event:
