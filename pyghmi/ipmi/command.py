@@ -93,6 +93,7 @@ class Command(object):
         self.bmc = bmc
         self._sdr = None
         self._oem = None
+        self._currchannel = None
         if onlogon is not None:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,
@@ -556,7 +557,41 @@ class Command(object):
             yield {'name': self._sdr.sensors[sensor].name,
                    'type': self._sdr.sensors[sensor].sensor_type}
 
-    def set_channel_access(self, channel=14, access_update_mode='non_volatile',
+    def get_current_channel(self):
+        if self._currchannel is None:
+            rsp = self.xraw_command(netfn=6, command=0x42, data=(0xe,))
+            self._currchannel = struct.unpack('B', rsp['data'][0])[0] & 0b1111
+        return self._currchannel
+
+    def get_alert_destination_count(self, channel=None):
+        if channel is None:
+            channel = self.get_current_channel()
+        rqdata = (channel, 0x11, 0, 0)
+        rsp = self.xraw_command(netfn=0xc, command=2, data=rqdata)
+        return struct.unpack('B', rsp['data'][1])[0]
+
+    def get_alert_destination(self, destination=0, channel=None):
+        destinfo = {}
+        if channel is None:
+            channel = self.get_current_channel()
+        rqdata = (channel, 18, destination, 0)
+        rsp = self.xraw_command(netfn=0xc, command=2, data=rqdata)
+        dtype, acktimeout, retries = struct.unpack('BBB', rsp['data'][2:])
+        destinfo['acknowledge_required'] = dtype & 0b10000000 == 0b10000000
+        # Ignore destination type for now...
+        if destinfo['acknowledge_required']:
+            destinfo['acknowledgement_timeout'] = acktimeout
+        destinfo['retries'] = retries
+        rqdata = (channel, 19, destination, 0)
+        rsp = self.xraw_command(netfn=0xc, command=2, data=rqdata)
+        if ord(rsp['data'][2]) & 0b11110000 == 0:
+            destinfo['addrformat'] = 'ipv4'
+        destinfo['address'] = '{0}.{1}.{2}.{3}'.format(*(struct.unpack(
+            '4B', rsp['data'][4:8])))
+        return destinfo
+
+    def set_channel_access(self, channel=None,
+                           access_update_mode='non_volatile',
                            alerting=False, per_msg_auth=False,
                            user_level_auth=False, access_mode='always',
                            privilege_update_mode='non_volatile',
@@ -618,6 +653,8 @@ class Command(object):
             * administrator
             * proprietary   = used by OEM
         """
+        if channel is None:
+            channel = self.get_current_channel()
         data = []
         data.append(channel & 0b00001111)
         access_update_modes = {
@@ -666,7 +703,7 @@ class Command(object):
             raise Exception(response['error'])
         return True
 
-    def get_channel_access(self, channel=14, read_mode='volatile'):
+    def get_channel_access(self, channel=None, read_mode='volatile'):
         """Get channel access
 
         :param channel: number [1:7]
@@ -694,6 +731,8 @@ class Command(object):
               }
            }
         """
+        if channel is None:
+            channel = self.get_current_channel()
         data = []
         data.append(channel & 0b00001111)
         b = 0
@@ -735,7 +774,7 @@ class Command(object):
         r['privilege_level'] = privilege_levels[data[1] & 0b00001111]
         return r
 
-    def get_channel_info(self, channel=14):
+    def get_channel_info(self, channel=None):
         """Get channel info
 
         :param channel: number [1:7]
@@ -749,6 +788,8 @@ class Command(object):
                 single- and multi-session operation, as can occur with a
                 serial/modem channel that supports connection mode auto-detect)
         """
+        if channel is None:
+            channel = self.get_current_channel()
         data = []
         data.append(channel & 0b00001111)
         response = self.raw_command(netfn=0x06, command=0x42, data=data)
@@ -794,8 +835,8 @@ class Command(object):
         r['Auxiliary Channel Info'] = [data[7], data[8]]
         return r
 
-    def set_user_access(self, uid, channel=14, callback=False, link_auth=True,
-                        ipmi_msg=True, privilege_level='user'):
+    def set_user_access(self, uid, channel=None, callback=False,
+                        link_auth=True, ipmi_msg=True, privilege_level='user'):
         """Set user access
 
         :param uid: user number [1:16]
@@ -841,6 +882,8 @@ class Command(object):
             * proprietary
             * no_access
         """
+        if channel is None:
+            channel = self.get_current_channel()
         b = 0b10000000
         if callback:
             b |= 0b01000000
@@ -865,7 +908,7 @@ class Command(object):
             raise Exception(response['error'])
         return True
 
-    def get_user_access(self, uid, channel=14):
+    def get_user_access(self, uid, channel=None):
         """Get user access
 
         :param uid: user number [1:16]
@@ -885,6 +928,8 @@ class Command(object):
                               operatorm administrator, proprietary, no_access]
         """
         ## user access available during call-in or callback direct connection
+        if channel is None:
+            channel = self.get_current_channel()
         data = [channel, uid]
         response = self.raw_command(netfn=0x06, command=0x44, data=data)
         if 'error' in response:
@@ -990,16 +1035,18 @@ class Command(object):
             raise Exception(response['error'])
         return True
 
-    def get_channel_max_user_count(self, channel=14):
+    def get_channel_max_user_count(self, channel=None):
         """Get max users in channel (helper)
 
         :param channel: number [1:7]
         :return: int -- often 16
         """
+        if channel is None:
+            channel = self.get_current_channel()
         access = self.get_user_access(channel=channel, uid=1)
         return access['channel_info']['max_user_count']
 
-    def get_user(self, uid, channel=14):
+    def get_user(self, uid, channel=None):
         """Get user (helper)
 
         :param uid: user number [1:16]
@@ -1016,19 +1063,23 @@ class Command(object):
                 privilege_level: (str)[callback, user, operatorm administrator,
                                        proprietary, no_access]
         """
+        if channel is None:
+            channel = self.get_current_channel()
         name = self.get_user_name(uid)
         access = self.get_user_access(uid, channel)
         data = {'name': name, 'uid': uid, 'channel': channel,
                 'access': access['access']}
         return data
 
-    def get_name_uids(self, name, channel=14):
+    def get_name_uids(self, name, channel=None):
         """get list of users (helper)
 
         :param channel: number [1:7]
 
         :return: list of users
         """
+        if channel is None:
+            channel = self.get_current_channel()
         uid_list = []
         max_ids = self.get_channel_max_user_count(channel)
         for uid in range(1, max_ids):
@@ -1036,7 +1087,7 @@ class Command(object):
                 uid_list.append(uid)
         return uid_list
 
-    def get_users(self, channel=14):
+    def get_users(self, channel=None):
         """get list of users and channel access information (helper)
 
         :param channel: number [1:7]
@@ -1052,6 +1103,8 @@ class Command(object):
                 privilege_level: (str)[callback, user, operatorm administrator,
                                        proprietary, no_access]
         """
+        if channel is None:
+            channel = self.get_current_channel()
         names = {}
         max_ids = self.get_channel_max_user_count(channel)
         for uid in range(1, max_ids):
@@ -1060,7 +1113,7 @@ class Command(object):
                 names[uid] = self.get_user(uid=uid, channel=channel)
         return names
 
-    def create_user(self, uid, name, password, channel=14, callback=False,
+    def create_user(self, uid, name, password, channel=None, callback=False,
                     link_auth=True, ipmi_msg=True,
                     privilege_level='user'):
         """create/ensure a user is created with provided settings (helper)
@@ -1077,6 +1130,8 @@ class Command(object):
         """
         # current user might be trying to update.. dont disable
         # set_user_password(uid, password, mode='disable')
+        if channel is None:
+            channel = self.get_current_channel()
         self.set_user_name(uid, name)
         self.set_user_access(uid, channel, callback=callback,
                              link_auth=link_auth, ipmi_msg=ipmi_msg,
@@ -1085,12 +1140,14 @@ class Command(object):
         self.set_user_password(uid, mode='enable', password=password)
         return True
 
-    def user_delete(self, uid, channel=14):
+    def user_delete(self, uid, channel=None):
         """Delete user (helper)
 
         :param uid: user number [1:16]
         :param channel: number [1:7]
         """
+        if channel is None:
+            channel = self.get_current_channel()
         self.set_user_password(uid, mode='disable', password=None)
         self.set_user_name(uid, '')
         # TODO(steveweber) perhaps should set user access on all channels
