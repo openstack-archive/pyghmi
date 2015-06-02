@@ -439,6 +439,9 @@ class Command(object):
             self._sdr = sdr.SDR(self)
         for fruid in self._sdr.fru:
             yield self._sdr.fru[fruid].fru_name
+        self.oem_init()
+        for compname in self._oem.get_oem_inventory_descriptions():
+            yield compname
 
     def get_inventory_of_component(self, component):
         """Retrieve inventory of a component

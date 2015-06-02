@@ -143,6 +143,13 @@ class OEMHandler(generic.OEMHandler):
                 event['component_type_id'] == 13):
             event['component'] += ' {0}'.format(evdata[1] & 0b11111)
 
+    def get_oem_inventory_descriptions(self):
+        if (self.oemid['manufacturer_id'] == 19046 and
+            self.oemid['device_id'] == 32):
+            # Thinkserver with TSM
+
+
+
     def process_fru(self, fru):
         if fru is None:
             return fru
