@@ -41,6 +41,35 @@ class OEMHandler(object):
         if evdata[0] & 0b110000 == 0b100000:
             event['oem_byte3'] = evdata[2]
 
+    def get_oem_inventory_descriptions(self):
+        """Get descriptions of available additional inventory items
+
+        OEM implementation may provide additional records not indicated
+        by FRU locator SDR records.  An implementation is expected to
+        implement this function to list component names that would map to
+        OEM behavior beyond the specification.  It should return an iterable
+        of names
+        """
+        return ()
+
+    def get_oem_inventory(self):
+        """Get tuples of component names and inventory data.
+
+        This returns an iterable of tuples.  The first member of each tuple
+        is a string description of the inventory item.  The second member
+        is a dict of inventory information about the component.
+        """
+        for desc in self.get_oem_inventory_descriptions():
+            yield (desc, self.get_inventory_of_component(desc))
+
+    def get_inventory_of_component(self, component):
+        """Get inventory detail of an OEM defined component
+
+        Given a string that may be an OEM component, return the detail of that
+        component.  If the component does not exist, returns None
+        """
+        return None
+
     def process_fru(self, fru):
         """Modify a fru entry with OEM understanding.
 
