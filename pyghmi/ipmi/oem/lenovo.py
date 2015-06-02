@@ -17,7 +17,9 @@
 import pyghmi.constants as pygconst
 import pyghmi.ipmi.oem.generic as generic
 import pyghmi.ipmi.private.constants as ipmiconst
+import pyghmi.ipmi.private.spd as spd
 import pyghmi.ipmi.private.util as util
+import struct
 
 firmware_types = {
     1: 'Management Controller',
@@ -67,6 +69,8 @@ class OEMHandler(generic.OEMHandler):
         # will need to retain data to differentiate
         # variations.  For example System X versus Thinkserver
         self.oemid = oemid
+        self.ipmicmd = ipmicmd
+        self.oem_inventory_info = None
 
     def process_event(self, event, ipmicmd, seldata):
         if 'oemdata' in event:
@@ -142,6 +146,72 @@ class OEMHandler(generic.OEMHandler):
                 (evdata[0] & 0b11000000) == 0b10000000 and
                 event['component_type_id'] == 13):
             event['component'] += ' {0}'.format(evdata[1] & 0b11111)
+
+    def get_oem_inventory_descriptions(self):
+        if (self.oemid['manufacturer_id'] == 19046 and
+                self.oemid['device_id'] == 32):
+            # Thinkserver with TSM
+            if not self.oem_inventory_info:
+                self._collect_oem_inventory()
+            return iter(self.oem_inventory_info)
+
+    def _collect_oem_inventory(self):
+        # Collect CPU inventory
+        self.oem_inventory_info = {}
+        rsp = self.ipmicmd.xraw_command(netfn=6, command=0x59,
+                                        data=(0, 0xc1, 1, 0))
+        compcount = ord(rsp['data'][1])
+        for cpu in xrange(0, compcount):
+            offset = 2 + (85 * cpu)
+            keytext = 'CPU {0}'.format(ord(rsp['data'][offset]))
+            self.oem_inventory_info[keytext] = {}
+            if rsp['data'][offset + 1] == '\x00':
+                self.oem_inventory_info[keytext] = None
+                continue
+            self.oem_inventory_info[keytext]['Cores'] = ord(
+                rsp['data'][offset + 1])
+            self.oem_inventory_info[keytext]['Threads'] = ord(
+                rsp['data'][offset + 2])
+            self.oem_inventory_info[keytext]['Manufacturer'] = \
+                rsp['data'][offset + 3:offset + 16].rstrip('\x00')
+            self.oem_inventory_info[keytext]['Family'] = \
+                rsp['data'][offset + 16: offset + 46].rstrip('\x00')
+            self.oem_inventory_info[keytext]['Model'] = \
+                rsp['data'][offset + 46: offset + 76].rstrip('\x00')
+            self.oem_inventory_info[keytext]['Stepping'] = \
+                rsp['data'][offset + 76: offset + 79].rstrip('\x00')
+            self.oem_inventory_info[keytext]['Maximum frequency'] = \
+                '{0:.1f} GHz'.format(
+                    struct.unpack(
+                        '<I', rsp['data'][
+                            offset + 79: offset + 83])[0] / 1000.0)
+        # Collect memory inventory
+        rsp = self.ipmicmd.xraw_command(netfn=6, command=0x59,
+                                        data=(0, 0xc1, 2, 0))
+        compcount = ord(rsp['data'][1])
+        for dimm in xrange(0, compcount):
+            offset = 2 + (dimm * 84)
+            keytext = 'DIMM {0}'.format(ord(rsp['data'][offset]))
+            if rsp['data'][offset + 1] == '\x00':
+                self.oem_inventory_info[keytext] = None
+                continue
+            self.oem_inventory_info[keytext] = {}
+            self.oem_inventory_info[keytext]['module_type'] = \
+                rsp['data'][offset + 3: offset + 13].rstrip('\x00')
+            self.oem_inventory_info[keytext]['voltage'] = \
+                rsp['data'][offset + 13: offset + 23].rstrip('\x00')
+            clock = struct.unpack(
+                '<H', rsp['data'][offset + 23:offset + 25])[0]
+            self.oem_inventory_info[keytext]['speed'] = spd.speed_by_clock.get(
+                clock, 'Unknown')
+            self.oem_inventory_info[keytext]['capacity_mb'] = struct.unpack(
+                '<H', rsp['data'][offset + 25:offset + 27])[0] * 1024
+            self.oem_inventory_info[keytext]['manufacturer'] = \
+                rsp['data'][offset + 27:offset + 57].rstrip('\x00')
+            self.oem_inventory_info[keytext]['serial'] = \
+                rsp['data'][offset + 57:offset + 61].rstrip('\x00')
+            self.oem_inventory_info[keytext]['model'] = \
+                rsp['data'][offset + 61:offset + 82].rstrip('\x00')
 
     def process_fru(self, fru):
         if fru is None:
