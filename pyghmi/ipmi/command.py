@@ -439,6 +439,9 @@ class Command(object):
             self._sdr = sdr.SDR(self)
         for fruid in self._sdr.fru:
             yield self._sdr.fru[fruid].fru_name
+        self.oem_init()
+        for compname in self._oem.get_oem_inventory_descriptions():
+            yield compname
 
     def get_inventory_of_component(self, component):
         """Retrieve inventory of a component
@@ -455,6 +458,7 @@ class Command(object):
             if self._sdr.fru[fruid].fru_name == component:
                 return self._oem.process_fru(fru.FRU(
                     ipmicmd=self, fruid=fruid, sdr=self._sdr.fru[fruid]).info)
+        return self._oem.get_inventory_of_component(component)
 
     def _get_zero_fru(self):
         # It is expected that a manufacturer matches SMBIOS to IPMI
@@ -493,6 +497,8 @@ class Command(object):
             if fruinf is not None:
                 fruinf = self._oem.process_fru(fruinf)
             yield (self._sdr.fru[fruid].fru_name, fruinf)
+        for componentpair in self._oem.get_oem_inventory():
+            yield componentpair
 
     def get_health(self):
         """Summarize health of managed system
