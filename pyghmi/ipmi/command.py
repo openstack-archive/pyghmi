@@ -668,6 +668,38 @@ class Command(object):
         self.set_alert_destination(
             '0.0.0.0', False, 0, 0, destination, channel)
 
+    def set_alert_community(self, community, channel=None):
+        """Set the community string for alerts
+
+        This configures the string the BMC will use as the community string
+        for PET alerts/traps.
+
+        :param community: The community string
+        :param channel: The LAN channel (defaults to auto detect)
+        """
+        if channel is None:
+            channel = self.get_network_channel()
+        community = community.encode('utf-8')
+        community += b'\x00' * (18 - len(community))
+        cmddata = bytearray((channel, 16))
+        cmddata += community
+        self.xraw_command(netfn=0xc, command=1, data=cmddata)
+
+    def get_alert_community(self, channel=None):
+        """Get the current community string for alerts
+
+        Returns the community string that will be in SNMP traps from this
+        BMC
+
+        :param channel: The channel to get configuration for, autodetect by
+                        default
+        :returns: The community string
+        """
+        if channel is None:
+            channel = self.get_network_channel()
+        rsp = self.xraw_command(netfn=0xc, command=2, data=(channel, 16, 0, 0))
+        return rsp['data'][1:].partition('\x00')[0]
+
     def set_alert_destination(self, ip=None, acknowledge_required=None,
                               acknowledge_timeout=None, retries=None,
                               destination=0, channel=None):
