@@ -55,6 +55,7 @@ iosockets = []  # set of iosockets that will be shared amongst Session objects
 MAX_BMCS_PER_SOCKET = 64  # no more than this many BMCs will share a socket
                          # this could be adjusted based on rmem_max
                          # value, leading to fewer filehandles
+ipv4only = False
 
 
 def define_worker():
@@ -300,9 +301,15 @@ class Session(object):
             cls.socketpool[sorted_candidates[0][0]] += 1
             return sorted_candidates[0][0]
         # we need a new socket
-        tmpsocket = _io_apply(socket.socket,
-                              (socket.AF_INET6, socket.SOCK_DGRAM))  # INET6
+        if not ipv4only:
+            tmpsocket = _io_apply(socket.socket,
+                                  (socket.AF_INET6, socket.SOCK_DGRAM))  # INET6
                                     # can do IPv4 if you are nice to it
+            if tmpsocket is None:
+                ipv4only = True
+        if ipv4only:
+            tmpsocket = _io_apply(socket.socket,
+                                  (socket.AF_INET4, socket.SOCK_DGRAM))  # INET6
         tmpsocket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         if server is None:
             cls.socketpool[tmpsocket] = 1
@@ -328,9 +335,11 @@ class Session(object):
         trueself = None
         for res in socket.getaddrinfo(bmc, port, 0, socket.SOCK_DGRAM):
             sockaddr = res[4]
-            if res[0] == socket.AF_INET:  # convert the sockaddr to AF_INET6
+            if not ipv4only and res[0] == socket.AF_INET:  # convert the sockaddr to AF_INET6
                 newhost = '::ffff:' + sockaddr[0]
                 sockaddr = (newhost, sockaddr[1], 0, 0)
+            elif ipv4only and res[0] == socket.AF_INET6:
+                continue
             if sockaddr in cls.bmc_handlers:
                 self = cls.bmc_handlers[sockaddr]
                 if (self.bmc == bmc and self.userid == userid and
