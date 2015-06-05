@@ -371,24 +371,18 @@ class EventHandler(object):
         self._sdr = sdr
         self._ipmicmd = ipmicmd
 
-    def _decode_standard_event(self, eventdata, event):
-        # Ignore the generator id for now..
-        if eventdata[2] != 4:
-            raise pygexc.PyghmiException(
-                'Unrecognized Event message version {0}'.format(eventdata[2]))
-        sensor_type = eventdata[3]
-        event['component_id'] = eventdata[4]
+    def _populate_event(self, deassertion, event, event_data, event_type,
+                        sensor_type, sensorid):
+        event['component_id'] = sensorid
         try:
-            event['component'] = self._sdr.sensors[eventdata[4]].name
+            event['component'] = self._sdr.sensors[sensorid].name
         except KeyError:
-            if eventdata[4] == 0:
+            if sensorid == 0:
                 event['component'] = None
             else:
-                event['component'] = 'Sensor {0}'.format(eventdata[4])
-        event['deassertion'] = (eventdata[5] & 0b10000000 == 0b10000000)
-        event_data = eventdata[6:]
+                event['component'] = 'Sensor {0}'.format(sensorid)
+        event['deassertion'] = deassertion
         event['event_data_bytes'] = event_data
-        event_type = eventdata[5] & 0b1111111
         byte2type = (event_data[0] & 0b11000000) >> 6
         byte3type = (event_data[0] & 0b110000) >> 4
         if byte2type == 1:
@@ -433,9 +427,42 @@ class EventHandler(object):
             # sensor specific decode, see sdr module...
             # 2 - 0xc: generic discrete, 0x6f, sensor specific
             additionaldata = decode_eventdata(
-                eventdata[3], evtoffset, event_data, self._sdr)
+                sensor_type, evtoffset, event_data, self._sdr)
             if additionaldata:
                 event['event_data'] = additionaldata
+
+    def decode_pet(self, specifictrap, petdata):
+        if isinstance(specifictrap, int):
+            specifictrap = struct.unpack('4B', struct.pack('>I', specifictrap))
+        if len(specifictrap) != 4:
+            raise pygexc.InvalidParameterValue(
+                'specifictrap should be integer number or 4 byte array')
+        specifictrap = bytearray(specifictrap)
+        sensor_type = specifictrap[1]
+        event_type = specifictrap[2]
+        # Event Offset is in first event data byte, so no need to fetch it here
+        # evtoffset = specifictrap[3] & 0b1111
+        deassertion = (specifictrap[3] & 0b10000000) == 0b10000000
+        # alertseverity = petdata[26]
+        sensorid = petdata[28]
+        event_data = petdata[31:34]
+        event = {}
+        self._populate_event(deassertion, event, event_data, event_type,
+                             sensor_type, sensorid)
+        return event
+
+    def _decode_standard_event(self, eventdata, event):
+        # Ignore the generator id for now..
+        if eventdata[2] != 4:
+            raise pygexc.PyghmiException(
+                'Unrecognized Event message version {0}'.format(eventdata[2]))
+        sensor_type = eventdata[3]
+        sensorid = eventdata[4]
+        event_data = eventdata[6:]
+        deassertion = (eventdata[5] & 0b10000000 == 0b10000000)
+        event_type = eventdata[5] & 0b1111111
+        self._populate_event(deassertion, event, event_data, event_type,
+                             sensor_type, sensorid)
 
     def _sel_decode(self, origselentry):
         selentry = bytearray(origselentry)

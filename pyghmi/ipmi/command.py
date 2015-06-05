@@ -427,6 +427,24 @@ class Command(object):
         self.oem_init()
         return sel.EventHandler(self.init_sdr(), self).fetch_sel(self, clear)
 
+    def decode_pet(self, specifictrap, petdata):
+        """Decode PET to an event
+
+        In IPMI, the alert format are PET alerts.  It is a particular set of
+        data put into an SNMPv1 trap and sent. It bears no small resemblence
+        to the SEL entries.  This function takes data that would have been
+        received by an SNMP trap handler, and provides an event decode, similar
+        to one entry of get_event_log.
+
+        :param specifictrap: The specific trap, as either a bytearray or int
+        :param petdata: An iterable of the octet data of varbind for
+                        1.3.6.1.4.1.3183.1.1.1
+        :returns: A dict event similar to one iteration of get_event_log
+        """
+        self.oem_init()
+        return sel.EventHandler(self.init_sdr(), self).decode_pet(specifictrap,
+                                                                  petdata)
+
     def get_inventory_descriptions(self):
         """Retrieve list of things that could be inventoried
 
