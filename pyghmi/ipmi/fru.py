@@ -160,7 +160,7 @@ class FRU(object):
             response = self.ipmicmd.raw_command(
                 netfn=0xa, command=0x11, data=[fruid, offset & 0xff,
                                                offset >> 8, chunksize])
-            if response['code'] == 201:
+            if response['code'] in (201, 202):
                 # if it was too big, back off and try smaller
                 # Try just over half to mitigate the chance of
                 # one request becoming three rather than just two
