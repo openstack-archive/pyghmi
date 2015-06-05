@@ -318,7 +318,8 @@ class SDREntry(object):
         # this function handles the common aspects of compact and full
         # offsets from spec, minus 6
         self.sensor_number = entry[2]
-        self.entity = ipmiconst.entity_ids[entry[3]]
+        self.entity = ipmiconst.entity_ids.get(
+            entry[3], 'Unknown entity {0}'.format(entry[3]))
         self.sensor_type_number = entry[7]
         try:
             self.sensor_type = ipmiconst.sensor_type_codes[entry[7]]
