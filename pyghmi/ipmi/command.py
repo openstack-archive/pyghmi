@@ -550,7 +550,8 @@ class Command(object):
                     raise exc.IpmiException(rsp['error'], rsp['code'])
                 return self._sdr.sensors[sensor].decode_sensor_reading(
                     rsp['data'])
-        raise Exception('Sensor not found: ' + sensorname)
+        self.oem_init()
+        return self._oem.get_sensor_reading(sensorname)
 
     def get_sensor_data(self):
         """Get sensor reading objects
@@ -569,6 +570,8 @@ class Command(object):
                     continue
                 raise exc.IpmiException(rsp['error'], code=rsp['code'])
             yield self._sdr.sensors[sensor].decode_sensor_reading(rsp['data'])
+        for reading in self._oem.get_sensor_data():
+            yield reading
 
     def get_sensor_descriptions(self):
         """Get available sensor names
@@ -582,6 +585,9 @@ class Command(object):
         for sensor in self._sdr.get_sensor_numbers():
             yield {'name': self._sdr.sensors[sensor].name,
                    'type': self._sdr.sensors[sensor].sensor_type}
+        self.oem_init()
+        for sensor in self._oem.get_sensor_descriptions():
+            yield sensor
 
     def get_network_channel(self):
         """Get a reasonable 'default' network channel.

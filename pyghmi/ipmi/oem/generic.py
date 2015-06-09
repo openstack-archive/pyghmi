@@ -52,6 +52,33 @@ class OEMHandler(object):
         """
         return ()
 
+    def get_sensor_reading(self, sensorname):
+        """Get an OEM sensor
+
+        If software wants to model some OEM behavior as a 'sensor' without
+        doing SDR, this hook provides that ability.  It should mimic
+        the behavior of 'get_sensor_reading' in command.py.
+        """
+        raise Exception('Sensor not found: ' + sensorname)
+
+    def get_sensor_descriptions(self):
+        """Get list of OEM sensor names and types
+
+        Iterate over dicts describing a label and type for OEM 'sensors'.  This
+        should mimic the behavior of the get_sensor_descriptions function
+        in command.py.
+        """
+        return ()
+
+    def get_sensor_data(self):
+        """Get OEM sensor data
+
+        Iterate through all OEM 'sensors' and return data as if they were
+        normal sensors.  This should mimic the behavior of the get_sensor_data
+        function in command.py.
+        """
+        return ()
+
     def get_oem_inventory(self):
         """Get tuples of component names and inventory data.
 
