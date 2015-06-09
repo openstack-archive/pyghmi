@@ -21,6 +21,7 @@ import pyghmi.ipmi.oem.lenovo as lenovo
 oemmap = {
     20301: lenovo,  # IBM x86 (and System X at Lenovo)
     19046: lenovo,  # Lenovo x86 (e.g. Thinkserver)
+    0: lenovo,  # Not to be merged, workaround for FPC issue
 }
 
 

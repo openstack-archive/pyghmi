@@ -21,6 +21,8 @@ import pyghmi.ipmi.private.spd as spd
 import pyghmi.ipmi.private.util as util
 import struct
 
+
+
 firmware_types = {
     1: 'Management Controller',
     2: 'UEFI/BIOS',
@@ -60,6 +62,55 @@ me_flash_status = {
     1: ('ME flash erase limit reached', pygconst.Health.Critical),
     2: ('ME flash write limit reached', pygconst.Health.Critical),
     3: ('ME flash write enabled', pygconst.Health.Ok),
+}
+
+
+def nextscale_fpc_read_ac_input(ipmicmd):
+    rsp = ipmicmd.xraw_command(netfn=0x32, command=0x90, data=(1,))
+    rsp = rsp['data']
+    return struct.unpack_from('<H', rsp[3:5])[0]
+
+
+def nextscale_fpc_read_dc_output(ipmicmd):
+    rsp = ipmicmd.xraw_command(netfn=0x32, command=0x90, data=(2,))
+    rsp = rsp['data']
+    return struct.unpack_from('<H', rsp[3:5])[0]
+
+
+def nextscale_fpc_read_fan_power(ipmicmd):
+    rsp = ipmicmd.xraw_command(netfn=0x32, command=0x90, data=(2,))
+    rsp = rsp['data']
+    rsp += '\x00'
+    return struct.unpack_from('<I', rsp[1:])[0] / 100.0
+
+
+def nextscale_fpc_read_psu_fan(ipmicmd, number):
+    rsp = ipmicmd.xraw_command(netfn=0x32, command=0xa5, data=(number,))
+    rsp = rsp['data']
+    return struct.unpack_from('<H', rsp[:2])[0]
+
+nextscale_fpc_sensors = {
+    'AC Power': {
+        'type': 'Power',
+        'units': 'W',
+        'provider': nextscale_fpc_read_ac_input,
+    },
+    'DC Power': {
+        'type': 'Power',
+        'units': 'W',
+        'provider': nextscale_fpc_read_dc_output,
+    },
+    'Fan Power': {
+        'type': 'Power',
+        'units': 'W',
+        'provider': nextscale_fpc_read_fan_power
+    },
+    'PSU Fan Speed': {
+        'type': 'Fan',
+        'units': 'RPM',
+        'provider': nextscale_fpc_read_psu_fan,
+        'elements': 4,
+    }
 }
 
 
@@ -146,6 +197,11 @@ class OEMHandler(generic.OEMHandler):
                 (evdata[0] & 0b11000000) == 0b10000000 and
                 event['component_type_id'] == 13):
             event['component'] += ' {0}'.format(evdata[1] & 0b11111)
+
+    @property
+    def is_fpc(self):
+        # TODO(jjohnson2): get a real mfg id for FPC into firmware
+        return self.oemid['manufacturer_id'] == 0
 
     @property
     def has_tsm(self):
@@ -235,6 +291,45 @@ class OEMHandler(generic.OEMHandler):
         for dimm in xrange(0, compcount):
             offset = 2 + (dimm * 84)
             self._decode_tsm_dimm(offset, rsp['data'])
+
+    def get_sensor_data(self):
+        if self.is_fpc:
+            for sensorname in nextscale_fpc_sensors:
+                yield self.get_sensor_reading(sensorname)
+
+    def get_sensor_descriptions(self):
+        if self.is_fpc:
+            for sensorname in nextscale_fpc_sensors:
+                sensor = nextscale_fpc_sensors[sensorname]
+                if 'elements' in sensor:
+                    for elemidx in xrange(sensor['elements']):
+                        elemidx += 1
+                        yield ('{0} {1}'.format(sensorname, elemidx),
+                               sensor['type'])
+                else:
+                    yield sensorname, sensor['type']
+
+    def get_sensor_reading(self, sensorname):
+        if self.is_fpc:
+            value = None
+            sensor = None
+            if (sensorname in nextscale_fpc_sensors and
+                    'elements' not in nextscale_fpc_sensors[sensorname]):
+                sensor = nextscale_fpc_sensors[sensorname]
+                value = sensor['provider']()
+
+            else:
+                sensortypename, sensoridx = sensorname.rpartition(' ')
+                nfs = nextscale_fpc_sensors
+                if (sensortypename in nfs and
+                        sensoridx <= nfs[sensorname]['elements']):
+                    sensor = nextscale_fpc_sensors[sensorname]
+                    value = sensor['provider'](sensoridx)
+            if sensor is not None:
+                return {'name': sensorname, 'imprecision': None,
+                        'value': value, 'states': [], 'health': 0,
+                        'units': sensor['units'], 'type': sensor['type']}
+        raise Exception('Sensor not found: ' + sensorname)
 
     def process_fru(self, fru):
         if fru is None:
