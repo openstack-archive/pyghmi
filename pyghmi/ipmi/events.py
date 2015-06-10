@@ -467,6 +467,7 @@ class EventHandler(object):
     def _sel_decode(self, origselentry):
         selentry = bytearray(origselentry)
         event = {}
+        event['record_id'] = struct.unpack_from('<H', origselentry[:2])[0]
         if selentry[2] == 2 or (0xc0 <= selentry[2] <= 0xdf):
             # Either standard, or at least the timestamp is standard
             event['timecode'] = struct.unpack_from('<I', buffer(selentry[3:7])
