@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import pyghmi.constants as pygconst
+import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.oem.generic as generic
 import pyghmi.ipmi.private.constants as ipmiconst
 import pyghmi.ipmi.private.spd as spd
@@ -222,8 +223,11 @@ class OEMHandler(generic.OEMHandler):
     def _collect_tsm_inventory(self):
         # Collect CPU inventory
         self.oem_inventory_info = {}
-        rsp = self.ipmicmd.xraw_command(netfn=6, command=0x59,
-                                        data=(0, 0xc1, 1, 0))
+        try:
+            rsp = self.ipmicmd.xraw_command(netfn=6, command=0x59,
+                                            data=(0, 0xc1, 1, 0))
+        except pygexc.IpmiException:
+            return
         compcount = ord(rsp['data'][1])
         for cpu in xrange(0, compcount):
             offset = 2 + (85 * cpu)
