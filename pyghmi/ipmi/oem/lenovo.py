@@ -223,22 +223,29 @@ class OEMHandler(generic.OEMHandler):
     def _collect_tsm_inventory(self):
         # Collect CPU inventory
         self.oem_inventory_info = {}
+        process_cpus = True
         try:
             rsp = self.ipmicmd.xraw_command(netfn=6, command=0x59,
                                             data=(0, 0xc1, 1, 0))
         except pygexc.IpmiException:
-            return
-        compcount = ord(rsp['data'][1])
-        for cpu in xrange(0, compcount):
-            offset = 2 + (85 * cpu)
-            self._decode_tsm_cpu(offset, rsp['data'])
+            process_cpus = False
+        if process_cpus:
+            compcount = ord(rsp['data'][1])
+            for cpu in xrange(0, compcount):
+                offset = 2 + (85 * cpu)
+                self._decode_tsm_cpu(offset, rsp['data'])
         # Collect memory inventory
-        rsp = self.ipmicmd.xraw_command(netfn=6, command=0x59,
-                                        data=(0, 0xc1, 2, 0))
-        compcount = ord(rsp['data'][1])
-        for dimm in xrange(0, compcount):
-            offset = 2 + (dimm * 84)
-            self._decode_tsm_dimm(offset, rsp['data'])
+        process_memory = True
+        try:
+            rsp = self.ipmicmd.xraw_command(netfn=6, command=0x59,
+                                            data=(0, 0xc1, 2, 0))
+        except pygexc.IpmiException:
+            process_memory = False
+        if process_memory:
+            compcount = ord(rsp['data'][1])
+            for dimm in xrange(0, compcount):
+                offset = 2 + (dimm * 84)
+                self._decode_tsm_dimm(offset, rsp['data'])
 
     def process_fru(self, fru):
         if fru is None:
