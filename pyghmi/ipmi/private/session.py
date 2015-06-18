@@ -17,6 +17,7 @@
 # This represents the low layer message framing portion of IPMI
 
 import collections
+import ctypes
 import fcntl
 import hashlib
 import hmac
@@ -180,6 +181,12 @@ def _monotonic_time():
     # for most OSes, os.times()[4] works well.
     # for microsoft, GetTickCount64
     return os.times()[4]
+
+
+try:
+    _monotonic_time = ctypes.windll.kernel32.GetTickCount64
+except AttributeError:
+    pass
 
 
 def _poller(timeout=0):
