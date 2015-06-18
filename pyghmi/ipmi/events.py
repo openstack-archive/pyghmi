@@ -447,6 +447,12 @@ class EventHandler(object):
         sensorid = petdata[28]
         event_data = petdata[31:34]
         event = {}
+        seqnum = struct.unpack_from('>H', buffer(petdata[16:18]))
+        ltimestamp = struct.unpack_from('>I', buffer(petdata[18:22]))
+        petack = bytearray(struct.pack('<HIBBBBBB', seqnum, ltimestamp,
+                                       petdata[25], petdata[27], sensorid,
+                                       *event_data))
+        self.ipmicmd.xraw_command(netfn=4, command=0x17, data=petack)
         self._populate_event(deassertion, event, event_data, event_type,
                              sensor_type, sensorid)
         return event
