@@ -447,6 +447,7 @@ class Session(object):
         self.integrityalgo = 0
         self.k1 = None
         self.rmcptag = 1
+        self.lastpayload = None
         self.ipmicallback = None
         self.sessioncontext = None
         self.sequencenumber = 0
