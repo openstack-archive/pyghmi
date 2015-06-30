@@ -447,12 +447,15 @@ class EventHandler(object):
         sensorid = petdata[28]
         event_data = petdata[31:34]
         event = {}
-        seqnum = struct.unpack_from('>H', buffer(petdata[16:18]))
-        ltimestamp = struct.unpack_from('>I', buffer(petdata[18:22]))
+        seqnum = struct.unpack_from('>H', buffer(petdata[16:18]))[0]
+        ltimestamp = struct.unpack_from('>I', buffer(petdata[18:22]))[0]
         petack = bytearray(struct.pack('<HIBBBBBB', seqnum, ltimestamp,
                                        petdata[25], petdata[27], sensorid,
                                        *event_data))
-        self.ipmicmd.xraw_command(netfn=4, command=0x17, data=petack)
+        try:
+            self._ipmicmd.xraw_command(netfn=4, command=0x17, data=petack)
+        except pygexc.IpmiException:  # Ignore failure to ack for now
+            pass
         self._populate_event(deassertion, event, event_data, event_type,
                              sensor_type, sensorid)
         return event
