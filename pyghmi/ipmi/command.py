@@ -1331,16 +1331,29 @@ class Command(object):
     def user_delete(self, uid, channel=None):
         """Delete user (helper)
 
+        Note that in IPMI, user 'deletion' isn't a concept.  This function
+        will make a best effort to provide the expected result (e.g.
+        web interfaces skipping names and ipmitool skipping as well.
+
         :param uid: user number [1:16]
         :param channel: number [1:7]
         """
+        # TODO(jjohnson2): Provide OEM extensibility to cover user deletion
         if channel is None:
             channel = self.get_network_channel()
         self.set_user_password(uid, mode='disable', password=None)
-        self.set_user_name(uid, '')
         # TODO(steveweber) perhaps should set user access on all channels
         # so new users dont get extra access
         self.set_user_access(uid, channel=channel, callback=False,
                              link_auth=False, ipmi_msg=False,
                              privilege_level='no_access')
+        try:
+            # First try to set name to all \x00 explicitly
+            self.set_user_name(uid, '')
+        except Exception:
+            # An invalid data field in request  is frequently reported.
+            # however another convention that exists is all '\xff'
+            # if this fails, pass up the error so that calling code knows
+            # that the deletion did not go as planned for now
+            self.set_user_name(uid, '\xff' * 16)
         return True
