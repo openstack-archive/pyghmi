@@ -458,6 +458,8 @@ class EventHandler(object):
             pass
         self._populate_event(deassertion, event, event_data, event_type,
                              sensor_type, sensorid)
+        event['timecode'] = ltimestamp
+        _fix_sel_time((event,), self._ipmicmd)
         return event
 
     def _decode_standard_event(self, eventdata, event):
