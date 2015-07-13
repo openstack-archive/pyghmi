@@ -770,7 +770,10 @@ class Command(object):
                     currtype[1] |= 0b10000000
                 else:
                     currtype[1] &= 0b1111111
-            if acknowledge_timeout is not None:
+            if acknowledge_timeout is None:
+                if currtype[2] == 0:
+                    currtype[2] = 3
+            else:
                 currtype[2] = acknowledge_timeout
             if retries is not None:
                 currtype[3] = retries
