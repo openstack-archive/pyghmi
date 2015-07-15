@@ -194,6 +194,7 @@ class SensorReading(object):
         try:
             self.health = reading['health']
             self.states = reading['states']
+            self.state_ids = reading['state_ids']
             self.value = reading['value']
             self.imprecision = reading['imprecision']
         except KeyError:
@@ -207,6 +208,7 @@ class SensorReading(object):
         return repr({
             'value': self.value,
             'states': self.states,
+            'state_ids': self.state_ids,
             'units': self.units,
             'imprecision': self.imprecision,
             'name': self.name,
@@ -313,6 +315,10 @@ class SDREntry(object):
         self._common_decode(entry)
         self.sensor_name = self.tlv_decode(entry[26], entry[27:])
 
+    def assert_trap_value(self, offset):
+        trapval = (self.sensor_type_number << 16) + (self.reading_type << 8)
+        return trapval + offset
+
     def _common_decode(self, entry):
         # compact and full are very similar
         # this function handles the common aspects of compact and full
@@ -402,6 +408,7 @@ class SDREntry(object):
         output = {
             'name': self.sensor_name,
             'type': self.sensor_type,
+            'id': self.sensor_number,
         }
         if reading[1] & 0b100000:
             output['unavailable'] = 1
@@ -429,6 +436,7 @@ class SDREntry(object):
             upper = 'lower'
             lower = 'upper'
         output['states'] = []
+        output['state_ids'] = []
         output['health'] = const.Health.Ok
         if discrete:
             for state in range(8):
@@ -436,31 +444,40 @@ class SDREntry(object):
                     statedesc, health = self._decode_state(state)
                     output['health'] |= health
                     output['states'].append(statedesc)
+                    output['state_ids'].append(self.assert_trap_value(state))
             if len(reading) > 3:
                 for state in range(7):
                     if reading[3] & (0b1 << state):
                         statedesc, health = self._decode_state(state + 8)
                         output['health'] |= health
                         output['states'].append(statedesc)
+                        output['state_ids'].append(
+                            self.assert_trap_value(state + 8))
         else:
             if reading[2] & 0b1:
                 output['health'] |= const.Health.Warning
                 output['states'].append(lower + " non-critical threshold")
+                output['state_ids'].append(self.assert_trap_value(1))
             if reading[2] & 0b10:
                 output['health'] |= const.Health.Critical
                 output['states'].append(lower + " critical threshold")
+                output['state_ids'].append(self.assert_trap_value(2))
             if reading[2] & 0b100:
                 output['health'] |= const.Health.Failed
                 output['states'].append(lower + " non-recoverable threshold")
+                output['state_ids'].append(self.assert_trap_value(3))
             if reading[2] & 0b1000:
                 output['health'] |= const.Health.Warning
                 output['states'].append(upper + " non-critical threshold")
+                output['state_ids'].append(self.assert_trap_value(4))
             if reading[2] & 0b10000:
                 output['health'] |= const.Health.Critical
                 output['states'].append(upper + " critical threshold")
+                output['state_ids'].append(self.assert_trap_value(5))
             if reading[2] & 0b100000:
                 output['health'] |= const.Health.Failed
                 output['states'].append(upper + " non-recoverable threshold")
+                output['state_ids'].append(self.assert_trap_value(6))
         return SensorReading(output, self.unit_suffix)
 
     def _set_tmp_formula(self, value):
