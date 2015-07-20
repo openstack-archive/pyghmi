@@ -37,7 +37,7 @@ sensor_type_codes = {
     2: 'Voltage',
     3: 'Current',
     4: 'Fan',
-    5: 'Chassis Intrusion',
+    5: 'Physical Security',
     6: 'Platform Security',
     7: 'Processor',
     8: 'Power Supply',
@@ -470,33 +470,33 @@ sensor_type_offsets = {
     # observed
     5: {
         0: {
-            'desc': 'General',
+            'desc': 'Chassis intrusion',
             'severity': const.Health.Critical,
-            'deassertion_desc': 'Deasserted',
+            'deassertion_desc': 'Chassis intrusion deasserted',
             'deassertion_severity': const.Health.Ok,
         },
         1: {
-            'desc': 'Drive Bay',
+            'desc': 'Drive area intrusion',
             'severity': const.Health.Critical,
-            'deassertion_desc': 'Drive Bay deasserted',
+            'deassertion_desc': 'Drive area intrusion deasserted',
             'deassertion_severity': const.Health.Ok,
         },
         2: {
-            'desc': 'I/O card area',
+            'desc': 'I/O card area intrusion',
             'severity': const.Health.Critical,
-            'deassertion_desc': 'I/O card area deasserted',
+            'deassertion_desc': 'I/O card area intrusion deasserted',
             'deassertion_severity': const.Health.Ok,
         },
         3: {
-            'desc': 'Processor area',
+            'desc': 'Processor area intrusion',
             'severity': const.Health.Critical,
-            'deassertion_desc': 'Processor area deasserted',
+            'deassertion_desc': 'Processor area intrusion deasserted',
             'deassertion_severity': const.Health.Ok,
         },
         4: {
-            'desc': 'Lost LAN',
+            'desc': 'LAN connection lost',
             'severity': const.Health.Critical,
-            'deassertion_desc': 'LAN restored',
+            'deassertion_desc': 'LAN connection restored',
             'deassertion_severity': const.Health.Ok,
         },
         5: {
@@ -506,9 +506,9 @@ sensor_type_offsets = {
             'deassertion_severity': const.Health.Ok,
         },
         6: {
-            'desc': 'Fan area',
+            'desc': 'Fan area intrusion',
             'severity': const.Health.Critical,
-            'deassertion_desc': 'Fan area deasserted',
+            'deassertion_desc': 'Fan area intrusion deasserted',
             'deassertion_severity': const.Health.Ok,
         },
     },
@@ -554,9 +554,9 @@ sensor_type_offsets = {
     },
     7: {
         0: {
-            'desc': 'Internal Error',
+            'desc': 'Internal error',
             'severity': const.Health.Failed,
-            'deassertion_desc': 'Internal Error Recovered',
+            'deassertion_desc': 'Internal error recovered',
             'deassertion_severity': const.Health.Ok,
         },
         1: {
@@ -654,21 +654,21 @@ sensor_type_offsets = {
             'deassertion_severity': const.Health.Ok,
         },
         3: {
-            'desc': 'Input lost',
+            'desc': 'Power input lost',
             'severity': const.Health.Critical,
-            'deassertion_desc': 'Input restored',
+            'deassertion_desc': 'Power input restored',
             'deassertion_severity': const.Health.Ok,
         },
         4: {
-            'desc': 'Input out of range or lost',
+            'desc': 'Power input out of range or lost',
             'severity': const.Health.Critical,
-            'deassertion_desc': 'Input in range',
+            'deassertion_desc': 'Power input present and in range',
             'deassertion_severity': const.Health.Ok,
         },
         5: {
-            'desc': 'Input out of range',
+            'desc': 'Power input out of range',
             'severity': const.Health.Critical,
-            'deassertion_desc': 'Input in range',
+            'deassertion_desc': 'Power input in range',
             'deassertion_severity': const.Health.Ok,
         },
         6: {
@@ -829,7 +829,7 @@ sensor_type_offsets = {
             'deassertion_severity': const.Health.Ok,
         },
         4: {
-            'desc': 'Drive consitency check in progress',
+            'desc': 'Drive consistency check in progress',
             'severity': const.Health.Ok,
             'deassertion_desc': 'Drive consistency check complete',
             'deassertion_severity': const.Health.Ok,
