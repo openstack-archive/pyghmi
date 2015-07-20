@@ -1211,9 +1211,13 @@ class Command(object):
         data = [uid, mode_mask[mode]]
         if password:
             password = str(password)
-            if len(password) > 16:
-                raise Exception('password has limit of 16 chars')
-            password = password.ljust(16, "\x00")
+            if 21 > len(password) > 16:
+                password = password.ljust(20, '\x00')
+                data[0] |= 0b10000000
+            elif len(password) > 20:
+                raise Exception('password has limit of 20 chars')
+            else:
+                password = password.ljust(16, "\x00")
             data.extend([ord(x) for x in password])
         response = self.raw_command(netfn=0x06, command=0x47, data=data)
         if 'error' in response:
