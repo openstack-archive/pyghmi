@@ -66,6 +66,15 @@ power_states = {
 }
 
 
+def _mask_to_cidr(mask):
+    maskn = struct.unpack_from('>I', mask)[0]
+    cidr = 32
+    while maskn & 0b1 == 0 and cidr > 0:
+        cidr -= 1
+        maskn >>= 1
+    return cidr
+
+
 class Command(object):
     """Send IPMI commands to BMCs.
 
@@ -552,6 +561,68 @@ class Command(object):
                     rsp['data'])
         self.oem_init()
         return self._oem.get_sensor_reading(sensorname)
+
+    def _fetch_lancfg_param(self, channel, param, prefixlen=False):
+        """Internal helper for fetching lan cfg parameters
+
+        If the parameter revison != 0x11, bail.  Further, if 4 bytes, return
+        string with ipv4.  If 6 bytes, colon delimited hex (mac address).  If
+        one byte, return the int value
+        """
+        fetchcmd = bytearray((channel, param, 0, 0))
+        fetched = self.xraw_command(0xc, 2, data=fetchcmd)
+        fetchdata = fetched['data']
+        if ord(fetchdata[0]) != 17:
+            return None
+        if len(fetchdata) == 5:  # IPv4 address
+            if prefixlen:
+                return _mask_to_cidr(fetchdata[1:])
+            else:
+                ip = socket.inet_ntop(socket.AF_INET, fetchdata[1:])
+                if ip == '0.0.0.0':
+                    return None
+                return ip
+        elif len(fetchdata) == 7:  # MAC address
+            mac = '{0:02x}:{1:02x}:{2:02x}:{3:02x}:{4:02x}:{5:02x}'.format(
+                *bytearray(fetchdata[1:]))
+            if mac == '00:00:00:00:00:00':
+                return None
+            return mac
+        elif len(fetchdata) == 2:
+            return ord(fetchdata[1])
+        else:
+            raise Exception("Unrecognized data format " + repr(fetchdata))
+
+    def get_net_configuration(self, channel=None):
+        """Get network configuration data
+
+        Retrieve network configuration from the target
+
+        :param channel: Channel to configure, defaults to None for 'autodetect'
+        :returns: A dictionary of network configuration data
+        """
+        if channel is None:
+            channel = self.get_network_channel()
+        retdata = {}
+        v4addr = self._fetch_lancfg_param(channel, 3)
+        v4masklen = self._fetch_lancfg_param(channel, 6, prefixlen=True)
+        retdata['ipv4_address'] = '{0}/{1}'.format(v4addr, v4masklen)
+        v4cfgmethods = {
+            0: 'Unspecified',
+            1: 'Static',
+            2: 'DHCP',
+            3: 'BIOS',
+            4:  'Other',
+        }
+        retdata['ipv4_configuration'] = v4cfgmethods[self._fetch_lancfg_param(
+            channel, 4)]
+        retdata['mac_address'] = self._fetch_lancfg_param(channel, 5)
+        retdata['ipv4_gateway'] = self._fetch_lancfg_param(channel, 12)
+        retdata['ipv4_gateway_mac'] = self._fetch_lancfg_param(channel, 13)
+        retdata['ipv4_backup_gateway'] = self._fetch_lancfg_param(channel, 14)
+        retdata['ipv4_backup_gateway_mac'] = self._fetch_lancfg_param(channel,
+                                                                      15)
+        return retdata
 
     def get_sensor_data(self):
         """Get sensor reading objects
