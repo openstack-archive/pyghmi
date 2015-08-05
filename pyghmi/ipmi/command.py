@@ -75,6 +75,10 @@ def _mask_to_cidr(mask):
     return cidr
 
 
+def _cidr_to_mask(prefix):
+    return struct.pack('>I', 2**prefix-1 << (32-prefix))
+
+
 class Command(object):
     """Send IPMI commands to BMCs.
 
@@ -593,6 +597,46 @@ class Command(object):
         else:
             raise Exception("Unrecognized data format " + repr(fetchdata))
 
+    def set_net_configuration(self, ipv4_address=None, ipv4_configuration=None,
+                              ipv4_gateway=None, channel=None):
+        """Set network configuration data.
+
+        Apply desired network configuration data, leaving unspecified
+        parameters alone.
+
+        :param ipv4_address:  CIDR notation for IP address and netmask
+                          Example: '192.168.0.10/16'
+        :param ipv4_configuration: Method to use to configure the network.
+                        'DHCP' or 'Static'.
+        :param ipv4_gateway: IP address of gateway to use.
+        :param channel:  LAN channel to configure, defaults to autodetect
+        """
+        if channel is None:
+            channel = self.get_network_channel()
+        if ipv4_configuration is not None:
+            cmddata = [channel, 4, 0]
+            if ipv4_configuration.lower() == 'dhcp':
+                cmddata[-1] = 2
+            elif ipv4_configuration.lower() == 'static':
+                cmddata[-1] = 1
+            else:
+                raise Exception('Unrecognized ipv4cfg parameter {0}'.format(
+                    ipv4_configuration))
+            self.xraw_command(netfn=0xc, command=1, data=cmddata)
+        if ipv4_address is not None:
+            netmask = None
+            if '/' in ipv4_address:
+                ipv4_address, prefix = ipv4_address.split('/')
+                netmask = _cidr_to_mask(int(prefix))
+            cmddata = bytearray((channel, 3)) + socket.inet_aton(ipv4_address)
+            self.xraw_command(netfn=0xc, command=1, data=cmddata)
+            if netmask is not None:
+                cmddata = bytearray((channel, 6)) + netmask
+                self.xraw_command(netfn=0xc, command=1, data=cmddata)
+        if ipv4_gateway is not None:
+            cmddata = bytearray((channel, 12)) + socket.inet_aton(ipv4_gateway)
+            self.xraw_command(netfn=0xc, command=1, data=cmddata)
+
     def get_net_configuration(self, channel=None):
         """Get network configuration data
 
@@ -605,8 +649,11 @@ class Command(object):
             channel = self.get_network_channel()
         retdata = {}
         v4addr = self._fetch_lancfg_param(channel, 3)
-        v4masklen = self._fetch_lancfg_param(channel, 6, prefixlen=True)
-        retdata['ipv4_address'] = '{0}/{1}'.format(v4addr, v4masklen)
+        if v4addr is None:
+            retdata['ipv4_address'] = None
+        else:
+            v4masklen = self._fetch_lancfg_param(channel, 6, prefixlen=True)
+            retdata['ipv4_address'] = '{0}/{1}'.format(v4addr, v4masklen)
         v4cfgmethods = {
             0: 'Unspecified',
             1: 'Static',
