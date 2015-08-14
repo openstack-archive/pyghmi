@@ -64,6 +64,9 @@ def docommand(result, ipmisession):
             print repr(reading)
     elif cmmand == 'health':
         print repr(ipmisession.get_health())
+    elif cmmand == 'inventory':
+        for item in ipmisession.get_inventory():
+            print repr(item)
     elif cmmand == 'raw':
         print ipmisession.raw_command(netfn=int(args[0]),
                                       command=int(args[1]),
