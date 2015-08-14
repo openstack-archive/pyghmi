@@ -1417,7 +1417,7 @@ class Command(object):
             channel = self.get_network_channel()
         names = {}
         max_ids = self.get_channel_max_user_count(channel)
-        for uid in range(1, max_ids):
+        for uid in range(1, max_ids+1):
             name = self.get_user_name(uid=uid)
             if name is not None:
                 names[uid] = self.get_user(uid=uid, channel=channel)
