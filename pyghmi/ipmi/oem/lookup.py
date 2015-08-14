@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import pyghmi.ipmi.oem.generic as generic
-import pyghmi.ipmi.oem.lenovo as lenovo
+import pyghmi.ipmi.oem.lenovo.handler as lenovo
 
 # The mapping comes from
 # http://www.iana.org/assignments/enterprise-numbers/enterprise-numbers
