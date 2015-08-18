@@ -531,6 +531,15 @@ class Command(object):
         for componentpair in self._oem.get_oem_inventory():
             yield componentpair
 
+    def get_leds(self):
+        """Get LED status information
+
+        This provides a detailed view of the LEDs of the managed system.
+        """
+        self.oem_init()
+        for leds in self._oem.get_leds():
+            yield leds
+
     def get_health(self):
         """Summarize health of managed system
 

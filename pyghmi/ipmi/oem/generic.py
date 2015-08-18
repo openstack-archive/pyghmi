@@ -97,6 +97,14 @@ class OEMHandler(object):
         """
         return None
 
+    def get_leds(self):
+        """Get tuples of LED categories.
+
+        Each category contains a category name and a dicionary of LED names
+        with their status as values.
+        """
+        return ()
+
     def process_fru(self, fru):
         """Modify a fru entry with OEM understanding.
 

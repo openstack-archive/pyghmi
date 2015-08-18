@@ -77,6 +77,28 @@ me_flash_status = {
     3: ('ME flash write enabled', pygconst.Health.Ok),
 }
 
+leds = {
+    "BMC_UID": 0x00,
+    "BMC_HEARTBEAT": 0x01,
+    "SYSTEM_FAULT": 0x02,
+    "PSU1_FAULT": 0x03,
+    "PSU2_FAULT": 0x04,
+    "LED_FAN_FAULT_1": 0x10,
+    "LED_FAN_FAULT_2": 0x11,
+    "LED_FAN_FAULT_3": 0x12,
+    "LED_FAN_FAULT_4": 0x13,
+    "LED_FAN_FAULT_5": 0x14,
+    "LED_FAN_FAULT_6": 0x15,
+    "LED_FAN_FAULT_7": 0x16,
+    "LED_FAN_FAULT_8": 0x17
+}
+
+led_status = {
+    0x00: "Off",
+    0xFF: "On"
+}
+led_status_default = "Blink"
+
 
 class OEMHandler(generic.OEMHandler):
     # noinspection PyUnusedLocal
@@ -212,6 +234,18 @@ class OEMHandler(generic.OEMHandler):
                         # If we can't parse an inventory item, ignore it
                         print traceback.print_exc()
                         continue
+
+    def get_leds(self):
+        result_leds = {}
+        for (name, id_) in leds.items():
+            try:
+                rsp = self.ipmicmd.xraw_command(netfn=0x3A, command=0x02,
+                                                data=(id_,))
+            except pygexc.IpmiException:
+                continue  # Ignore LEDs we can't retrieve
+            result_leds[name] = led_status.get(ord(rsp['data'][0]),
+                                               led_status_default)
+        yield ("leds", result_leds)
 
     def process_fru(self, fru):
         if fru is None:
