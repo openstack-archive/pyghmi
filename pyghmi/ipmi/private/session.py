@@ -853,9 +853,7 @@ class Session(object):
                 # some implementations will let us get this far,
                 # but suddenly get skiddish.  Try again in such a case
                 self.privlevel = 3
-                self.logged = 1
-                self.logout()
-                self._relog()
+                self._req_priv_level()
                 return
             mysuffix = " while requesting privelege level %d for %s" % (
                 self.privlevel, self.userid)
