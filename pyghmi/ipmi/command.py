@@ -1479,3 +1479,7 @@ class Command(object):
             # that the deletion did not go as planned for now
             self.set_user_name(uid, '\xff' * 16)
         return True
+
+    def get_fwversion(self):
+        self.oem_init()
+        return self._oem.get_oem_fwversion()
