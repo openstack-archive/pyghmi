@@ -25,6 +25,7 @@ import pyghmi.ipmi.private.util as util
 from pyghmi.ipmi.oem.lenovo import cpu
 from pyghmi.ipmi.oem.lenovo import dimm
 from pyghmi.ipmi.oem.lenovo import drive
+from pyghmi.ipmi.oem.lenovo import firmware
 from pyghmi.ipmi.oem.lenovo import inventory
 from pyghmi.ipmi.oem.lenovo import pci
 from pyghmi.ipmi.oem.lenovo import psu
@@ -280,3 +281,9 @@ class OEMHandler(generic.OEMHandler):
         else:
             fru['oem_parser'] = None
             return fru
+
+    def get_oem_firmware(self):
+        if self.has_tsm:
+            command = firmware.get_categories()["firmware"]
+            rsp = self.ipmicmd.xraw_command(**command["command"])
+            return command["parser"](rsp["data"])

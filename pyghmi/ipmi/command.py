@@ -1502,3 +1502,9 @@ class Command(object):
         """
         self.set_user_password(uid, mode)
         return True
+
+    def get_firmware(self):
+        """Retrieve OEM Firmware information
+        """
+        self.oem_init()
+        return self._oem.get_oem_firmware()
