@@ -28,6 +28,7 @@ from pyghmi.ipmi.oem.lenovo import drive
 from pyghmi.ipmi.oem.lenovo import inventory
 from pyghmi.ipmi.oem.lenovo import pci
 from pyghmi.ipmi.oem.lenovo import psu
+from pyghmi.ipmi.oem.lenovo import fwversion
 
 inventory.register_inventory_category(cpu)
 inventory.register_inventory_category(dimm)
@@ -280,3 +281,10 @@ class OEMHandler(generic.OEMHandler):
         else:
             fru['oem_parser'] = None
             return fru
+
+    def get_oem_fwversion(self):
+        if self.has_tsm:
+            command = fwversion.get_categories()["fwversion"]
+            rsp = self.ipmicmd.xraw_command(**command["command"])
+            bytes_read, versions = command["parser"](rsp["data"])
+            return versions
