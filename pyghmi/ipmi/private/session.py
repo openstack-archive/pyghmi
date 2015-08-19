@@ -842,28 +842,24 @@ class Session(object):
         self._req_priv_level()
 
     def _req_priv_level(self):
-        self.ipmicallback = self._got_priv_level
-        self._send_ipmi_net_payload(netfn=0x6,
-                                    command=0x3b,
+        self.logged = 1
+        response = self.raw_command(netfn=0x6, command=0x3b,
                                     data=[self.privlevel])
-
-    def _got_priv_level(self, response):
         if response['code']:
             if response['code'] in (0x80, 0x81) and self.privlevel == 4:
                 # some implementations will let us get this far,
                 # but suddenly get skiddish.  Try again in such a case
                 self.privlevel = 3
-                self.logged = 1
-                self.logout()
-                self._relog()
-                return
-            mysuffix = " while requesting privelege level %d for %s" % (
-                self.privlevel, self.userid)
-            errstr = get_ipmi_error(response, suffix=mysuffix)
-            if errstr:
-                self.onlogon({'error': errstr})
-                return
-        self.logged = 1
+                response = self.raw_command(netfn=0x6, command=0x3b,
+                                    data=[self.privlevel])
+            if response['code']:
+                self.logged = 0
+                mysuffix = " while requesting privelege level %d for %s" % (
+                    self.privlevel, self.userid)
+                errstr = get_ipmi_error(response, suffix=mysuffix)
+                if errstr:
+                    self.onlogon({'error': errstr})
+                    return
         self.logging = False
         Session.keepalive_sessions[self] = {}
         Session.keepalive_sessions[self]['ipmisession'] = self
@@ -1154,7 +1150,7 @@ class Session(object):
             # needs to do mutual assurance
             if not (data[5] & 0b01000000):  # This would be the line that might
                                          # trip up some insecure BMC
-                                         # implementation
+                                      # implementation
                 return
             encrypted = 0
             if data[5] & 0b10000000:
@@ -1401,7 +1397,6 @@ class Session(object):
             return -1
 
     def _parse_payload(self, payload):
-
         if hasattr(self, 'hasretried') and self.hasretried:
             self.hasretried = 0
             self.tabooseq[
