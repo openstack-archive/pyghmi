@@ -843,19 +843,20 @@ class Session(object):
 
     def _req_priv_level(self):
         self.ipmicallback = self._got_priv_level
+        print "Sending request to set priv to {0}".format(self.privlevel)
         self._send_ipmi_net_payload(netfn=0x6,
                                     command=0x3b,
                                     data=[self.privlevel])
 
     def _got_priv_level(self, response):
+        print 'got priv response of {0}'.format(response['code'])
         if response['code']:
             if response['code'] in (0x80, 0x81) and self.privlevel == 4:
                 # some implementations will let us get this far,
                 # but suddenly get skiddish.  Try again in such a case
+                print "Received code when attempting admin, trying to back off"
                 self.privlevel = 3
-                self.logged = 1
-                self.logout()
-                self._relog()
+                self._req_priv_level()
                 return
             mysuffix = " while requesting privelege level %d for %s" % (
                 self.privlevel, self.userid)
@@ -1066,12 +1067,16 @@ class Session(object):
 
     @classmethod
     def _route_ipmiresponse(cls, sockaddr, data, mysocket):
+        print 'got a packet to contemplate'
         if not (data[0] == '\x06' and data[2:4] == '\xff\x07'):  # not ipmi
+            print 'it was not ipmi'
             return
         try:
+            print 'checking to see if we have a handler'
             cls.bmc_handlers[sockaddr]._handle_ipmi_packet(data,
                                                            sockaddr=sockaddr)
         except KeyError:
+            print 'no handler found?'
             # check if we have a server attached to the target socket
             if mysocket in cls.bmc_handlers:
                 cls.bmc_handlers[mysocket].sessionless_data(data, sockaddr)
@@ -1082,10 +1087,12 @@ class Session(object):
         elif (self.sockaddr is not None and
               sockaddr is not None and
               self.sockaddr != sockaddr):
+            print 'ignoring the response for some reason'
             return  # here, we might have sent an ipv4 and ipv6 packet to kick
                    # things off ignore the second reply since we have one
                    # satisfactory answer
         if data[4] in ('\x00', '\x02'):  # This is an ipmi 1.5 paylod
+            print 'got a 1.5'
             remsequencenumber = struct.unpack('<I', data[5:9])[0]
             if (hasattr(self, 'remsequencenumber') and
                     remsequencenumber < self.remsequencenumber):
@@ -1132,6 +1139,7 @@ class Session(object):
         pass
 
     def _handle_ipmi2_packet(self, rawdata):
+        print 'processing ipmi2 packet'
         data = list(struct.unpack("%dB" % len(rawdata), rawdata))
                     #now need mutable array
         ptype = data[5] & 0b00111111
@@ -1152,9 +1160,10 @@ class Session(object):
         elif ptype == 0 or ptype == 1:  # good old ipmi payload or sol
             # If endorsing a shared secret scheme, then at the very least it
             # needs to do mutual assurance
+            print 'ipmi data recv'
             if not (data[5] & 0b01000000):  # This would be the line that might
                                          # trip up some insecure BMC
-                                         # implementation
+                print 'peer did not auth'                      # implementation
                 return
             encrypted = 0
             if data[5] & 0b10000000:
@@ -1165,6 +1174,7 @@ class Session(object):
             expectedauthcode = hmac.new(
                 self.k1, rawdata[4:-12], hashlib.sha1).digest()[:12]
             if authcode != expectedauthcode:
+                print 'authcode bad'
                 return  # BMC failed to assure integrity to us, drop it
             sid = struct.unpack("<I", rawdata[6:10])[0]
             if sid != self.localsid:  # session id mismatch, drop it
@@ -1173,6 +1183,7 @@ class Session(object):
             if (hasattr(self, 'remseqnumber') and
                 (remseqnumber < self.remseqnumber) and
                     (self.remseqnumber != 0xffffffff)):
+                print 'seqnumber was rejected'
                 return
             self.remseqnumber = remseqnumber
             psize = data[14] + (data[15] << 8)
@@ -1369,6 +1380,7 @@ class Session(object):
         # For now, skip the checksums since we are in LAN only,
         # TODO(jbjohnso): if implementing other channels, add checksum checks
         # here
+        print 'extracting core of ipmi reply'
         if self.servermode:
             self.seqlun = payload[4]
             self.clientaddr = payload[3]
@@ -1387,6 +1399,7 @@ class Session(object):
             #response or else error message will be parsed and return.
             if ((entry[0] in [0x06, 0x07]) and (entry[2] == 0x34)
                and (payload[-2] == 0x0)):
+                print 'rejecting because of i submission'
                 return -1
             else:
                 self._parse_payload(payload)
@@ -1398,10 +1411,11 @@ class Session(object):
         else:
             # payload is not a match for our last packet
             # it is also not a bridge request.
+            print 'not a match... dropping'
             return -1
 
     def _parse_payload(self, payload):
-
+        print 'actually parsing the reply now'
         if hasattr(self, 'hasretried') and self.hasretried:
             self.hasretried = 0
             self.tabooseq[
