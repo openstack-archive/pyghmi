@@ -122,3 +122,8 @@ class OEMHandler(object):
             return fru
         fru['oem_parser'] = None
         return fru
+
+    def get_oem_fwversion(self):
+        """Get Firmware version.
+        """
+        return ()
