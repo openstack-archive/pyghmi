@@ -1488,3 +1488,17 @@ class Command(object):
             # that the deletion did not go as planned for now
             self.set_user_name(uid, '\xff' * 16)
         return True
+
+    def disable_user(self, uid, mode):
+        """Disable User
+
+        Just disable the User.
+        This will not disable the password or revoke privileges.
+
+        :param uid: user number [1:16]
+        :param mode:
+            disable       = disable user connections
+            enable        = enable user connections
+        """
+        self.set_user_password(uid, mode)
+        return True
