@@ -186,6 +186,7 @@ class SensorReading(object):
     """
 
     def __init__(self, reading, suffix):
+        self.broken_sensor_ids = {}
         self.health = const.Health.Ok
         self.type = reading['type']
         self.value = None
@@ -637,6 +638,7 @@ class SDR(object):
         offset = 0
         size = 0xff
         chunksize = 128
+        self.broken_sensor_ids = {}
         while recid != 0xffff:  # per 33.12 Get SDR command, 0xffff marks end
             newrecid = 0
             currlen = 0
@@ -687,6 +689,8 @@ class SDR(object):
             if newrecid == recid:
                 raise exc.BmcErrorException("Incorrect SDR record id from BMC")
             recid = newrecid
+        for sid in self.broken_sensor_ids:
+            del self.sensors[sid]
 
     def get_sensor_numbers(self):
         return self.sensors.iterkeys()
@@ -696,12 +700,14 @@ class SDR(object):
         if newent.sdrtype == TYPE_SENSOR:
             id = newent.sensor_number
             if id in self.sensors:
-                raise exc.BmcErrorException("Duplicate sensor number %d" % id)
+                self.broken_sensor_ids[id] = True
+                return
             self.sensors[id] = newent
         elif newent.sdrtype == TYPE_FRU:
             id = newent.fru_number
             if id in self.fru:
-                raise exc.BmcErrorException("Duplicate FRU identifier %d" % id)
+                self.broken_sensor_ids[id] = True
+                return
             self.fru[id] = newent
 
     def decode_aux(self, auxdata):
