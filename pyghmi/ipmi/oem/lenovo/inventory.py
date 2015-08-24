@@ -50,7 +50,7 @@ class EntryField(object):
 
 
 # General parameter parsing functions
-def parse_inventory_category(name, info):
+def parse_inventory_category(name, info, countable=True):
     """Parses every entry in an inventory category (CPU, memory, PCI, drives,
     etc).
 
@@ -59,19 +59,27 @@ def parse_inventory_category(name, info):
 
     :param name: the name of the parameter (e.g.: "cpu")
     :param info: a list of integers with raw data read from an IPMI requests
+    :param countable: whether the data have an entries count field
 
     :returns: dict -- a list of entries in the category.
     """
     raw = info["data"][1:]
 
     cur = 0
-    count = struct.unpack("B", raw[cur])[0]
-    cur += 1
+    if countable:
+        count = struct.unpack("B", raw[cur])[0]
+        cur += 1
+    else:
+        count = 0
 
     entries = []
     while cur < len(raw):
         read, cpu = categories[name]["parser"](raw[cur:])
         cur = cur + read
+        if not countable:
+            # count by myself
+            count += 1
+            cpu["index"] = count
         entries.append(cpu)
 
     # TODO(avidal): raise specific exception to point that there's data left in
