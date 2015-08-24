@@ -537,8 +537,7 @@ class Command(object):
         This provides a detailed view of the LEDs of the managed system.
         """
         self.oem_init()
-        for leds in self._oem.get_leds():
-            yield leds
+        return self._oem.get_leds()
 
     def get_health(self):
         """Summarize health of managed system
