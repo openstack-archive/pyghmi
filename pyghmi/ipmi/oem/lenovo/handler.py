@@ -29,12 +29,16 @@ from pyghmi.ipmi.oem.lenovo import firmware
 from pyghmi.ipmi.oem.lenovo import inventory
 from pyghmi.ipmi.oem.lenovo import pci
 from pyghmi.ipmi.oem.lenovo import psu
+from pyghmi.ipmi.oem.lenovo import raid_controller
+from pyghmi.ipmi.oem.lenovo import raid_drive
 
 inventory.register_inventory_category(cpu)
 inventory.register_inventory_category(dimm)
 inventory.register_inventory_category(pci)
 inventory.register_inventory_category(drive)
 inventory.register_inventory_category(psu)
+inventory.register_inventory_category(raid_drive)
+inventory.register_inventory_category(raid_controller)
 
 
 firmware_types = {
@@ -220,7 +224,8 @@ class OEMHandler(generic.OEMHandler):
                 continue
             else:
                 try:
-                    items = inventory.parse_inventory_category(catid, rsp)
+                    items = inventory.parse_inventory_category(catid, rsp,
+                        countable=catspec.get("countable", True))
                 except Exception:
                     # If we can't parse an inventory category, ignore it
                     print traceback.print_exc()
