@@ -266,6 +266,13 @@ class Command(object):
         else:
             return lastresponse
 
+    def reset_bmc(self):
+        """Do a cold reset in BMC
+        """
+        response = self.raw_command(netfn=6, command=2)
+        if 'error' in response:
+            raise exc.IpmiException(response['error'])
+
     def set_bootdev(self,
                     bootdev,
                     persist=False,
