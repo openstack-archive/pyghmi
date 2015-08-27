@@ -58,6 +58,7 @@ power_states = {
     "off": 0,
     "on": 1,
     "reset": 3,
+    "diag": 4,
     "softoff": 5,
     "shutdown": 5,
     # NOTE(jbjohnso): -1 is not a valid direct boot state,
