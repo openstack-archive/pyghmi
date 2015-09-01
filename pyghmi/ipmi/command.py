@@ -844,6 +844,37 @@ class Command(object):
         cmddata += community
         self.xraw_command(netfn=0xc, command=1, data=cmddata)
 
+    def _assure_alert_policy(self, channel, destination):
+        """Make sure an alert policy exists
+
+        Each policy will be a dict with the following keys:
+        -'index' - The policy index number
+        :returns: An iterable of currently configured alert policies
+        """
+        # First we do a get PEF configuration parameters to get the count
+        # of entries.  We have no guarantee that the meaningful data will
+        # be contiguous
+        rsp = self.xraw_command(netfn=4, command=0x13, data=(8, 0, 0))
+        numpol = ord(rsp['data'][1])
+        desiredchandest = (channel << 4) | destination
+        availpolnum = None
+        for polnum in xrange(1, numpol + 1):
+            currpol = self.xraw_command(netfn=4, command=0x13,
+                                        data=(9, polnum, 0))
+            polidx, chandest = struct.unpack_from('>BB', currpol['data'][2:4])
+            if not polidx & 0b1000:
+                if availpolnum is None:
+                    availpolnum = polnum
+                continue
+            if chandest == desiredchandest:
+                return True
+        # If chandest did not equal desiredchandest ever, we need to use a slot
+        if availpolnum is None:
+            raise Exception("No available alert policy entry")
+        self.xraw_command(netfn=4, command=0x12,
+                          data=(9, availpolnum, (availpolnum << 4) | 0x8,
+                                desiredchandest, 0))
+
     def get_alert_community(self, channel=None):
         """Get the current community string for alerts
 
@@ -911,6 +942,8 @@ class Command(object):
             destreq = bytearray((channel, 18))
             destreq.extend(currtype)
             self.xraw_command(netfn=0xc, command=1, data=destreq)
+        if not ip == '0.0.0.0':
+            self._assure_alert_policy(channel, destination)
 
     def set_channel_access(self, channel=None,
                            access_update_mode='non_volatile',
