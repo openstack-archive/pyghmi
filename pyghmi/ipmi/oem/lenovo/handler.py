@@ -292,3 +292,28 @@ class OEMHandler(generic.OEMHandler):
             command = firmware.get_categories()["firmware"]
             rsp = self.ipmicmd.xraw_command(**command["command"])
             return command["parser"](rsp["data"])
+
+    def get_oem_pw_capping(self):
+        if self.has_tsm:
+            rsp = self.ipmicmd.xraw_command(netfn=0x3a, command=0x1b,
+                                            data=(3,))
+            if rsp['data'][0] == '\x00':
+                return 'off'
+            else:
+                return 'on'
+
+    def set_oem_pw_capping(self, value):
+        """Set PSU based power capping
+
+        :param value: Value to be set
+        """
+        # 1 – Enable power capping(default)
+        if value == 'on':
+            statecode = 1
+        # 0 – Disable power capping
+        else:
+            statecode = 0
+        if self.has_tsm:
+            self.ipmicmd.xraw_command(netfn=0x3a, command=0x1a,
+                                      data=(3, statecode))
+            return True
