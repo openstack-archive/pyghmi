@@ -1548,3 +1548,17 @@ class Command(object):
         """
         self.oem_init()
         return self._oem.get_oem_firmware()
+
+    def get_pw_capping(self):
+        """Get PSU based power capping status
+        """
+        self.oem_init()
+        return self._oem.get_oem_pw_capping()
+
+    def set_pw_capping(self, value):
+        """Set PSU based power capping
+
+        :param value: Value to be set
+        """
+        self.oem_init()
+        return self._oem.set_oem_pw_capping(value)
