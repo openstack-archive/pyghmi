@@ -127,3 +127,17 @@ class OEMHandler(object):
         """Get Firmware information.
         """
         return ()
+
+    def get_oem_capping_enabled(self):
+        """Get PSU based power capping status
+
+        :return: True if enabled and False if disabled
+        """
+        return ()
+
+    def set_oem_capping_enabled(self, enable):
+        """Set PSU based power capping
+
+        :param enable: True for enable and False for disable
+        """
+        return ()

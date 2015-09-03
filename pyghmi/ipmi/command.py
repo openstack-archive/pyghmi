@@ -1548,3 +1548,19 @@ class Command(object):
         """
         self.oem_init()
         return self._oem.get_oem_firmware()
+
+    def get_capping_enabled(self):
+        """Get PSU based power capping status
+
+        :return: True if enabled and False if disabled
+        """
+        self.oem_init()
+        return self._oem.get_oem_capping_enabled()
+
+    def set_capping_enabled(self, enable):
+        """Set PSU based power capping
+
+        :param enable: True for enable and False for disable
+        """
+        self.oem_init()
+        return self._oem.set_oem_capping_enabled(enable)
