@@ -1630,3 +1630,9 @@ class Command(object):
         """
         self.oem_init()
         return self._oem.set_oem_capping_enabled(enable)
+
+    def get_remote_kvm_available(self):
+        """Get remote KVM availability
+        """
+        self.oem_init()
+        return self._oem.get_oem_remote_kvm_available()

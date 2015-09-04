@@ -355,3 +355,8 @@ class OEMHandler(generic.OEMHandler):
             self.ipmicmd.xraw_command(netfn=0x3a, command=0x1a,
                                       data=(3, statecode))
             return True
+
+    def get_oem_remote_kvm_available(self):
+        if self.has_tsm:
+            rsp = self.ipmicmd.raw_command(netfn=0x3a, command=0x13)
+            return rsp['data'][0] == 0

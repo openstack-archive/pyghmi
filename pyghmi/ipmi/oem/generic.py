@@ -172,3 +172,8 @@ class OEMHandler(object):
         :param enable: True for enable and False for disable
         """
         return ()
+
+    def get_oem_remote_kvm_available(self):
+        """Get remote KVM availability
+        """
+        return ()
