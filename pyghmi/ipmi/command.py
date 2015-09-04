@@ -1564,3 +1564,9 @@ class Command(object):
         """
         self.oem_init()
         return self._oem.set_oem_capping_enabled(enable)
+
+    def get_ikvm_status(self):
+        """Get iKVM key status
+        """
+        self.oem_init()
+        return self._oem.get_oem_ikvm_status()
