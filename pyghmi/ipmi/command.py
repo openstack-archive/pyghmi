@@ -945,6 +945,56 @@ class Command(object):
         if not ip == '0.0.0.0':
             self._assure_alert_policy(channel, destination)
 
+    def get_mci(self):
+        """Get the Management Controller Identifier, per DCMI specification
+
+        :returns: The identifier as a string
+        """
+        return self._chunkwise_dcmi_fetch(9)
+
+    def set_mci(self, mci):
+        """Set the management controller identifier, per DCMI specification
+
+        """
+        return self._chunkwise_dcmi_set(0xa, mci)
+
+    def get_asset_tag(self):
+        """Get the system asset tag, per DCMI specification
+
+        :returns: The asset tag
+        """
+        return self._chunkwise_dcmi_fetch(6)
+
+    def set_asset_tag(self, tag):
+        """Set the asset tag value
+
+        """
+        return self._chunkwise_dcmi_set(8, tag)
+
+    def _chunkwise_dcmi_fetch(self, command):
+        szdata = self.xraw_command(
+            netfn=0x2c, command=command, data=(0xdc, 0, 0))
+        totalsize = ord(szdata['data'][1])
+        chksize = 0xf
+        offset = 0
+        retstr = ''
+        while offset < totalsize:
+            if (offset + chksize) > totalsize:
+                chksize = totalsize - offset
+            chk = self.xraw_command(
+                netfn = 0x2c, command=command, data=(0xdc, offset, chksize))
+            retstr += chk['data'][2:]
+            offset += chksize
+        return retstr
+
+    def _chunkwise_dcmi_set(self, command, data):
+        chunks = [data[i:i+15] for i in xrange(0, len(data), 15)]
+        offset = 0
+        for chunk in chunks:
+            cmddata = bytearray((0xdc, offset, len(chunk)))
+            cmddata += chunk
+            self.xraw_command(netfn=0x2c, command=command, data=cmddata)
+
     def set_channel_access(self, channel=None,
                            access_update_mode='non_volatile',
                            alerting=False, per_msg_auth=False,
