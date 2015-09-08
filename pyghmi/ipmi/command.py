@@ -547,6 +547,22 @@ class Command(object):
         self.oem_init()
         return self._oem.get_leds()
 
+    def get_ntp_enabled(self):
+        self.oem_init()
+        return self._oem.get_ntp_enabled()
+
+    def set_ntp_enabled(self, enable):
+        self.oem_init()
+        return self._oem.set_ntp_enabled(enable)
+
+    def get_ntp_servers(self):
+        self.oem_init()
+        return self._oem.get_ntp_servers()
+
+    def set_ntp_server(self, server, index=0):
+        self.oem_init()
+        return self._oem.set_ntp_server(server, index)
+
     def get_health(self):
         """Summarize health of managed system
 
