@@ -105,6 +105,36 @@ class OEMHandler(object):
         """
         return ()
 
+    def get_ntp_enabled(self):
+        """Get whether ntp is enabled or not
+
+        :returns: True if enabled, False if disabled, None if unsupported
+        """
+        return None
+
+    def set_ntp_enabled(self, enabled):
+        """Set whether NTP should be enabled
+
+        :returns: True on success
+        """
+        return None
+
+    def get_ntp_servers(self):
+        """Get current set of configured NTP servers
+
+        :returns iterable of configured NTP servers:
+        """
+        return ()
+
+    def set_ntp_server(self, server, index=0):
+        """Set an ntp server
+
+        :param server:  Destination address of server to reach
+        :param index: Index of server to configure, primary assumed if not
+        specified
+        :returns: True if success
+        """
+        return None
     def process_fru(self, fru):
         """Modify a fru entry with OEM understanding.
 

@@ -189,6 +189,39 @@ class OEMHandler(generic.OEMHandler):
                 event['component_type_id'] == 13):
             event['component'] += ' {0}'.format(evdata[1] & 0b11111)
 
+    def get_ntp_enabled(self):
+        if self.has_tsm:
+            ntpres = self.ipmicmd.xraw_command(netfn=0x32, command=0xa7)
+            return ntpres['data'][0] == 1
+        return None
+
+    def get_ntp_servers(self):
+        if self.has_tsm:
+            srvs = []
+            ntpres = self.ipmicmd.xraw_command(netfn=0x32, command=0xa7)
+            srvs.append(ntpres['data'][1:129].rstrip('\x00'))
+            srvs.append(ntpres['data'][129:257].rstrip('\x00'))
+        return None
+
+    def set_ntp_enabled(self, enabled):
+        if self.has_tsm:
+            if enabled:
+                self.ipmicmd.xraw_command(netfn=0x32, command=0xa8, data=(3, 1))
+            else:
+                self.ipmicmd.xraw_command(netfn=0x32, command=0xa8, data=(3, 0))
+            return True
+        return None
+
+    def set_ntp_server(self, server, index=0):
+        if self.has_tsm:
+            if not (0 <= index <= 1):
+                raise pygexc.InvalidParameterValue("Index must be 0 or 1")
+            cmddata = bytearray((1 + index))
+            cmddata.append(server.ljust('\x00'))
+            self.ipmicmd.xraw_command(netfn=0x32, command=0xa8, data=cmddata)
+            return True
+        return None
+
     @property
     def has_tsm(self):
         """True if this particular server have a TSM based service processor
