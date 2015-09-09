@@ -141,3 +141,13 @@ class OEMHandler(object):
         :param enable: True for enable and False for disable
         """
         return ()
+
+    def get_oem_ntp_config(self):
+        """Get NTP configuration
+        """
+        return ()
+
+    def set_oem_ntp_config(self, mode, value):
+        """Set NTP configuration
+        """
+        return ()

@@ -27,6 +27,7 @@ from pyghmi.ipmi.oem.lenovo import dimm
 from pyghmi.ipmi.oem.lenovo import drive
 from pyghmi.ipmi.oem.lenovo import firmware
 from pyghmi.ipmi.oem.lenovo import inventory
+from pyghmi.ipmi.oem.lenovo import ntp_config
 from pyghmi.ipmi.oem.lenovo import pci
 from pyghmi.ipmi.oem.lenovo import psu
 from pyghmi.ipmi.oem.lenovo import raid_controller
@@ -319,3 +320,40 @@ class OEMHandler(generic.OEMHandler):
             self.ipmicmd.xraw_command(netfn=0x3a, command=0x1a,
                                       data=(3, statecode))
             return True
+
+    def get_oem_ntp_config(self):
+        if self.has_tsm:
+            command = ntp_config.get_categories()["ntp_config"]
+            rsp = self.ipmicmd.xraw_command(**command["command"])
+            return command["parser"](rsp["data"])
+
+    def set_oem_ntp_config(self, mode, value):
+        """Set NTP configuration
+
+        :param mode:
+            enable      = value(1) for enable and value(0) for disable
+            set_server1 = set primary server address
+            set_server2 = set secondary server address
+        :param value:   value to be set
+        """
+        mode_mask = {
+            'enable': 3,
+            'set_server1': 1,
+            'set_server2': 2
+        }
+        if mode_mask[mode] == 1 or mode_mask[mode] == 2:
+            if len(value) > 128:
+                raise Exception('value must be less than or = 128 chars')
+            else:
+                value = value.ljust(128, "\x00")
+        elif mode_mask[mode] == 3:
+            if value not in [0, 1]:
+                raise Exception('value should be 0 or 1')
+        else:
+            raise Exception('Unknown mode')
+
+        data = [mode_mask[mode]]
+        data.extend([ord(x) for x in value])
+        if self.has_tsm:
+            self.ipmicmd.xraw_command(netfn=0x32, command=0xa8, data=data)
+            return

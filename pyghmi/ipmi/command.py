@@ -1614,3 +1614,15 @@ class Command(object):
         """
         self.oem_init()
         return self._oem.set_oem_capping_enabled(enable)
+
+    def get_ntp_config(self):
+        """Get NTP configuration
+        """
+        self.oem_init()
+        return self._oem.get_oem_ntp_config()
+
+    def set_ntp_config(self, mode, value):
+        """Set NTP configuration
+        """
+        self.oem_init()
+        return self._oem.set_oem_ntp_config(mode, value)
