@@ -1636,3 +1636,17 @@ class Command(object):
         """
         self.oem_init()
         return self._oem.get_oem_remote_kvm_available()
+
+    def get_domain_name(self):
+        """Get Domain name
+        """
+        self.oem_init()
+        return self._oem.get_oem_domain_name()
+
+    def set_domain_name(self, name):
+        """Set Domain name
+
+        :param name: domain name to be set
+        """
+        self.oem_init()
+        self._oem.set_oem_domain_name(name)
