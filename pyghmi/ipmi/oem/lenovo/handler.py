@@ -319,3 +319,23 @@ class OEMHandler(generic.OEMHandler):
             self.ipmicmd.xraw_command(netfn=0x3a, command=0x1a,
                                       data=(3, statecode))
             return True
+
+    def get_oem_domain_name(self):
+        if self.has_tsm:
+            name = ''
+            for i in range(1, 5):
+                rsp = self.ipmicmd.xraw_command(netfn=0x32, command=0x6b,
+                                                data=(4, i))
+                name += rsp['data'][:]
+            return name
+
+    def set_oem_domain_name(self, name):
+        if self.has_tsm:
+            name = name.ljust(256, "\x00")
+
+            for i in range(0, 4):
+                data = [4, i+1]
+                offset = i*64
+                data.extend([ord(x) for x in name[offset:offset+64]])
+                self.ipmicmd.xraw_command(netfn=0x32, command=0x6c, data=data)
+            return
