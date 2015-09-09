@@ -177,3 +177,15 @@ class OEMHandler(object):
         """Get remote KVM availability
         """
         return False
+
+    def get_oem_domain_name(self):
+        """Get Domain name
+        """
+        return ()
+
+    def set_oem_domain_name(self, name):
+        """Set Domain name
+
+        :param name: domain name to be set
+        """
+        return ()
