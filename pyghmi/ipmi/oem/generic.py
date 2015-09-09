@@ -141,3 +141,15 @@ class OEMHandler(object):
         :param enable: True for enable and False for disable
         """
         return ()
+
+    def get_oem_domain_name(self):
+        """Get Domain name
+        """
+        return ()
+
+    def set_oem_domain_name(self, name):
+        """Set Domain name
+
+        :param name: domain name to be set
+        """
+        return ()
