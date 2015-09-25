@@ -872,7 +872,7 @@ class Command(object):
         if availpolnum is None:
             raise Exception("No available alert policy entry")
         self.xraw_command(netfn=4, command=0x12,
-                          data=(9, availpolnum, (availpolnum << 4) | 0x8,
+                          data=(9, availpolnum, 16,
                                 desiredchandest, 0))
 
     def get_alert_community(self, channel=None):
