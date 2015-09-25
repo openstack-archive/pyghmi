@@ -860,7 +860,7 @@ class Command(object):
         cmddata += community
         self.xraw_command(netfn=0xc, command=1, data=cmddata)
 
-    def _assure_alert_policy(self, channel, destination):
+    def _assure_alert_policy(self, channel, destination, policy_num):
         """Make sure an alert policy exists
 
         Each policy will be a dict with the following keys:
@@ -887,8 +887,10 @@ class Command(object):
         # If chandest did not equal desiredchandest ever, we need to use a slot
         if availpolnum is None:
             raise Exception("No available alert policy entry")
+        if policy_num is None:
+            policy_num = availpolnum
         self.xraw_command(netfn=4, command=0x12,
-                          data=(9, availpolnum, (availpolnum << 4) | 0x8,
+                          data=(9, availpolnum, (policy_num << 4) | 0x8,
                                 desiredchandest, 0))
 
     def get_alert_community(self, channel=None):
@@ -908,7 +910,7 @@ class Command(object):
 
     def set_alert_destination(self, ip=None, acknowledge_required=None,
                               acknowledge_timeout=None, retries=None,
-                              destination=0, channel=None):
+                              destination=0, policy_num=None, channel=None):
         """Configure one or more parameters of an alert destination
 
         If any parameter is 'None' (default), that parameter is left unchanged.
@@ -959,7 +961,7 @@ class Command(object):
             destreq.extend(currtype)
             self.xraw_command(netfn=0xc, command=1, data=destreq)
         if not ip == '0.0.0.0':
-            self._assure_alert_policy(channel, destination)
+            self._assure_alert_policy(channel, destination, policy_num)
 
     def get_mci(self):
         """Get the Management Controller Identifier, per DCMI specification
