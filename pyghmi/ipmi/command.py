@@ -871,8 +871,12 @@ class Command(object):
         # If chandest did not equal desiredchandest ever, we need to use a slot
         if availpolnum is None:
             raise Exception("No available alert policy entry")
+        # 24 = 1 << 4 | 8
+        # 1 == set to which this rule belongs
+        # 8 == 0b1000, in other words, enable this policy, always send to
+        # indicated destination
         self.xraw_command(netfn=4, command=0x12,
-                          data=(9, availpolnum, (availpolnum << 4) | 0x8,
+                          data=(9, availpolnum, 24,
                                 desiredchandest, 0))
 
     def get_alert_community(self, channel=None):
