@@ -328,6 +328,7 @@ class OEMHandler(generic.OEMHandler):
             command = firmware.get_categories()["firmware"]
             rsp = self.ipmicmd.xraw_command(**command["command"])
             return command["parser"](rsp["data"])
+        return ()
 
     def get_oem_capping_enabled(self):
         if self.has_tsm:
