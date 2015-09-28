@@ -280,14 +280,15 @@ class OEMHandler(generic.OEMHandler):
                         continue
 
     def get_leds(self):
-        for (name, id_) in leds.items():
-            try:
-                rsp = self.ipmicmd.xraw_command(netfn=0x3A, command=0x02,
-                                                data=(id_,))
-            except pygexc.IpmiException:
-                continue  # Ignore LEDs we can't retrieve
-            status = led_status.get(ord(rsp['data'][0]), led_status_default)
-            yield (name, {'status': status})
+        if self.has_tsm:
+            for (name, id_) in leds.items():
+                try:
+                    rsp = self.ipmicmd.xraw_command(netfn=0x3A, command=0x02,
+                                                    data=(id_,))
+                except pygexc.IpmiException:
+                    continue  # Ignore LEDs we can't retrieve
+                status = led_status.get(ord(rsp['data'][0]), led_status_default)
+                yield (name, {'status': status})
 
     def process_fru(self, fru):
         if fru is None:
