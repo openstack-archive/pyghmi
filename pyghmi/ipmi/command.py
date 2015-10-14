@@ -911,7 +911,7 @@ class Command(object):
         return rsp['data'][1:].partition('\x00')[0]
 
     def set_alert_destination(self, ip=None, acknowledge_required=None,
-                              acknowledge_timeout=None, retries=None,
+                              acknowledgement_timeout=None, retries=None,
                               destination=0, channel=None):
         """Configure one or more parameters of an alert destination
 
@@ -923,7 +923,7 @@ class Command(object):
                    present this data as IP address.
         :param acknowledge_required: Whether or not the target should expect
                                      an acknowledgement from this alert target.
-        :param acknowledge_timeout: Time to wait for acknowledgement if enabled
+        :param acknowledgement_timeout: Time to wait for acknowledgement if enabled
         :param retries:  How many times to attempt transmit of an alert.
         :param destination:  Destination index, defaults to 0.
         :param channel: The channel to configure the alert on.  Defaults to
@@ -944,7 +944,7 @@ class Command(object):
                 destdata.extend(parsedip)
             self.xraw_command(netfn=0xc, command=1, data=destdata)
         if (acknowledge_required is not None or retries is not None or
-                acknowledge_timeout is not None):
+                acknowledgement_timeout is not None):
             currtype = self.xraw_command(netfn=0xc, command=2, data=(
                 channel, 18, destination, 0))
             if currtype['data'][0] != '\x11':
@@ -955,8 +955,8 @@ class Command(object):
                     currtype[1] |= 0b10000000
                 else:
                     currtype[1] &= 0b1111111
-            if acknowledge_timeout is not None:
-                currtype[2] = acknowledge_timeout
+            if acknowledgement_timeout is not None:
+                currtype[2] = acknowledgement_timeout
             if retries is not None:
                 currtype[3] = retries
             destreq = bytearray((channel, 18))
