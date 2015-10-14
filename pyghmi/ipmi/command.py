@@ -798,7 +798,7 @@ class Command(object):
         configuration.  The following keys may be present:
         acknowledge_required - Indicates whether the target expects an
                                acknowledgement
-        acknowledgement_timeout - How long it will wait for an acknowledgment
+        acknowledge_timeout - How long it will wait for an acknowledgment
                                   before retrying
         retries - How many attempts will be made to deliver the alert to this
                   destination
@@ -817,7 +817,7 @@ class Command(object):
         destinfo['acknowledge_required'] = dtype & 0b10000000 == 0b10000000
         # Ignore destination type for now...
         if destinfo['acknowledge_required']:
-            destinfo['acknowledgement_timeout'] = acktimeout
+            destinfo['acknowledge_timeout'] = acktimeout
         destinfo['retries'] = retries
         rqdata = (channel, 19, destination, 0)
         rsp = self.xraw_command(netfn=0xc, command=2, data=rqdata)
