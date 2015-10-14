@@ -47,6 +47,7 @@ def get_categories():
                 "netfn": 0x06,
                 "command": 0x59,
                 "data": (0x00, 0xc1, 0x02, 0x00)
-            }
+            },
+            "workaround_bmc_bug": True
         }
     }
