@@ -25,8 +25,11 @@ import pyghmi.ipmi.private.util as util
 from pyghmi.ipmi.oem.lenovo import cpu
 from pyghmi.ipmi.oem.lenovo import dimm
 from pyghmi.ipmi.oem.lenovo import drive
+
 from pyghmi.ipmi.oem.lenovo import firmware
 from pyghmi.ipmi.oem.lenovo import inventory
+from pyghmi.ipmi.oem.lenovo import raid_drive
+from pyghmi.ipmi.oem.lenovo import raid_controller
 from pyghmi.ipmi.oem.lenovo import pci
 from pyghmi.ipmi.oem.lenovo import psu
 from pyghmi.ipmi.oem.lenovo import raid_controller
@@ -254,30 +257,54 @@ class OEMHandler(generic.OEMHandler):
     def _collect_tsm_inventory(self):
         self.oem_inventory_info = {}
         for catid, catspec in inventory.categories.items():
-            try:
-                rsp = self.ipmicmd.xraw_command(**catspec["command"])
-            except pygexc.IpmiException:
-                continue
+            if (catspec.get("workaround_bmc_bug", False)):
+                rsp = None
+                tmp_command = dict(catspec["command"])
+                tmp_command["data"] = list(tmp_command["data"])
+                count = 0
+                for i in xrange(0x01, 0xff):
+                    tmp_command["data"][-1] = i
+                    try:
+                        partrsp = self.ipmicmd.xraw_command(**tmp_command)
+                        if rsp is None:
+                            rsp = partrsp
+                            rsp["data"] = list(rsp["data"])
+                        else:
+                            rsp["data"].extend(partrsp["data"][1:])
+                        count += 1
+                    except:
+                        break
+                # If we didn't get any response, assume we don't have
+                # this category and go on to the next one
+                if rsp is None:
+                    continue
+                rsp["data"].insert(1, count)
+                rsp["data"] = buffer(bytearray(rsp["data"]))
             else:
                 try:
-                    items = inventory.parse_inventory_category(
-                        catid, rsp,
-                        countable=catspec.get("countable", True)
-                    )
+                    rsp = self.ipmicmd.xraw_command(**catspec["command"])
+                except pygexc.IpmiException:
+                    continue
+            # Parse the response we got
+            try:
+                items = inventory.parse_inventory_category(
+                    catid, rsp,
+                    countable=catspec.get("countable", True)
+                )
+            except Exception:
+                # If we can't parse an inventory category, ignore it
+                print traceback.print_exc()
+                continue
+
+            for item in items:
+                try:
+                    key = catspec["idstr"].format(item["index"])
+                    del item["index"]
+                    self.oem_inventory_info[key] = item
                 except Exception:
-                    # If we can't parse an inventory category, ignore it
+                    # If we can't parse an inventory item, ignore it
                     print traceback.print_exc()
                     continue
-
-                for item in items:
-                    try:
-                        key = catspec["idstr"].format(item["index"])
-                        del item["index"]
-                        self.oem_inventory_info[key] = item
-                    except Exception:
-                        # If we can't parse an inventory item, ignore it
-                        print traceback.print_exc()
-                        continue
 
     def get_leds(self):
         if self.has_tsm:
@@ -348,10 +375,10 @@ class OEMHandler(generic.OEMHandler):
 
         :param enable: True for enable and False for disable
         """
-        # 1 – Enable power capping(default)
+        # 1 - Enable power capping(default)
         if enable:
             statecode = 1
-        # 0 – Disable power capping
+        # 0 - Disable power capping
         else:
             statecode = 0
         if self.has_tsm:
