@@ -83,7 +83,7 @@ def psu_status_word_parser(word):
 
 psu_fields = (
     EntryField("index", "B"),
-    EntryField("Presence State", "B", include=False),
+    EntryField("Presence State", "B", presence=True),
     EntryField("Capacity W", "<H"),
     EntryField("Board manufacturer", "18s"),
     EntryField("Board model", "18s"),
