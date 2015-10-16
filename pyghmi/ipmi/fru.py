@@ -37,7 +37,7 @@ import pyghmi.ipmi.private.spd as spd
 import struct
 import time
 
-fruepoch = time.mktime(time.strptime('1/1/1996', "%m/%d/%Y"))
+fruepoch = 820454400  # 1/1/1996, 0:00
 
 # This is from SMBIOS specification Table 16
 enclosure_types = {
