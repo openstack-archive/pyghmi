@@ -1012,7 +1012,7 @@ class Command(object):
         offset = 0
         for chunk in chunks:
             cmddata = bytearray((0xdc, offset, len(chunk)))
-            cmddata += chunk
+            cmddata += bytearray(chunk, 'utf-8')
             self.xraw_command(netfn=0x2c, command=command, data=cmddata)
 
     def set_channel_access(self, channel=None,
