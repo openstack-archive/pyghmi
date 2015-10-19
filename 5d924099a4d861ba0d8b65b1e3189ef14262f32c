@@ -1,0 +1,10 @@
+Verified+2: Jenkins
+Code-Review+2: Jarrod Johnson <jjohnson2@lenovo.com>
+Workflow+1: Jarrod Johnson <jjohnson2@lenovo.com>
+Code-Review+1: venkatamahesh <venkatamaheshkotha@gmail.com>
+Code-Review+1: Clint Adams <clint@gcfm.net>
+Submitted-by: Jenkins
+Submitted-at: Mon, 19 Oct 2015 20:22:19 +0000
+Reviewed-on: https://review.openstack.org/236544
+Project: openstack/pyghmi
+Branch: refs/heads/master
