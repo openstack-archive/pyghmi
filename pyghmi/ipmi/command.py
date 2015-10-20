@@ -1011,8 +1011,9 @@ class Command(object):
         chunks = [data[i:i+15] for i in xrange(0, len(data), 15)]
         offset = 0
         for chunk in chunks:
+            chunk = bytearray(chunk, 'utf-8')
             cmddata = bytearray((0xdc, offset, len(chunk)))
-            cmddata += bytearray(chunk, 'utf-8')
+            cmddata += chunk
             self.xraw_command(netfn=0x2c, command=command, data=cmddata)
 
     def set_channel_access(self, channel=None,
