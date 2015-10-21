@@ -351,9 +351,15 @@ class Console(object):
                     self._sendpendingoutput()
             if len(self.pendingoutput) > 0:
                 self._sendpendingoutput()
-        elif self.awaitingack:  # session marked us as happy, but we are not
-                #this does mean that we will occasionally retry a packet
-                #sooner than retry suggests, but that's no big deal
+        elif ackseq != 0 and self.awaitingack:
+            # if an ack packet came in, but did not match what we
+            # expected, retry our payload now.
+            # the situation that was triggered was a senseless retry
+            # when data came in while we xmitted.  In theory, a BMC
+            # should handle a retry correctly, but some do not, so
+            # try to mitigate by avoiding overeager retries
+            # occasional retry of a packet
+            # sooner than timeout suggests is evidently a big deal
             self.send_payload(payload=self.lastpayload)
 
     def main_loop(self):
