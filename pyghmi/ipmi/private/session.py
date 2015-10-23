@@ -600,7 +600,8 @@ class Session(object):
                     bridge_request=None,
                     data=(),
                     retry=True,
-                    delay_xmit=None):
+                    delay_xmit=None,
+                    timeout=None):
         if not self.logged:
             raise exc.IpmiException('Session no longer connected')
         while self._isincommand():
@@ -612,7 +613,8 @@ class Session(object):
         self.ipmicallback = self._generic_callback
         self._send_ipmi_net_payload(netfn, command, data,
                                     bridge_request=bridge_request,
-                                    retry=retry, delay_xmit=delay_xmit)
+                                    retry=retry, delay_xmit=delay_xmit,
+                                    timeout=timeout)
 
         if retry:  # in retry case, let the retry timers indicate wait time
             timeout = None
@@ -632,7 +634,7 @@ class Session(object):
 
     def _send_ipmi_net_payload(self, netfn=None, command=None, data=[], code=0,
                                bridge_request=None,
-                               retry=None, delay_xmit=None):
+                               retry=None, delay_xmit=None, timeout=None):
         if retry is None:
             retry = not self.servermode
         if self.servermode:
@@ -645,10 +647,10 @@ class Session(object):
                                               data)
         payload_type = constants.payload_types['ipmi']
         self.send_payload(payload=ipmipayload, payload_type=payload_type,
-                          retry=retry, delay_xmit=delay_xmit)
+                          retry=retry, delay_xmit=delay_xmit, timeout=timeout)
 
     def send_payload(self, payload=(), payload_type=None, retry=True,
-                     delay_xmit=None, needskeepalive=False):
+                     delay_xmit=None, needskeepalive=False, timeout=None):
         """Send payload over the IPMI Session
 
         :param needskeepalive: If the payload is expected not to count as
@@ -657,6 +659,7 @@ class Session(object):
                                job done because of this payload.
                                Notably, 0-length SOL packets
                                are prone to confusion.
+        :param timeout: Specify a custom timeout for long-running request
         """
         if payload and self.lastpayload:
                              # we already have a packet outgoing, make this
@@ -754,7 +757,7 @@ class Session(object):
                 not self._customkeepalives):
             Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
                 25 + (random.random() * 4.9)
-        self._xmit_packet(retry, delay_xmit=delay_xmit)
+        self._xmit_packet(retry, delay_xmit=delay_xmit, timeout=timeout)
 
     def _ipmi15authcode(self, payload, checkremotecode=False):
         #checkremotecode is used to verify remote code,
@@ -1475,7 +1478,7 @@ class Session(object):
             self.send_payload()
         self.nowait = False
 
-    def _xmit_packet(self, retry=True, delay_xmit=None):
+    def _xmit_packet(self, retry=True, delay_xmit=None, timeout=None):
         if self.sequencenumber:  # seq number of zero will be left alone, it is
                                 # special, otherwise increment
             self.sequencenumber += 1
@@ -1509,8 +1512,12 @@ class Session(object):
         if retry:
             Session.waiting_sessions[self] = {}
             Session.waiting_sessions[self]['ipmisession'] = self
-            Session.waiting_sessions[self]['timeout'] = self.timeout + \
-                _monotonic_time()
+            if timeout is not None:
+                Session.waiting_sessions[self]['timeout'] = timeout + \
+                    _monotonic_time()
+            else:
+                Session.waiting_sessions[self]['timeout'] = self.timeout + \
+                    _monotonic_time()
 
     def logout(self):
         if not self.logged:
