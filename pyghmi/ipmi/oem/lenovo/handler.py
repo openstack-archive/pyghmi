@@ -209,7 +209,7 @@ class OEMHandler(generic.OEMHandler):
         if self.has_tsm:
             if enabled:
                 self.ipmicmd.xraw_command(
-                    netfn=0x32, command=0xa8, data=(3, 1))
+                    netfn=0x32, command=0xa8, data=(3, 1), timeout=15)
             else:
                 self.ipmicmd.xraw_command(
                     netfn=0x32, command=0xa8, data=(3, 0))
