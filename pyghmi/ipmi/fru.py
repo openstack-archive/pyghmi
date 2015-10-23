@@ -214,9 +214,16 @@ class FRU(object):
             # return it as a bytearray, not much to be done for it
             return retinfo, newoffset
         elif currtype == 3:  # text string
-            if lang == 0:
+            # Sometimes BMCs have FRU data with 0xff termination
+            # contrary to spec, but can be tolerated
+            # also in case something null terminates, handle that too
+            # strictly speaking, \xff should be a y with diaeresis, but
+            # erring on the side of that not being very relevant in practice
+            # to fru info, particularly the last values
+            retinfo = retinfo.rstrip('\xff\x00')
+            if lang in (0, 25):
                 try:
-                    retinfo = retinfo.decode('utf-8')
+                    retinfo = retinfo.decode('iso-8859-1')
                 except UnicodeDecodeError:
                     pass
             else:
