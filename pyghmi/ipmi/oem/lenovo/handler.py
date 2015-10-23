@@ -323,15 +323,18 @@ class OEMHandler(generic.OEMHandler):
             fru['oem_parser'] = 'lenovo'
             # Thinkserver lays out specific interpretation of the
             # board extra fields
-            _, _, wwn1, wwn2, mac1, mac2 = fru['board_extra']
-            if wwn1 not in ('0000000000000000', ''):
-                fru['WWN 1'] = wwn1
-            if wwn2 not in ('0000000000000000', ''):
-                fru['WWN 2'] = wwn2
-            if mac1 not in ('00:00:00:00:00:00', ''):
-                fru['MAC Address 1'] = mac1
-            if mac2 not in ('00:00:00:00:00:00', ''):
-                fru['MAC Address 2'] = mac2
+            try:
+                _, _, wwn1, wwn2, mac1, mac2 = fru['board_extra']
+                if wwn1 not in ('0000000000000000', ''):
+                    fru['WWN 1'] = wwn1
+                if wwn2 not in ('0000000000000000', ''):
+                    fru['WWN 2'] = wwn2
+                if mac1 not in ('00:00:00:00:00:00', ''):
+                    fru['MAC Address 1'] = mac1
+                if mac2 not in ('00:00:00:00:00:00', ''):
+                    fru['MAC Address 2'] = mac2
+            except (AttributeError, KeyError):
+                pass
             try:
                 # The product_extra field is UUID as the system would present
                 # in DMI.  This is different than the two UUIDs that
