@@ -322,7 +322,7 @@ class Command(object):
         return {'bootdev': bootdev}
 
     def xraw_command(self, netfn, command, bridge_request=(), data=(),
-                     delay_xmit=None):
+                     delay_xmit=None, retry=True, timeout=None):
         """Send raw ipmi command to BMC, raising exception on error
 
         This is identical to raw_command, except it raises exceptions
@@ -336,18 +336,23 @@ class Command(object):
         :param bridge_request: The target slave address and channel number for
                                the bridge request.
         :param data: Command data as a tuple or list
+        :param retry: Whether to retry this particular payload or not, defaults
+                      to true.
+        :param timeout: A custom time to wait for initial reply, useful for
+                        a slow command.  This may interfere with retry logic.
         :returns: dict -- The response from IPMI device
         """
         rsp = self.ipmi_session.raw_command(netfn=netfn, command=command,
                                             bridge_request=bridge_request,
-                                            data=data, delay_xmit=delay_xmit)
+                                            data=data, delay_xmit=delay_xmit,
+                                            retry=retry, timeout=timeout)
         if 'error' in rsp:
             raise exc.IpmiException(rsp['error'], rsp['code'])
         rsp['data'] = buffer(bytearray(rsp['data']))
         return rsp
 
     def raw_command(self, netfn, command, bridge_request=(), data=(),
-                    delay_xmit=None):
+                    delay_xmit=None, retry=True, timeout=None):
         """Send raw ipmi command to BMC
 
         This allows arbitrary IPMI bytes to be issued.  This is commonly used
@@ -360,11 +365,15 @@ class Command(object):
         :param bridge_request: The target slave address and channel number for
                                the bridge request.
         :param data: Command data as a tuple or list
+        :param retry: Whether or not to retry command if no response received.
+                      Defaults to True
+        :param timeout: A custom amount of time to wait for initial reply
         :returns: dict -- The response from IPMI device
         """
         return self.ipmi_session.raw_command(netfn=netfn, command=command,
                                              bridge_request=bridge_request,
-                                             data=data, delay_xmit=delay_xmit)
+                                             data=data, delay_xmit=delay_xmit,
+                                             retry=retry, timeout=timeout)
 
     def get_power(self):
         """Get current power state of the managed system
