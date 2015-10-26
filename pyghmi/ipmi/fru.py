@@ -186,16 +186,21 @@ class FRU(object):
             frutype = self.sdr.fru_type_and_modifier >> 8
             frusubtype = self.sdr.fru_type_and_modifier & 0xff
             if frutype > 0x10 or frutype < 0x8 or frusubtype not in (0, 1, 2):
-                raise iexc.PyghmiException(
-                    'Unsupported FRU device: {0:x}h, {1:x}h'.format(frutype,
-                                                                    frusubtype
-                                                                    ))
+                return
+                #TODO(jjohnson2): strict mode to detect pyghmi and BMC
+                #gaps
+                # raise iexc.PyghmiException(
+                #     'Unsupported FRU device: {0:x}h, {1:x}h'.format(frutype,
+                #                                                    frusubtype
+                #                                                    ))
             elif frusubtype == 1:
                 self.myspd = spd.SPD(self.databytes)
                 self.info = self.myspd.info
                 return
         if self.databytes[0] != 1:
-            raise iexc.BmcErrorException("Invalid/Unsupported FRU format")
+            return
+            #TODO(jjohnson2): strict mode to flag potential BMC errors
+            # raise iexc.BmcErrorException("Invalid/Unsupported FRU format")
         # Ignore the internal use even if present.
         self._parse_chassis()
         self._parse_board()
