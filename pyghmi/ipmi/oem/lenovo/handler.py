@@ -345,7 +345,8 @@ class OEMHandler(generic.OEMHandler):
                 # to strip \x00 from the end of text strings.  Work around this
                 # by padding with \x00 to the right if less than 16 long
                 byteguid.extend('\x00' * (16 - len(byteguid)))
-                fru['UUID'] = util.decode_wireformat_uuid(byteguid)
+                if byteguid not in ('\x20' * 16, '\x00' * 16, '\xff' * 16):
+                    fru['UUID'] = util.decode_wireformat_uuid(byteguid)
             except (AttributeError, KeyError):
                 pass
             return fru
