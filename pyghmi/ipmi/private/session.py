@@ -626,10 +626,14 @@ class Session(object):
         #of only the constructor needing a callback.  From then on,
         #synchronous usage of the class acts in a greenthread style governed by
         #order of data on the network
-        while retry and self.lastresponse is None:
+        while retry and self.lastresponse is None and self.logged:
             Session.wait_for_rsp(timeout=timeout)
+        if not self.logged:
+            raise
         lastresponse = self.lastresponse
         self.incommand = False
+        if lastresponse is None:
+            raise exc.IpmiException('Session no longer connected')
         return lastresponse
 
     def _send_ipmi_net_payload(self, netfn=None, command=None, data=[], code=0,
