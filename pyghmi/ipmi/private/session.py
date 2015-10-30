@@ -630,7 +630,7 @@ class Session(object):
             Session.wait_for_rsp(timeout=timeout)
         lastresponse = self.lastresponse
         self.incommand = False
-        if lastresponse is None:
+        if retry and lastresponse is None:
             raise exc.IpmiException('Session no longer connected')
         return lastresponse
 
