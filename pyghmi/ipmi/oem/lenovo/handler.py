@@ -230,8 +230,16 @@ class OEMHandler(generic.OEMHandler):
     def has_tsm(self):
         """True if this particular server have a TSM based service processor
         """
-        return (self.oemid['manufacturer_id'] == 19046 and
-                self.oemid['device_id'] == 32)
+        if (self.oemid['manufacturer_id'] == 19046 and
+                self.oemid['device_id'] == 32):
+            try:
+                self.ipmicmd.xraw_command(netfn=0x3a, command=0xf)
+            except pygexc.IpmiException as ie:
+                if ie.ipmicode == 193:
+                    return False
+                raise
+            return True
+        return False
 
     def get_oem_inventory_descriptions(self):
         if self.has_tsm:
