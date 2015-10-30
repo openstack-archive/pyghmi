@@ -145,6 +145,19 @@ class Command(object):
         """
         return session.Session.wait_for_rsp(timeout=timeout)
 
+    def _get_device_id(self):
+        response = self.raw_command(netfn=6, command=1)
+        if 'error' in response:
+            raise exc.IpmiException(response['error'], code=response['code'])
+        return {
+            'device_id': response['data'][0],
+            'device_revision': response['data'][1] & 0b1111,
+            'manufacturer_id': struct.unpack(
+                '<I', struct.pack('3B', *response['data'][6:9]) + '\x00')[0],
+            'product_id': struct.unpack(
+                '<H', struct.pack('2B', *response['data'][9:11]))[0],
+        }
+
     def oem_init(self):
         """Initialize the command object for OEM capabilities
 
@@ -155,17 +168,7 @@ class Command(object):
         """
         if self._oem:
             return
-        response = self.raw_command(netfn=6, command=1)
-        if 'error' in response:
-            raise exc.IpmiException(response['error'], code=response['code'])
-        self._oem = get_oem_handler({
-            'device_id': response['data'][0],
-            'device_revision': response['data'][1] & 0b1111,
-            'manufacturer_id': struct.unpack(
-                '<I', struct.pack('3B', *response['data'][6:9]) + '\x00')[0],
-            'product_id': struct.unpack(
-                '<H', struct.pack('2B', *response['data'][9:11]))[0],
-        }, self)
+        self._oem = get_oem_handler(self._get_device_id(), self)
 
     def get_bootdev(self):
         """Get current boot device override information.
@@ -521,6 +524,15 @@ class Command(object):
         if 'error' not in guiddata:
             zerofru['UUID'] = pygutil.decode_wireformat_uuid(
                 guiddata['data'])
+        # Add some fields returned by get device ID command to FRU 0
+        # Also rename them to something more in line with FRU 0 field naming
+        # standards
+        device_id = self._get_device_id()
+        device_id['Device ID'] = device_id.pop('device_id')
+        device_id['Device Revision'] = device_id.pop('device_revision')
+        device_id['Manufacturer ID'] = device_id.pop('manufacturer_id')
+        device_id['Product ID'] = device_id.pop('product_id')
+        zerofru.update(device_id)
         if not zerofru:
             zerofru = None
         return self._oem.process_fru(zerofru)
