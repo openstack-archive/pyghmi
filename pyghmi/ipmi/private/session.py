@@ -302,10 +302,10 @@ class Session(object):
         tmpsocket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)  # INET6
                                     # can do IPv4 if you are nice to it
         tmpsocket.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
-        # Rather than wait until send() to bind, bind now so that we have
-        # a port number allocated no matter what
-        tmpsocket.bind(('', 0))
         if server is None:
+            # Rather than wait until send() to bind, bind now so that we have
+            # a port number allocated no matter what
+            tmpsocket.bind(('', 0))
             cls.socketpool[tmpsocket] = 1
         else:
             tmpsocket.bind(server)
