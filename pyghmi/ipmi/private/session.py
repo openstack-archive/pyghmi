@@ -1190,11 +1190,13 @@ class Session(object):
             if ptype == 0:
                 self._parse_ipmi_payload(payload)
             elif ptype == 1:  # There should be no other option
-                # note that we assume the SOL payload is good enough to avoid
-                # retry SOL logic is sufficiently different, we just
-                # defer that call to the sol handler, it can re submit if it
-                # is unhappy
-                if self.last_payload_type == 1:  # but only if SOL was last tx
+                if (payload[1] & 0b1111) and self.last_payload_type == 1:
+                    # for ptype 1, the 4 least significant bits of 2nd byte
+                    # is  the ACK number.
+                    # if it isn't an ACK at all, we'll keep retrying, however
+                    # if it's a subtle SOL situation (partial ACK, wrong ACK)
+                    # then sol_handler will have to resubmit and we will
+                    # stop the generic retry behavior here
                     self.lastpayload = None
                     self.last_payload_type = None
                     Session.waiting_sessions.pop(self, None)
