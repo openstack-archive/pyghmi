@@ -28,6 +28,10 @@ class IpmiException(PyghmiException):
         super(IpmiException, self).__init__(text)
         self.ipmicode = code
 
+class UnrecognizedCertificate(Exception):
+    def __init__(self, text='', certdata):
+        super(UnrecognizedCertificate, self).__init__(text)
+        self.certdata = certdata
 
 class InvalidParameterValue(PyghmiException):
     pass

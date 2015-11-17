@@ -100,9 +100,18 @@ class Command(object):
     :param onlogon: function to run when logon completes in an asynchronous
                     fashion.  This will result in a greenthread behavior.
     :param kg: Optional parameter to use if BMC has a particular Kg configured
+    :param certverifycallback: A callback to evaluate the validity of a TLS
+                    certificate should one be encountered.  For example, if
+                    OEM capability goes into a ssh or TLS (e.g. https) mode,
+                    this will be called.  The arguments given to the callback
+                    are the key type ('tls' or 'ssh') and then the key.  For
+                    TLS, the key will be presented as binary (for example,
+                    the return of getpeercert(binary_form=True).  Required
+                    to support OEM functionality that may involve TLS or ssh.
     """
 
-    def __init__(self, bmc, userid, password, port=623, onlogon=None, kg=None):
+    def __init__(self, bmc, userid, password, port=623, onlogon=None, kg=None,
+                 certverifycallback=None):
         # TODO(jbjohnso): accept tuples and lists of each parameter for mass
         # operations without pushing the async complexities up the stack
         self.onlogon = onlogon
@@ -110,6 +119,7 @@ class Command(object):
         self._sdr = None
         self._oem = None
         self._netchannel = None
+        self._certverify = certverifycallback
         if onlogon is not None:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,
@@ -269,6 +279,16 @@ class Command(object):
             return {'powerstate': currpowerstate}
         else:
             return lastresponse
+
+    def get_video_launchdata(self):
+        """Get data required to launch a remote video session to target.
+
+        This is a highly proprietary scenario, the return data may vary greatly
+        host to host.  The return should be a dict describing the type of data
+        and the data.  For example {'jnlp': jnlpstring}
+        """
+        self.oem_init()
+        return self._oem.get_video_launchdata()
 
     def reset_bmc(self):
         """Do a cold reset in BMC
