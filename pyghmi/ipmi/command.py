@@ -100,6 +100,14 @@ class Command(object):
     :param onlogon: function to run when logon completes in an asynchronous
                     fashion.  This will result in a greenthread behavior.
     :param kg: Optional parameter to use if BMC has a particular Kg configured
+    :param certverifycallback: A callback to evaluate the validity of a TLS
+                    certificate should one be encountered.  For example, if
+                    OEM capability goes into a ssh or TLS (e.g. https) mode,
+                    this will be called.  The arguments given to the callback
+                    are the key type ('tls' or 'ssh') and then the key.  For
+                    TLS, the key will be presented as binary (for example,
+                    the return of getpeercert(binary_form=True).  Required
+                    to support OEM functionality that may involve TLS or ssh.
     """
 
     def __init__(self, bmc, userid, password, port=623, onlogon=None, kg=None):
@@ -126,6 +134,22 @@ class Command(object):
                                                 password=password,
                                                 port=port,
                                                 kg=kg)
+
+    def register_key_handler(self, callback, type='tls'):
+        """Assign a verification handler for a public key
+
+        When the library attempts to communicate with the management target
+        using a non-IPMI protocol, it will try to verify a key.  This
+        allows a caller to register a key handler for accepting or rejecting
+        a public key/certificate.  The callback will be passed the peer public
+        key or certificate.
+
+        :param callback:  The function to call with public key/certificate
+        :param type: Whether the callback is meant to handle 'tls' or 'ssh',
+                     defaults to 'tls'
+        """
+        if type == 'tls':
+            self._certverify = callback
 
     def logged(self, response):
         self.onlogon(response, self)
@@ -269,6 +293,16 @@ class Command(object):
             return {'powerstate': currpowerstate}
         else:
             return lastresponse
+
+    def get_video_launchdata(self):
+        """Get data required to launch a remote video session to target.
+
+        This is a highly proprietary scenario, the return data may vary greatly
+        host to host.  The return should be a dict describing the type of data
+        and the data.  For example {'jnlp': jnlpstring}
+        """
+        self.oem_init()
+        return self._oem.get_video_launchdata()
 
     def reset_bmc(self):
         """Do a cold reset in BMC
