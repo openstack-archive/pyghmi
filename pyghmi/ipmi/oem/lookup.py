@@ -24,8 +24,9 @@ oemmap = {
 }
 
 
-def get_oem_handler(oemid, ipmicmd):
+def get_oem_handler(oemid, ipmicmd, certverifycallback):
     try:
-        return oemmap[oemid['manufacturer_id']].OEMHandler(oemid, ipmicmd)
+        return oemmap[oemid['manufacturer_id']].OEMHandler(oemid, ipmicmd,
+                                                           certverifycallback)
     except KeyError:
-        return generic.OEMHandler(oemid, ipmicmd)
+        return generic.OEMHandler(oemid, ipmicmd, certverifycallback)
