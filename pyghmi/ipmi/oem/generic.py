@@ -24,8 +24,11 @@ class OEMHandler(object):
     a dictionary with product_id, device_id, manufacturer_id, and
     device_revision as keys in a dictionary, along with an ipmi Command object
     """
-    def __init__(self, oemid, ipmicmd):
+    def __init__(self, oemid, ipmicmd, certverifycallback):
         pass
+
+    def get_video_launchdata(self):
+        return {}
 
     def process_event(self, event, ipmicmd, seldata):
         """Modify an event according with OEM understanding.
