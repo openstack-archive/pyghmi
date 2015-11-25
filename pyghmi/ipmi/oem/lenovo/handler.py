@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import traceback
+import urllib
 
 import pyghmi.constants as pygconst
 import pyghmi.exceptions as pygexc
@@ -34,7 +35,7 @@ from pyghmi.ipmi.oem.lenovo import psu
 from pyghmi.ipmi.oem.lenovo import raid_controller
 from pyghmi.ipmi.oem.lenovo import raid_drive
 
-#import pyghmi.util.webclient as wc
+import pyghmi.util.webclient as wc
 
 inventory.register_inventory_category(cpu)
 inventory.register_inventory_category(dimm)
@@ -465,3 +466,55 @@ class OEMHandler(generic.OEMHandler):
 
             self._restart_dns()
             return
+
+    """ Gets a remote console launcher for a Lenovo ThinkServer.
+
+    Returns a tuple: (content type, launcher) or None if the launcher could
+    not be retrieved."""
+    def _get_ts_remote_console(self, bmc, username, password):
+        # We don't establish non-secure connections without checking
+        # certificates
+        if not self._certverify:
+            return
+        conn = wc.SecureHTTPConnection(bmc, 443,
+            verifycallback=self._certverify)
+        conn.connect()
+        params = urllib.urlencode({
+            'WEBVAR_USERNAME': username,
+            'WEBVAR_PASSWORD': password
+        })
+        headers = {
+            'Connection': 'keep-alive'
+        }
+        conn.request('POST', '/rpc/WEBSES/create.asp', params, headers)
+        rsp = conn.getresponse()
+        if rsp.status == 200:
+            body = rsp.read().split('\n')
+            session_line = None
+            for line in body:
+                if 'SESSION_COOKIE' in line:
+                    session_line = line
+            if session_line is None:
+                return
+
+            session_id = session_line.split('\'')[3]
+            # Usually happens when maximum number of sessions is reached
+            if session_id == 'Failure_Session_Creation':
+                return
+
+            headers = {
+                'Connection': 'keep-alive',
+                'Cookie': 'SessionCookie=' + session_id,
+            }
+            conn.request('GET',
+                '/Java/jviewer.jnlp?EXTRNIP=' + bmc + '&JNLPSTR=JViewer',
+                None, headers)
+            rsp = conn.getresponse()
+            if rsp.status == 200:
+                return rsp.getheader('Content-Type'), rsp.read()
+        conn.close()
+
+    def get_graphical_console(self):
+        return self._get_ts_remote_console(self.ipmicmd.bmc,
+            self.ipmicmd.ipmi_session.userid,
+            self.ipmicmd.ipmi_session.password)
