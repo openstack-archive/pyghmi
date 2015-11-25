@@ -70,6 +70,8 @@ def docommand(result, ipmisession):
     elif cmmand == 'leds':
         for led in ipmisession.get_leds():
             print repr(led)
+    elif cmmand == 'graphical':
+        print ipmisession.get_graphical_console()
     elif cmmand == 'raw':
         print ipmisession.raw_command(netfn=int(args[0]),
                                       command=int(args[1]),

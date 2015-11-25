@@ -208,3 +208,7 @@ class OEMHandler(object):
         :param name: domain name to be set
         """
         return ()
+
+    def get_graphical_console(self):
+        """Get graphical console launcher"""
+        return ()

@@ -1702,3 +1702,8 @@ class Command(object):
         """
         self.oem_init()
         self._oem.set_oem_domain_name(name)
+
+    def get_graphical_console(self):
+        """Get graphical console launcher"""
+        self.oem_init()
+        return self._oem.get_graphical_console()
