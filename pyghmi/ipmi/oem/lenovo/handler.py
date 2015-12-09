@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import traceback
 import urllib
 
@@ -512,7 +513,8 @@ class OEMHandler(generic.OEMHandler):
                 None, headers)
             rsp = conn.getresponse()
             if rsp.status == 200:
-                return rsp.getheader('Content-Type'), rsp.read()
+                return rsp.getheader('Content-Type'), base64.b64encode(
+                    rsp.read())
         conn.close()
 
     def get_graphical_console(self):
