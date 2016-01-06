@@ -32,8 +32,8 @@ import sys
 
 
 class FakeBmc(bmc.Bmc):
-    def __init__(self, authdata, port):
-        super(FakeBmc, self).__init__(authdata, port)
+    def __init__(self, authdata, address, port):
+        super(FakeBmc, self).__init__(authdata, address, port)
         self.powerstate = 'off'
         self.bootdevice = 'default'
 
@@ -73,11 +73,15 @@ if __name__ == '__main__':
         prog='fakebmc',
         description='Pretend to be a BMC',
     )
+    parser.add_argument('--address',
+                        dest='address',
+                        default='::',
+                        help='IPv6 address to listen on; defaults to ::')
     parser.add_argument('--port',
                         dest='port',
                         type=int,
                         default=623,
                         help='Port to listen on; defaults to 623')
     args = parser.parse_args()
-    mybmc = FakeBmc({'admin': 'password'}, port=args.port)
+    mybmc = FakeBmc({'admin': 'password'}, address=args.address, port=args.port)
     mybmc.listen()

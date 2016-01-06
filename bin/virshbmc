@@ -26,8 +26,8 @@ import sys
 class LibvirtBmc(bmc.Bmc):
     """A class to provide an IPMI interface to the VirtualBox APIs."""
 
-    def __init__(self, authdata, hypervisor, domain, port):
-        super(LibvirtBmc, self).__init__(authdata, port)
+    def __init__(self, authdata, hypervisor, domain, address, port):
+        super(LibvirtBmc, self).__init__(authdata, address, port)
         # Rely on libvirt to throw on bad data
         self.conn = libvirt.open(hypervisor)
         self.domain = self.conn.lookupByName(domain)
@@ -69,6 +69,10 @@ if __name__ == '__main__':
         description='Pretend to be a BMC and proxy to virsh',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
+    parser.add_argument('--address',
+                        dest='address',
+                        default='::',
+                        help='IPv6 address to listen on; defaults to ::')
     parser.add_argument('--port',
                         dest='port',
                         type=int,
@@ -86,5 +90,6 @@ if __name__ == '__main__':
     mybmc = LibvirtBmc({'admin': 'password'},
                        hypervisor=args.hypervisor,
                        domain=args.domain,
+                       address=args.address,
                        port=args.port)
     mybmc.listen()
