@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2015 Lenovo
+# Copyright 2015-2016 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ from pyghmi.ipmi.oem.lenovo import drive
 
 from pyghmi.ipmi.oem.lenovo import firmware
 from pyghmi.ipmi.oem.lenovo import inventory
+from pyghmi.ipmi.oem.lenovo import nextscale
 from pyghmi.ipmi.oem.lenovo import pci
 from pyghmi.ipmi.oem.lenovo import psu
 from pyghmi.ipmi.oem.lenovo import raid_controller
@@ -236,6 +237,14 @@ class OEMHandler(generic.OEMHandler):
         return None
 
     @property
+    def is_fpc(self):
+        """True if the target is a Lenovo nextscale fan power controller
+        """
+        return (self.oemid['manufacturer_id'] == 20301 and
+                self.oemid['device_id'] == 32 and
+                self.oemid['product_id'] == 462)
+
+    @property
     def has_tsm(self):
         """True if this particular server have a TSM based service processor
         """
@@ -263,6 +272,19 @@ class OEMHandler(generic.OEMHandler):
             self._collect_tsm_inventory()
             for compname in self.oem_inventory_info:
                 yield (compname, self.oem_inventory_info[compname])
+
+    def get_sensor_data(self):
+        if self.is_fpc:
+            for name in nextscale.fpc_sensors:
+                yield nextscale.get_sensor_reading(name, self.ipmicmd)
+
+    def get_sensor_descriptions(self):
+        if self.is_fpc:
+            return nextscale.get_sensor_descriptions()
+
+    def get_sensor_reading(self, sensorname):
+        if self.is_fpc:
+            return nextscale.get_sensor_reading(sensorname, self.ipmicmd)
 
     def get_inventory_of_component(self, component):
         if self.has_tsm:
