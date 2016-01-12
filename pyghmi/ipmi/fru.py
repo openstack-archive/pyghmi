@@ -138,6 +138,8 @@ class FRU(object):
             self.parsedata()
         else:
             raise TypeError('Either rawdata or ipmicmd must be specified')
+        # Store pointer to the relevant SDR for OEM code to be able to use
+        self.info['sdr'] = sdr
 
     def fetch_fru(self, fruid):
         response = self.ipmicmd.raw_command(

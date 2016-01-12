@@ -117,6 +117,9 @@ class OEMHandler(generic.OEMHandler):
         self.oemid = oemid
         self.ipmicmd = ipmicmd
         self.oem_inventory_info = None
+        self._is_fpc = None
+        self._has_tsm = None
+        self._has_imm = None
 
     def get_video_launchdata(self):
         if self.has_tsm:
@@ -240,15 +243,19 @@ class OEMHandler(generic.OEMHandler):
     def is_fpc(self):
         """True if the target is a Lenovo nextscale fan power controller
         """
-        fpc_ids = ((20301, 32, 462),
-                   (19046, 32, 1063))
-        return (self.oemid['manufacturer_id'], self.oemid['device_id'],
-                self.oemid['product_id']) in fpc_ids
+        if self._is_fpc is None:
+            self._is_fpc = (self.oemid['manufacturer_id'],
+                            self.oemid['device_id'],
+                            self.oemid['product_id']) in nextscale.fpc_ids
+        return self._is_fpc
 
     @property
     def has_tsm(self):
         """True if this particular server have a TSM based service processor
         """
+        if self._has_tsm is not None:
+            return self._has_tsm
+        self._has_tsm = False  # false until proven otherwise
         if (self.oemid['manufacturer_id'] == 19046 and
                 self.oemid['device_id'] == 32):
             try:
@@ -257,8 +264,37 @@ class OEMHandler(generic.OEMHandler):
                 if ie.ipmicode == 193:
                     return False
                 raise
+            self._has_tsm = True
             return True
         return False
+
+    @property
+    def has_imm(self):
+        """True if this particular server is a system x series with an IMM
+        as the service processor
+        """
+        if self._has_imm is not None:
+            return self._has_imm
+        self._has_imm = False
+        if self.is_fpc:
+            return False
+        if self.has_tsm:
+            return False
+        try:
+            rsp = self.ipmicmd.xraw_command(netfn=0x3a, command=0x50)
+        except pygexc.IpmiException:
+            return False
+        if len(rsp['data']) != 30:
+            return False
+        # ignore everything to the right of a null, if present
+        buildid, _, _ = rsp['data'][:8].partition('\x00')
+        # 1aoo = IBM IMM2, yuoo == IBM IMM1, tcoo == Lenovo IMM2
+        if buildid[:4].lower in ('1aoo', 'tcoo', 'yuoo'):
+            self._has_imm = True
+            self.imm_buildid = buildid
+            return True
+        return False
+
 
     def get_oem_inventory_descriptions(self):
         if self.has_tsm:
@@ -359,9 +395,12 @@ class OEMHandler(generic.OEMHandler):
                 yield (name, {'status': status})
 
     def process_fru(self, fru):
+        sdr = fru['sdr']
+        del fru['sdr']  # should not be in the structure after this point
         if fru is None:
             return fru
         if self.has_tsm:
+            del fru['sdr']
             fru['oem_parser'] = 'lenovo'
             # Thinkserver lays out specific interpretation of the
             # board extra fields
@@ -392,6 +431,7 @@ class OEMHandler(generic.OEMHandler):
             except (AttributeError, KeyError):
                 pass
             return fru
+        elif self.has_imm:
         else:
             fru['oem_parser'] = None
             return fru

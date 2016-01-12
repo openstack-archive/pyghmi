@@ -305,6 +305,7 @@ class SDREntry(object):
         self.fru_logical = (entry[2] & 0b10000000) == 0b10000000
         # 0x8  to 0x10..  0 unspecified except on 0x10, 1 is dimm
         self.fru_type_and_modifier = (entry[5] << 8) + entry[6]
+        self.fru_oem_field = entry[9]
 
     def association_decode(self, entry):
         # table 43-4 Entity Associaition Record

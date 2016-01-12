@@ -171,6 +171,8 @@ class OEMHandler(object):
         if fru is None:
             return fru
         fru['oem_parser'] = None
+        #  Delete the transient reference to the SDR
+        del fru['sdr']
         return fru
 
     def get_oem_firmware(self):

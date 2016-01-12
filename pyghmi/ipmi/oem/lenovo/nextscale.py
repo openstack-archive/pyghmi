@@ -67,6 +67,10 @@ fpc_sensors = {
     }
 }
 
+# Tuples of manufacturer, device, and product ids that match nextscale FPCs
+fpc_ids = ((20301, 32, 462),
+           (19046, 32, 1063))
+
 
 def get_sensor_descriptions():
     global fpc_sensors
