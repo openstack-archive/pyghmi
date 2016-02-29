@@ -297,7 +297,7 @@ def _fix_sel_time(records, ipmicmd):
         correctearly = False
         inpreinit = False
     newtimestamp = 0
-    lasttimestamp = 0
+    lasttimestamp = None
     trimindexes = []
     for index in reversed(xrange(len(records))):
         record = records[index]
@@ -323,7 +323,8 @@ def _fix_sel_time(records, ipmicmd):
                 if not correctearly:
                     correctednowtime = nowtime
                     continue
-                if record['timecode'] < lasttimestamp:
+                if (lasttimestamp is not None and
+                        record['timecode'] > lasttimestamp):
                     # Time has gone backwards in pre-init, no hope for
                     # accurate time
                     correctearly = False
@@ -331,6 +332,9 @@ def _fix_sel_time(records, ipmicmd):
                     continue
                 inpreinit = True
                 lasttimestamp = record['timecode']
+                age = correctednowtime - record['timecode']
+                record['timestamp'] = time.strftime(
+                    '%Y-%m-%dT%H:%M:%S', time.localtime(time.time() - age))
             else:
                 # We are in 'normal' time, assume we cannot go to
                 # pre-init time and do corrections unless time sync events
@@ -464,7 +468,7 @@ class EventHandler(object):
 
     def _decode_standard_event(self, eventdata, event):
         # Ignore the generator id for now..
-        if eventdata[2] != 4:
+        if eventdata[2] not in (3, 4):
             raise pygexc.PyghmiException(
                 'Unrecognized Event message version {0}'.format(eventdata[2]))
         sensor_type = eventdata[3]
