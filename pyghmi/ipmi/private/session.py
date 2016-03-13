@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2013 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2016 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -365,10 +365,10 @@ class Session(object):
         if hasattr(self, 'initialized'):
             # new found an existing session, do not corrupt it
             if onlogon is None:
-                while not self.logged:
+                while self.logging:
                     Session.wait_for_rsp()
             else:
-                if not self.logged:
+                if self.logging:
                     self.logonwaiters.append(onlogon)
                 else:
                     self.iterwaiters.append(onlogon)
@@ -415,7 +415,7 @@ class Session(object):
             self.socket = self._assignsocket()
         self.login()
         if not self.async:
-            while self.logging and not self.logged:
+            while self.logging:
                 Session.wait_for_rsp()
 
     def _mark_broken(self):
@@ -426,6 +426,7 @@ class Session(object):
         self.logging = False
         if self.logged:
             self.logged = 0  # mark session as busted
+            self.logging = False
             self._customkeepalives = None
             if not self.broken:
                 self.socketpool[self.socket] -= 1
@@ -859,6 +860,7 @@ class Session(object):
                                             data=[self.privlevel])
             if response['code']:
                 self.logged = 0
+                self.logging = False
                 mysuffix = " while requesting privelege level %d for %s" % (
                     self.privlevel, self.userid)
                 errstr = get_ipmi_error(response, suffix=mysuffix)
