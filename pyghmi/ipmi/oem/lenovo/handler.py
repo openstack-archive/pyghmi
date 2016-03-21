@@ -541,4 +541,4 @@ class OEMHandler(generic.OEMHandler):
                 # fall back to a dumber, but more universal formatter
                 ipv6str = binascii.b2a_hex(ipv6_addr)
                 ipv6str = ':'.join([ipv6str[x:x+4] for x in xrange(0, 32, 4)])
-            netdata['ipv6_address'] = '{0}/{1}'.format(ipv6str, ipv6_prefix)
+            netdata['ipv6_addresses'] = ['{0}/{1}'.format(ipv6str, ipv6_prefix)]
