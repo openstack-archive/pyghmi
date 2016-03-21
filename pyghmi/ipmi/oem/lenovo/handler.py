@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import base64
+import binascii
 import traceback
 import urllib
 
@@ -37,6 +38,8 @@ from pyghmi.ipmi.oem.lenovo import raid_controller
 from pyghmi.ipmi.oem.lenovo import raid_drive
 
 import pyghmi.util.webclient as wc
+
+import socket
 
 inventory.register_inventory_category(cpu)
 inventory.register_inventory_category(dimm)
@@ -521,3 +524,21 @@ class OEMHandler(generic.OEMHandler):
         return self._get_ts_remote_console(self.ipmicmd.bmc,
                                            self.ipmicmd.ipmi_session.userid,
                                            self.ipmicmd.ipmi_session.password)
+
+    def add_extra_net_configuration(self, netdata):
+        if self.has_tsm:
+            ipv6_addr = self.ipmicmd.xraw_command(
+                netfn=0x0c, command=0x02,
+                data=(0x01, 0xc5, 0x00, 0x00))["data"][1:]
+            if not ipv6_addr:
+                return
+            ipv6_prefix = ord(self.ipmicmd.xraw_command(
+                netfn=0xc, command=0x02,
+                data=(0x1, 0xc6, 0, 0))['data'][1])
+            if hasattr(socket, 'inet_ntop'):
+                ipv6str = socket.inet_ntop(socket.AF_INET6, ipv6_addr)
+            else:
+                # fall back to a dumber, but more universal formatter
+                ipv6str = binascii.b2a_hex(ipv6_addr)
+                ipv6str = ':'.join([ipv6str[x:x+4] for x in xrange(0, 32, 4)])
+            netdata['ipv6_address'] = '{0}/{1}'.format(ipv6str, ipv6_prefix)

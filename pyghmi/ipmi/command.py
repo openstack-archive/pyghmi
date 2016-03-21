@@ -748,6 +748,8 @@ class Command(object):
         retdata['ipv4_backup_gateway'] = self._fetch_lancfg_param(channel, 14)
         retdata['ipv4_backup_gateway_mac'] = self._fetch_lancfg_param(channel,
                                                                       15)
+        self.oem_init()
+        self._oem.add_extra_net_configuration(retdata)
         return retdata
 
     def get_sensor_data(self):

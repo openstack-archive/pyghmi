@@ -72,6 +72,8 @@ def docommand(result, ipmisession):
             print repr(led)
     elif cmmand == 'graphical':
         print ipmisession.get_graphical_console()
+    elif cmmand == 'net':
+        print ipmisession.get_net_configuration()
     elif cmmand == 'raw':
         print ipmisession.raw_command(netfn=int(args[0]),
                                       command=int(args[1]),
