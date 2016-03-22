@@ -678,7 +678,7 @@ class Session(object):
             raise exc.IpmiException('Session no longer connected')
         return lastresponse
 
-    def _send_ipmi_net_payload(self, netfn=None, command=None, data=[], code=0,
+    def _send_ipmi_net_payload(self, netfn=None, command=None, data=(), code=0,
                                bridge_request=None,
                                retry=None, delay_xmit=None, timeout=None):
         if retry is None:
@@ -965,6 +965,12 @@ class Session(object):
         self.logontries = 5
         self._initsession()
         self._get_channel_auth_cap()
+
+    @classmethod
+    def pause(cls, timeout):
+        starttime = _monotonic_time()
+        while _monotonic_time() - starttime < timeout:
+            cls.wait_for_rsp(timeout - (_monotonic_time() - starttime))
 
     @classmethod
     def wait_for_rsp(cls, timeout=None, callout=True):

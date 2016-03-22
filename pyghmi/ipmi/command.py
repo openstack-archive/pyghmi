@@ -1709,3 +1709,18 @@ class Command(object):
         """Get graphical console launcher"""
         self.oem_init()
         return self._oem.get_graphical_console()
+
+    def attach_remote_media(self, url, username=None, password=None):
+        """Attach remote media by url
+
+        Given a url, attach remote media (cd/usb image) to the target system.
+
+        :param url:  URL to indicate where to find image (protocol support
+                     varies by BMC)
+        :param username: Username for endpoint to use when accessing the URL.
+                         If applicable, 'domain' would be indicated by '@' or
+                         '\' syntax.
+        :param password: Password for endpoint to use when accessing the URL.
+        """
+        self.oem_init()
+        self._oem.attach_remote_media(url, username, password)
