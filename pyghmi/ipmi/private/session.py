@@ -678,7 +678,7 @@ class Session(object):
             raise exc.IpmiException('Session no longer connected')
         return lastresponse
 
-    def _send_ipmi_net_payload(self, netfn=None, command=None, data=[], code=0,
+    def _send_ipmi_net_payload(self, netfn=None, command=None, data=(), code=0,
                                bridge_request=None,
                                retry=None, delay_xmit=None, timeout=None):
         if retry is None:

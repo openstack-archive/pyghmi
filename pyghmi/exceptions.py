@@ -42,3 +42,9 @@ class InvalidParameterValue(PyghmiException):
 class BmcErrorException(IpmiException):
     # This denotes when library detects an invalid BMC behavior
     pass
+
+
+class UnsupportedFunctionality(PyghmiException):
+    # Indicates when functionality is requested that is not supported by
+    # current endpoint
+    pass
