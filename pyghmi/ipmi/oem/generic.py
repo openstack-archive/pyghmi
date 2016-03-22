@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pyghmi.exceptions as exc
+
 
 class OEMHandler(object):
     """Handler class for OEM capabilities.
@@ -221,3 +223,6 @@ class OEMHandler(object):
         :param netdata: Dictionary to store additional network data
         """
         return
+
+    def attach_remote_media(self, imagename, username, password):
+        raise exc.UnsupportedFunctionality()

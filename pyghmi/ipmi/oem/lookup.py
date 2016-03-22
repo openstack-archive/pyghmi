@@ -21,6 +21,8 @@ import pyghmi.ipmi.oem.lenovo.handler as lenovo
 oemmap = {
     20301: lenovo,  # IBM x86 (and System X at Lenovo)
     19046: lenovo,  # Lenovo x86 (e.g. Thinkserver)
+    7154: lenovo,   # Technically, standard IPMI, but give lenovo a chance
+                    # to check for MegaRAC
 }
 
 
