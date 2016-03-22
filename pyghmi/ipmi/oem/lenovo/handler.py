@@ -40,6 +40,7 @@ from pyghmi.ipmi.oem.lenovo import raid_drive
 import pyghmi.util.webclient as wc
 
 import socket
+import struct
 
 inventory.register_inventory_category(cpu)
 inventory.register_inventory_category(dimm)
@@ -121,6 +122,7 @@ class OEMHandler(generic.OEMHandler):
         # variations.  For example System X versus Thinkserver
         self.oemid = oemid
         self.ipmicmd = ipmicmd
+        self._has_megarac = None
         self.oem_inventory_info = None
 
     def get_video_launchdata(self):
@@ -543,3 +545,110 @@ class OEMHandler(generic.OEMHandler):
                 ipv6str = ':'.join([ipv6str[x:x+4] for x in xrange(0, 32, 4)])
             netdata['ipv6_addresses'] = [
                 '{0}/{1}'.format(ipv6str, ipv6_prefix)]
+
+    @property
+    def has_megarac(self):
+        # if there is functionality that is the same for tsm or generic
+        # megarac, then this is appropriate.  If there's a TSM specific
+        # preferred, use has_tsm first
+        if self._has_megarac is not None:
+            return self._has_megarac
+        self._has_megarac = False
+        try:
+            rsp = self.ipmicmd.xraw_command(netfn=0x32, command=0x7e)
+            # We don't have a handy classify-only, so use get sel policy
+            # rsp should have a length of one, and be either '\x00' or '\x01'
+            if len(rsp['data'][:]) == 1 and rsp['data'][0] in ('\x00', '\x01'):
+                self._has_megarac = True
+        except pygexc.IpmiException:
+            pass  # Means that it's not going to be a megarac
+        return self._has_megarac
+
+    def _set_short_ris_string(self, selector, value):
+        data = (1, selector, 0) + struct.unpack('{0}B'.format(len(value)),
+                                                value)
+        self.ipmicmd.xraw_command(netfn=0x32, command=0x9f, data=data)
+
+    def _set_ris_string(self, selector, value):
+        if len(value) > 256:
+            raise pygexc.UnsupportedFunctionality(
+                    'Value exceeds 256 characters: {0}'.format(value))
+        padded = value + (256 - len(value)) * '\x00'
+        padded = list(struct.unpack('256B', padded))
+        # 8 = RIS, 4 = hd, 2 = fd, 1 = cd
+        try:  # try and clear in-progress if left incomplete
+            self.ipmicmd.xraw_command(netfn=0x32, command=0x9f,
+                                      data=(1, selector, 0, 0))
+        except pygexc.IpmiException:
+            pass
+        # set in-progress
+        self.ipmicmd.xraw_command(netfn=0x32, command=0x9f,
+                                  data=(1, selector, 0, 1))
+        # now do the set
+        for x in xrange(0, 256, 64):
+            currdata = padded[x:x+64]
+            currchunk = x // 64 + 1
+            cmddata = [1, selector, currchunk] + currdata
+            self.ipmicmd.xraw_command(netfn=0x32, command=0x9f, data=cmddata)
+        # unset in-progress
+        self.ipmicmd.xraw_command(netfn=0x32, command=0x9f,
+                                  data=(1, selector, 0, 0))
+
+    def _megarac_attach_media(self, proto, username, password, imagename,
+                             domain, path, host):
+        # First we must ensure that the RIS is actually enabled
+        rsp = self.ipmicmd.xraw_command(netfn=0x32, command=0x9e, data=(8, 10))
+        if rsp['data'][2] == '\x00':
+            # was disabled, go to enable
+            # we must enable *before* going about setting it up
+            self.ipmicmd.xraw_command(netfn=0x32, command=0x9f,
+                                      data=(8, 10, 0, 1))
+        # stop any current redirection
+        try:
+            self.ipmicmd.xraw_command(netfn=0x32, command=0xa0, data=(1, 0))
+        except pygexc.IpmiException as ie:
+            if ie.ipmicode != 0x92:
+                raise
+        if username is not None:
+            self._set_ris_string(3, username)
+        if password is not None:
+            self._set_short_ris_string(4, password)
+        if domain is not None:
+            self._set_ris_string(6, domain)
+        self._set_ris_string(0, imagename)
+        self._set_ris_string(1, path)
+        ip = util.get_ipv4(host)[0]
+        self._set_short_ris_string(2, ip)
+        self._set_short_ris_string(5, proto)
+        # now to restart RIS to have changes take effect...
+        self.ipmicmd.xraw_command(netfn=0x32, command=0x9f, data=(8, 11))
+        # now to kick off the requested mount
+        imageretries = 15
+        while imageretries:
+            try:
+                self.ipmicmd.xraw_command(netfn=0x32, command=0xa0,
+                                          data=(1, 1))
+                imageretries = None
+            except pygexc.IpmiException as ie:
+                if imageretries == 1:
+                    raise
+                if ie.ipmicode in (0x92, 0x99, 0x96):
+                    imageretries = imageretries - 1
+                    self.ipmicmd.wait_for_rsp(2)
+                else:
+                    raise
+
+
+    def attach_remote_media(self, url, username, password):
+        if self.has_megarac:
+            proto, host, path = util.urlsplit(url)
+            if proto == 'smb':
+                proto = 'cifs'
+            domain = None
+            path, imagename = path.rsplit('/', 1)
+            if username is not None and '@' in username:
+                username, domain = username.split('@', 1)
+            elif username is not None and '\\' in username:
+                domain, username = username.split('\\', 1)
+            self._megarac_attach_media(proto, username, password, imagename,
+                                      domain, path, host)
