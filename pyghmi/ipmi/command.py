@@ -716,12 +716,13 @@ class Command(object):
             cmddata = bytearray((channel, 12)) + socket.inet_aton(ipv4_gateway)
             self.xraw_command(netfn=0xc, command=1, data=cmddata)
 
-    def get_net_configuration(self, channel=None):
+    def get_net_configuration(self, channel=None, gateway_macs=True):
         """Get network configuration data
 
         Retrieve network configuration from the target
 
         :param channel: Channel to configure, defaults to None for 'autodetect'
+        :param gateway_macs: Whether to retrieve mac addresses for gateways
         :returns: A dictionary of network configuration data
         """
         if channel is None:
@@ -744,10 +745,11 @@ class Command(object):
             channel, 4)]
         retdata['mac_address'] = self._fetch_lancfg_param(channel, 5)
         retdata['ipv4_gateway'] = self._fetch_lancfg_param(channel, 12)
-        retdata['ipv4_gateway_mac'] = self._fetch_lancfg_param(channel, 13)
         retdata['ipv4_backup_gateway'] = self._fetch_lancfg_param(channel, 14)
-        retdata['ipv4_backup_gateway_mac'] = self._fetch_lancfg_param(channel,
-                                                                      15)
+        if gateway_macs:
+            retdata['ipv4_gateway_mac'] = self._fetch_lancfg_param(channel, 13)
+            retdata['ipv4_backup_gateway_mac'] = self._fetch_lancfg_param(
+                channel, 15)
         self.oem_init()
         self._oem.add_extra_net_configuration(retdata)
         return retdata
