@@ -1726,3 +1726,7 @@ class Command(object):
         """
         self.oem_init()
         self._oem.attach_remote_media(url, username, password)
+
+    def detach_remote_media(self):
+        self.oem_init()
+        self._oem.detach_remote_media()

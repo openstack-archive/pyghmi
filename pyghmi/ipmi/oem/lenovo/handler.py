@@ -676,3 +676,9 @@ class OEMHandler(generic.OEMHandler):
                                                imagename, domain, path, host)
                 else:
                     raise
+
+    def detach_remote_media(self):
+        if self.has_megarac:
+            self.ipmicmd.xraw_command(
+                netfn=0x32, command=0x9f, data=(8, 10, 0, 0))
+            self.ipmicmd.xraw_command(netfn=0x32, command=0x9f, data=(8, 11))

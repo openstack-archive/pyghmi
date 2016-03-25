@@ -224,5 +224,8 @@ class OEMHandler(object):
         """
         return
 
+    def detach_remote_media(self):
+        raise exc.UnsupportedFunctionality()
+
     def attach_remote_media(self, imagename, username, password):
         raise exc.UnsupportedFunctionality()
