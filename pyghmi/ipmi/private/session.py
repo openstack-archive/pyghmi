@@ -125,8 +125,10 @@ def define_worker():
 sessionqueue = collections.deque([])
 
 
-def _io_wait(timeout, myaddr=None):
+def _io_wait(timeout, myaddr=None, evq=None):
     evt = threading.Event()
+    if evq is not None:
+        evq.append(evt)
     deadline = timeout + _monotonic_time()
     ioqueue.append((deadline, evt, myaddr))
     # Unfortunately, at least with eventlet patched threading, the wait()
@@ -406,6 +408,8 @@ class Session(object):
         self.cleaningup = False
         self.lastpayload = None
         self._customkeepalives = None
+        self.evq = collections.deque([])  # queue of events denoting line to
+                                          # run a cmd
         self.bmc = bmc
         self.broken = False
         # a private queue for packets for which this session handler
@@ -625,7 +629,7 @@ class Session(object):
 
     def _cmdwait(self):
         while self._isincommand():
-            _io_wait(self._isincommand(), self.sockaddr)
+            _io_wait(self._isincommand(), self.sockaddr, self.evq)
 
     def awaitresponse(self, retry):
         while retry and self.lastresponse is None and self.logged:
@@ -676,6 +680,8 @@ class Session(object):
         self.incommand = False
         if retry and lastresponse is None:
             raise exc.IpmiException('Session no longer connected')
+        if self.evq:
+            self.evq.popleft().set()
         return lastresponse
 
     def _send_ipmi_net_payload(self, netfn=None, command=None, data=(), code=0,
