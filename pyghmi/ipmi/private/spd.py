@@ -677,16 +677,9 @@ ddr3_bus_width = {
     3: 64,
 }
 
-speed_by_clock = {
-    800: 6400,
-    1066: 8500,
-    1333: 10600,
-    1600: 12800,
-    1867: 14900,
-    2132: 17000,
-    2133: 17000,
-    2134: 17000,
-}
+
+def speed_from_clock(clock):
+    return int(clock * 8 - (clock * 8 % 100))
 
 
 def decode_manufacturer(index, mfg):
@@ -731,7 +724,7 @@ class SPD(object):
         fineoffset = (finetime * fineoffset) * 10**-3
         mtb = spd[10] / float(spd[11])
         clock = 2 // ((mtb * spd[12] + fineoffset)*10**-3)
-        self.info['speed'] = speed_by_clock.get(clock, 'Unknown')
+        self.info['speed'] = speed_from_clock(clock)
         self.info['ecc'] = (spd[8] & 0b11000) != 0
         self.info['module_type'] = module_types.get(spd[3] & 0xf, 'Unknown')
         sdramcap = ddr3_module_capacity[spd[4] & 0xf]
@@ -753,7 +746,7 @@ class SPD(object):
             if fineoffset & 0b10000000:
                 fineoffset = 0 - ((fineoffset ^ 0xff) + 1)
             clock = 2 // ((0.125 * spd[18] + fineoffset * 0.001) * 0.001)
-            self.info['speed'] = speed_by_clock.get(clock, 'Unknown')
+            self.info['speed'] = speed_from_clock(clock)
         else:
             self.info['speed'] = 'Unknown'
         self.info['ecc'] = (spd[13] & 0b11000) == 0b1000
