@@ -680,7 +680,7 @@ class Session(object):
         self.incommand = False
         if retry and lastresponse is None:
             raise exc.IpmiException('Session no longer connected')
-        if self.evq:
+        while self.evq:
             self.evq.popleft().set()
         return lastresponse
 
