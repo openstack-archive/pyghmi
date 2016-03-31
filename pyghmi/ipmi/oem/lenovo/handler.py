@@ -41,6 +41,7 @@ import pyghmi.util.webclient as wc
 
 import socket
 import struct
+import weakref
 
 inventory.register_inventory_category(cpu)
 inventory.register_inventory_category(dimm)
@@ -127,7 +128,7 @@ class OEMHandler(generic.OEMHandler):
         # will need to retain data to differentiate
         # variations.  For example System X versus Thinkserver
         self.oemid = oemid
-        self.ipmicmd = ipmicmd
+        self.ipmicmd = weakref.ref(ipmicmd)
         self._has_megarac = None
         self.oem_inventory_info = None
 
