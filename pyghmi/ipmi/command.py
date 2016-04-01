@@ -147,6 +147,7 @@ class Command(object):
 
     def logged(self, response):
         self.onlogon(response, self)
+        self.onlogon = None
 
     @classmethod
     def eventloop(cls):
