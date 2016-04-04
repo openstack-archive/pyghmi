@@ -34,6 +34,7 @@ import pyghmi.constants as const
 import pyghmi.exceptions as exc
 import pyghmi.ipmi.private.constants as ipmiconst
 import struct
+import weakref
 
 TYPE_UNKNOWN = 0
 TYPE_SENSOR = 1
@@ -251,7 +252,7 @@ class SDREntry(object):
         # ignore record id for now, we only care about the sensor number for
         # moment
         self.reportunsupported = reportunsupported
-        self.ipmicmd = ipmicmd
+        self.ipmicmd = weakref.ref(ipmicmd)
         if entrybytes[2] != 0x51:
             # only recognize '1.5', the only version defined at time of writing
             raise NotImplementedError
@@ -584,7 +585,7 @@ class SDR(object):
     :param ipmicmd: A Command class object
     """
     def __init__(self, ipmicmd):
-        self.ipmicmd = ipmicmd
+        self.ipmicmd = weakref.ref(ipmicmd)
         self.sensors = {}
         self.fru = {}
         self.read_info()
