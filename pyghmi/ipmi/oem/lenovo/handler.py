@@ -128,7 +128,7 @@ class OEMHandler(generic.OEMHandler):
         # will need to retain data to differentiate
         # variations.  For example System X versus Thinkserver
         self.oemid = oemid
-        self.ipmicmd = weakref.ref(ipmicmd)
+        self.ipmicmd = weakref.proxy(ipmicmd)
         self._has_megarac = None
         self.oem_inventory_info = None
 

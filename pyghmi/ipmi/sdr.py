@@ -252,7 +252,7 @@ class SDREntry(object):
         # ignore record id for now, we only care about the sensor number for
         # moment
         self.reportunsupported = reportunsupported
-        self.ipmicmd = weakref.ref(ipmicmd)
+        self.ipmicmd = ipmicmd
         if entrybytes[2] != 0x51:
             # only recognize '1.5', the only version defined at time of writing
             raise NotImplementedError
@@ -585,7 +585,7 @@ class SDR(object):
     :param ipmicmd: A Command class object
     """
     def __init__(self, ipmicmd):
-        self.ipmicmd = weakref.ref(ipmicmd)
+        self.ipmicmd = weakref.proxy(ipmicmd)
         self.sensors = {}
         self.fru = {}
         self.read_info()
