@@ -912,7 +912,7 @@ sensor_type_offsets = {
         },
         5: {
             'desc': 'Event log nearly full',
-            'severity': const.Health.Warning,
+            'severity': const.Health.Ok,
             'deassertion_desc': 'Event log no longer nearly full',
             'deassertion_severity': const.Health.Ok,
         },
