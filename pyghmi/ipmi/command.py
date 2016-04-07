@@ -110,6 +110,7 @@ class Command(object):
         self._sdr = None
         self._oem = None
         self._netchannel = None
+        self._ipv6support = None
         if onlogon is not None:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,
@@ -962,6 +963,18 @@ class Command(object):
         rsp = self.xraw_command(netfn=0xc, command=2, data=(channel, 16, 0, 0))
         return rsp['data'][1:].partition('\x00')[0]
 
+    @property
+    def _supports_standard_ipv6(self):
+        # Supports the *standard* ipv6 commands for various things
+        # used to internally steer some commands to standard or OEM
+        # handler of commands
+        lanchan = self.get_network_channel()
+        if self._ipv6support is None:
+            rsp = self.raw_command(netfn=0xc, command=0x2, data=(2, lanchan,
+                                                                 0x32, 0, 0))
+            self._ipv6support = rsp['code'] == 0
+        return self._ipv6support
+
     def set_alert_destination(self, ip=None, acknowledge_required=None,
                               acknowledge_timeout=None, retries=None,
                               destination=0, channel=None):
@@ -991,10 +1004,17 @@ class Command(object):
                 destdata.extend(parsedip)
                 destdata.extend('\x00\x00\x00\x00\x00\x00')
             except socket.error:
-                parsedip = socket.inet_pton(socket.AF_INET6, ip)
-                destdata.append(0b10000000)
-                destdata.extend(parsedip)
-            self.xraw_command(netfn=0xc, command=1, data=destdata)
+                if self._supports_standard_ipv6:
+                    parsedip = socket.inet_pton(socket.AF_INET6, ip)
+                    destdata.append(0b10000000)
+                    destdata.extend(parsedip)
+                else:
+                    destdata = None
+                    self.oem_init()
+                    self._oem.set_alert_ipv6_destination(ip, destination,
+                                                            channel)
+            if destdata:
+                self.xraw_command(netfn=0xc, command=1, data=destdata)
         if (acknowledge_required is not None or retries is not None or
                 acknowledge_timeout is not None):
             currtype = self.xraw_command(netfn=0xc, command=2, data=(
