@@ -229,3 +229,18 @@ class OEMHandler(object):
 
     def attach_remote_media(self, imagename, username, password):
         raise exc.UnsupportedFunctionality()
+
+    def set_alert_ipv6_destination(self, ip, destination, channel):
+        """Set an IPv6 alert destination
+
+        If and only if an implementation does not support standard
+        IPv6 but has an OEM implementation, override this to process
+        the data.
+
+        :param ip: IPv6 address to set
+        :param destination: Destination number
+        :param channel: Channel number to apply
+
+        :returns True if standard parameter set should be suppressed
+        """
+        return False

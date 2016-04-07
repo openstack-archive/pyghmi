@@ -131,6 +131,15 @@ class OEMHandler(generic.OEMHandler):
         self.ipmicmd = weakref.proxy(ipmicmd)
         self._has_megarac = None
         self.oem_inventory_info = None
+        self._mrethidx = None
+
+    @property
+    def _megarac_eth_index(self):
+        if self._mrethidx is None:
+            chan = self.ipmicmd.get_network_channel()
+            rsp = self.ipmicmd.xraw_command(0x32, command=0x62, data=(chan,))
+            self.mrethidx = rsp['data'][0]
+        return self._mrethidx
 
     def get_video_launchdata(self):
         if self.has_tsm:
@@ -570,6 +579,17 @@ class OEMHandler(generic.OEMHandler):
         except pygexc.IpmiException:
             pass  # Means that it's not going to be a megarac
         return self._has_megarac
+
+    def set_alert_ipv6_destination(self, ip, destination, channel):
+        if self.has_megarac:
+            ethidx = self._megarac_eth_index
+            reqdata = [193, ethidx, 1, 0]
+            parsedip = socket.inet_pton(socket.AF_INET6, ip)
+            reqdata.extend(parsedip)
+            reqdata.extend('\x00\x00\x00\x00\x00\x00')
+            self.ipmicmd.xraw_command(netfn=0xc, command=1, data=reqdata)
+            return True
+        return False
 
     def _set_short_ris_string(self, selector, value):
         data = (1, selector, 0) + struct.unpack('{0}B'.format(len(value)),
