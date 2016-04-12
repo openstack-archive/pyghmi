@@ -68,6 +68,18 @@ fpc_sensors = {
 }
 
 
+def get_sensor_names():
+    global fpc_sensors
+    for name in fpc_sensors:
+        sensor = fpc_sensors[name]
+        if 'elements' in sensor:
+            for elemidx in xrange(sensor['elements']):
+                elemidx += 1
+                yield '{0} {1}'.format(name, elemidx)
+        else:
+            yield name
+
+
 def get_sensor_descriptions():
     global fpc_sensors
     for name in fpc_sensors:

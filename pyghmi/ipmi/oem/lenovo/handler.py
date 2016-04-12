@@ -299,7 +299,7 @@ class OEMHandler(generic.OEMHandler):
 
     def get_sensor_data(self):
         if self.is_fpc:
-            for name in nextscale.fpc_sensors:
+            for name in nextscale.get_sensor_names():
                 yield nextscale.get_sensor_reading(name, self.ipmicmd)
 
     def get_sensor_descriptions(self):
