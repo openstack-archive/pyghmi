@@ -124,7 +124,7 @@ class Console(object):
            #BMC tells us this is the maximum allowed size
         #data[6:7] is the promise of how small packets are going to be, but we
         #don't have any reason to worry about it
-        if (data[8] + (data[9] << 8)) != 623:
+        if (data[8] + (data[9] << 8)) not in (623, 28418):
             #TODO(jbjohnso): support atypical SOL port number
             raise NotImplementedError("Non-standard SOL Port Number")
         #ignore data[10:11] for now, the vlan detail, shouldn't matter to this
