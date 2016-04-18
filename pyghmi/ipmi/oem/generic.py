@@ -175,10 +175,13 @@ class OEMHandler(object):
         fru['oem_parser'] = None
         return fru
 
-    def get_oem_firmware(self):
+    def get_oem_firmware(self, bmcver):
         """Get Firmware information.
         """
-        return ()
+        # Here the bmc version is passed into the OEM handler, to allow
+        # the handler to enrich the data. For the generic case, just
+        # provide the generic BMC version, which is all that is possible
+        yield ('BMC Version', {'version': bmcver})
 
     def get_oem_capping_enabled(self):
         """Get PSU based power capping status
