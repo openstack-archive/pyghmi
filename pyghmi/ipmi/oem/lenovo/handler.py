@@ -30,12 +30,14 @@ from pyghmi.ipmi.oem.lenovo import dimm
 from pyghmi.ipmi.oem.lenovo import drive
 
 from pyghmi.ipmi.oem.lenovo import firmware
+from pyghmi.ipmi.oem.lenovo import imm
 from pyghmi.ipmi.oem.lenovo import inventory
 from pyghmi.ipmi.oem.lenovo import nextscale
 from pyghmi.ipmi.oem.lenovo import pci
 from pyghmi.ipmi.oem.lenovo import psu
 from pyghmi.ipmi.oem.lenovo import raid_controller
 from pyghmi.ipmi.oem.lenovo import raid_drive
+
 
 import pyghmi.util.webclient as wc
 
@@ -132,6 +134,8 @@ class OEMHandler(generic.OEMHandler):
         self._has_megarac = None
         self.oem_inventory_info = None
         self._mrethidx = None
+        self._hasimm = None
+        self._immbuildinfo = None
 
     @property
     def _megarac_eth_index(self):
@@ -419,11 +423,30 @@ class OEMHandler(generic.OEMHandler):
             fru['oem_parser'] = None
             return fru
 
-    def get_oem_firmware(self):
+    @property
+    def has_imm(self):
+        if self._hasimm is not None:
+            return self._hasimm
+        try:
+            bdata = self.ipmicmd.xraw_command(netfn=0x3a, command=0x50)
+        except pygexc.IpmiException:
+            self._hasimm = False
+            return False
+        if len(bdata['data'][:]) != 30:
+            self._hasimm = False
+            return False
+        self._hasimm = True
+        self._immbuildinfo = bdata['data'][:]
+        return True
+
+    def get_oem_firmware(self, bmcver):
         if self.has_tsm:
             command = firmware.get_categories()["firmware"]
             rsp = self.ipmicmd.xraw_command(**command["command"])
             return command["parser"](rsp["data"])
+        elif self.has_imm:
+            return imm.get_firmware_inventory(self.ipmicmd, bmcver,
+                                              self._immbuildinfo)
         return ()
 
     def get_oem_capping_enabled(self):
