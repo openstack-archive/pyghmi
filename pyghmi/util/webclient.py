@@ -17,13 +17,15 @@
 # 2.6 as is found in commonly used enterprise linux distributions.
 
 __author__ = 'jjohnson2'
+
+import Cookie
 import httplib
 import pyghmi.exceptions as pygexc
 import socket
 import ssl
 
 
-class SecureHTTPConnection(httplib.HTTPConnection):
+class SecureHTTPConnection(httplib.HTTPConnection, object):
     default_port = httplib.HTTPS_PORT
 
     def __init__(self, host, port=None, key_file=None, cert_file=None,
@@ -31,6 +33,7 @@ class SecureHTTPConnection(httplib.HTTPConnection):
         httplib.HTTPConnection.__init__(self, host, port, strict, **kwargs)
         self.cert_reqs = ssl.CERT_NONE  # verification will be done ssh style..
         self._certverify = verifycallback
+        self.cookies = {}
 
     def connect(self):
         plainsock = socket.create_connection((self.host, self.port))
@@ -40,3 +43,23 @@ class SecureHTTPConnection(httplib.HTTPConnection):
         if not self._certverify(bincert):
             raise pygexc.UnrecognizedCertificate('Unknown certificate',
                                                  bincert)
+
+    def getresponse(self):
+        rsp = super(SecureHTTPConnection, self).getresponse()
+        for hdr in rsp.msg.headers:
+            if hdr.startswith('Set-Cookie:'):
+                c = Cookie.BaseCookie(hdr[11:])
+                for k in c:
+                    self.cookies[k] = c[k].value
+        return rsp
+
+    def request(self, method, url, body=None, headers=None):
+        if headers is None:
+            headers = {}
+        if self.cookies:
+            cookies = []
+            for ckey in self.cookies:
+                cookies.append('{0}={1}'.format(ckey, self.cookies[ckey]))
+            headers['Cookie'] = '; '.join(cookies)
+        return super(SecureHTTPConnection, self).request(method, url, body,
+                                                         headers)
