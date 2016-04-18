@@ -1690,7 +1690,10 @@ class Command(object):
         """Retrieve OEM Firmware information
         """
         self.oem_init()
-        return self._oem.get_oem_firmware()
+        mcinfo = self.xraw_command(netfn=6, command=1)
+        bmcver = '{0}.{1}'.format(
+            ord(mcinfo['data'][2]), hex(ord(mcinfo['data'][3]))[2:])
+        return self._oem.get_oem_firmware(bmcver)
 
     def get_capping_enabled(self):
         """Get PSU based power capping status
