@@ -47,6 +47,8 @@ iothread = None  # the thread in which all IO will be performed
 iothreadready = False  # whether io thread is yet ready to work
 iothreadwaiters = []  # threads waiting for iothreadready
 ioqueue = collections.deque([])
+myself = None
+ipv6support = None
 selectdeadline = 0
 running = True
 iosockets = []  # set of iosockets that will be shared amongst Session objects
@@ -60,7 +62,7 @@ def define_worker():
         def join(self):
             Session._cleanup()
             self.running = False
-            iosockets[0].sendto('\x01', ('::1', iosockets[0].getsockname()[1]))
+            iosockets[0].sendto('\x01', (myself, iosockets[0].getsockname()[1]))
             super(_IOWorker, self).join()
 
         def run(self):
@@ -136,7 +138,7 @@ def _io_wait(timeout, myaddr=None, evq=None):
     # it piggy back on the select() in the io thread, which is a truly
     # lazy wait even with eventlet involvement
     if deadline < selectdeadline:
-        iosockets[0].sendto('\x01', ('::1', iosockets[0].getsockname()[1]))
+        iosockets[0].sendto('\x01', (myself, iosockets[0].getsockname()[1]))
     evt.wait()
 
 
@@ -314,6 +316,8 @@ class Session(object):
         global iothread
         global iothreadready
         global iosockets
+        global ipv6support
+        global myself
         # seek for the least used socket.  As sessions close, they may free
         # up slots in seemingly 'full' sockets.  This scheme allows those
         # slots to be recycled
@@ -325,9 +329,20 @@ class Session(object):
             cls.socketpool[sorted_candidates[0][0]] += 1
             return sorted_candidates[0][0]
         # we need a new socket
-        tmpsocket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)  # INET6
-                                    # can do IPv4 if you are nice to it
-        tmpsocket.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        if ipv6support:
+            tmpsocket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+            tmpsocket.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        elif ipv6support is None:  # we need to determine ipv6 support now
+            try:
+                tmpsocket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+                tmpsocket.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+                ipv6support = True
+            except socket.error as se:
+                ipv6support = False
+                myself = '127.0.0.1'
+                tmpsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        else:
+            tmpsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         if server is None:
             # Rather than wait until send() to bind, bind now so that we have
             # a port number allocated no matter what
@@ -336,6 +351,16 @@ class Session(object):
         else:
             tmpsocket.bind(server)
         iosockets.append(tmpsocket)
+        if myself is None:
+            # we have confirmed kernel IPv6 support, but ::1 may still not
+            # be there
+            try:
+                iosockets[0].sendto(
+                    '\x01', ('::1', iosockets[0].getsockname()[1]))
+                myself = '::1'
+            except socket.error:
+                # AF_INET6, but no '::1', try the AF_INET6 version of 127
+                myself = '::ffff:127.0.0.1'
         if iothread is None:
             initevt = threading.Event()
             iothreadwaiters.append(initevt)
@@ -366,7 +391,8 @@ class Session(object):
         trueself = None
         for res in socket.getaddrinfo(bmc, port, 0, socket.SOCK_DGRAM):
             sockaddr = res[4]
-            if res[0] == socket.AF_INET:  # convert the sockaddr to AF_INET6
+            if ipv6support and res[0] == socket.AF_INET:
+                # convert the sockaddr to AF_INET6
                 newhost = '::ffff:' + sockaddr[0]
                 sockaddr = (newhost, sockaddr[1], 0, 0)
             if sockaddr in cls.bmc_handlers:
@@ -1570,8 +1596,8 @@ class Session(object):
                                               0,
                                               socket.SOCK_DGRAM):
                     sockaddr = res[4]
-                    if res[0] == socket.AF_INET:  # convert the sockaddr
-                                                    # to AF_INET6
+                    if ipv6support and res[0] == socket.AF_INET:
+                        # convert the sockaddr to AF_INET6
                         newhost = '::ffff:' + sockaddr[0]
                         sockaddr = (newhost, sockaddr[1], 0, 0)
                     self.allsockaddrs.append(sockaddr)
