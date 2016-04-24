@@ -135,7 +135,6 @@ class OEMHandler(generic.OEMHandler):
         self.oem_inventory_info = None
         self._mrethidx = None
         self._hasimm = None
-        self._immbuildinfo = None
 
     @property
     def _megarac_eth_index(self):
@@ -428,16 +427,15 @@ class OEMHandler(generic.OEMHandler):
         if self._hasimm is not None:
             return self._hasimm
         try:
-            bdata = self.ipmicmd.xraw_command(netfn=0x3a, command=0x50)
+            bdata = self.ipmicmd.xraw_command(netfn=0x3a, command=0xc1)
         except pygexc.IpmiException:
             self._hasimm = False
             return False
-        if len(bdata['data'][:]) != 30:
+        if len(bdata['data'][:]) != 3:
             self._hasimm = False
             return False
-        self._hasimm = True
-        self._immbuildinfo = bdata['data'][:]
-        return True
+        self._hasimm = ord(bdata['data'][1]) & 1 == 1
+        return self._hasimm
 
     def get_oem_firmware(self, bmcver):
         if self.has_tsm:
@@ -446,9 +444,8 @@ class OEMHandler(generic.OEMHandler):
             return command["parser"](rsp["data"])
         elif self.has_imm:
             return imm.get_firmware_inventory(self.ipmicmd, bmcver,
-                                              self._immbuildinfo,
                                               self._certverify)
-        return ()
+        return super(OEMHandler, self).get_oem_firmware(bmcver)
 
     def get_oem_capping_enabled(self):
         if self.has_tsm:
