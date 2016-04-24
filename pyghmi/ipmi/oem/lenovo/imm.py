@@ -112,11 +112,12 @@ def fetch_adapter_firmware(wc):
                     yield ('{0} {1}'.format(aname, fname), bdata)
 
 
-def get_firmware_inventory(ipmicmd, bmcver, immbuildinfo, certverify):
+def get_firmware_inventory(ipmicmd, bmcver, certverify):
     # First we fetch the system firmware found in imm properties
     # then check for agentless, if agentless, get adapter info using
     # https, using the caller TLS verification scheme
-    immverdata = parse_imm_buildinfo(immbuildinfo)
+    rsp = ipmicmd.xraw_command(netfn=0x3a, command=0x50)
+    immverdata = parse_imm_buildinfo(rsp['data'])
     bdata = {'version': bmcver, 'build': immverdata[0], 'date': immverdata[1]}
     yield ('IMM', bdata)
     bdata = fetch_grouped_properties(ipmicmd, {
