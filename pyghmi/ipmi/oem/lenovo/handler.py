@@ -597,8 +597,12 @@ class OEMHandler(generic.OEMHandler):
             # rsp should have a length of one, and be either '\x00' or '\x01'
             if len(rsp['data'][:]) == 1 and rsp['data'][0] in ('\x00', '\x01'):
                 self._has_megarac = True
-        except pygexc.IpmiException:
-            pass  # Means that it's not going to be a megarac
+        except pygexc.IpmiException as ie:
+            if ie.ipmicode == 0:
+                # if it's a generic IpmiException rather than an error code
+                # from the BMC, then this is a deeper problem than just an
+                # invalid command or command length or similar
+                raise
         return self._has_megarac
 
     def set_alert_ipv6_destination(self, ip, destination, channel):
