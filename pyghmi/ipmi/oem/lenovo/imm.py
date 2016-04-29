@@ -16,6 +16,7 @@
 
 from datetime import datetime
 import json
+from pyghmi.ipmi.private.session import _monotonic_time
 import pyghmi.util.webclient as webclient
 import urllib
 
@@ -86,11 +87,28 @@ def fetch_grouped_properties(ipmicmd, groupinfo):
         return retdata
 
 
-def fetch_adapter_firmware(wc):
-    wc.request('GET', '/designs/imm/dataproviders/imm_adapters.php')
-    rsp = wc.getresponse()
-    if rsp.status == 200:
-        adapterdata = json.loads(rsp.read())
+def fetch_adapter_firmware(ipmicmd, certverify):
+    adapterdata = None
+    try:
+        vintage = ipmicmd.ipmi_session.lenovo_cached_adapters[1]
+        if vintage > _monotonic_time() - 30:
+            adapterdata = ipmicmd.ipmi_session.lenovo_cached_adapters[0]
+    except AttributeError:
+        pass
+    if not adapterdata:
+        wc = get_imm_webclient(ipmicmd.bmc, certverify,
+                               ipmicmd.ipmi_session.userid,
+                               ipmicmd.ipmi_session.password)
+        if not wc:
+            return
+        wc.request('GET', '/designs/imm/dataproviders/imm_adapters.php')
+        rsp = wc.getresponse()
+        if rsp.status == 200:
+            adapterdata = json.loads(rsp.read())
+            ipmicmd.ipmi_session.lenovo_cached_adapters = (adapterdata,
+                                                           _monotonic_time())
+        wc.request('GET', '/data/logout')
+    if adapterdata:
         for adata in adapterdata['items']:
             aname = adata['adapter.adapterName']
             donenames = set([])
@@ -148,10 +166,5 @@ def get_firmware_inventory(ipmicmd, bmcver, certverify):
         'build': '/v2/bios/pending_build_id'})
     if bdata:
         yield ('UEFI Pending Update', bdata)
-    wc = get_imm_webclient(ipmicmd.bmc, certverify,
-                           ipmicmd.ipmi_session.userid,
-                           ipmicmd.ipmi_session.password)
-    if wc:
-        for firm in fetch_adapter_firmware(wc):
-            yield firm
-        wc.request('GET', '/data/logout')
+    for firm in fetch_adapter_firmware(ipmicmd, certverify):
+        yield firm
