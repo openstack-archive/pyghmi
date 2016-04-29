@@ -126,6 +126,11 @@ def get_firmware_inventory(ipmicmd, bmcver, certverify):
         'date': '/v2/ibmc/dm/fw/imm2/backup_build_date'})
     if bdata:
         yield ('IMM Backup', bdata)
+        bdata = fetch_grouped_properties(ipmicmd, {
+            'build': '/v2/ibmc/trusted_buildid',
+        })
+    if bdata:
+        yield ('IMM Trusted Image', bdata)
     bdata = fetch_grouped_properties(ipmicmd, {
         'build': '/v2/bios/build_id',
         'version': '/v2/bios/build_version',
