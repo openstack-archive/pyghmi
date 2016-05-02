@@ -20,6 +20,7 @@ __author__ = 'jjohnson2'
 
 import Cookie
 import httplib
+import json
 import pyghmi.exceptions as pygexc
 import socket
 import ssl
@@ -52,6 +53,12 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
                 for k in c:
                     self.cookies[k] = c[k].value
         return rsp
+
+    def grab_json_response(self, url):
+        self.request('GET', url)
+        rsp = self.getresponse()
+        if rsp.status == 200:
+            return json.loads(rsp.read())
 
     def request(self, method, url, body=None, headers=None):
         if headers is None:

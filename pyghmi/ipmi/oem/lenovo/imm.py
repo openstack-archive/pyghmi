@@ -87,27 +87,35 @@ def fetch_grouped_properties(ipmicmd, groupinfo):
         return retdata
 
 
-def fetch_adapter_firmware(ipmicmd, certverify):
-    adapterdata = None
+def get_cached_data(ipmicmd, attribute):
     try:
-        vintage = ipmicmd.ipmi_session.lenovo_cached_adapters[1]
-        if vintage > _monotonic_time() - 30:
-            adapterdata = ipmicmd.ipmi_session.lenovo_cached_adapters[0]
+        kv = getattr(ipmicmd.ipmi_session, attribute)
+        if kv[1] > _monotonic_time() - 30:
+            return kv[0]
     except AttributeError:
-        pass
+        return None
+
+
+def get_web_session(ipmicmd, certverify, wc):
+    if wc:
+        return wc
+    wc = get_imm_webclient(ipmicmd.bmc, certverify,
+                           ipmicmd.ipmi_session.userid,
+                           ipmicmd.ipmi_session.password)
+    return wc
+
+
+def fetch_agentless_firmware(ipmicmd, certverify):
+    wc = None
+    adapterdata = get_cached_data(ipmicmd, 'lenovo_cached_adapters')
     if not adapterdata:
-        wc = get_imm_webclient(ipmicmd.bmc, certverify,
-                               ipmicmd.ipmi_session.userid,
-                               ipmicmd.ipmi_session.password)
-        if not wc:
-            return
-        wc.request('GET', '/designs/imm/dataproviders/imm_adapters.php')
-        rsp = wc.getresponse()
-        if rsp.status == 200:
-            adapterdata = json.loads(rsp.read())
-            ipmicmd.ipmi_session.lenovo_cached_adapters = (adapterdata,
-                                                           _monotonic_time())
-        wc.request('GET', '/data/logout')
+        wc = get_web_session(ipmicmd, certverify, wc)
+        if wc:
+            adapterdata = wc.grab_json_response(
+                '/designs/imm/dataproviders/imm_adapters.php')
+            if adapterdata:
+                ipmicmd.ipmi_session.lenovo_cached_adapters = (
+                    adapterdata, _monotonic_time())
     if adapterdata:
         for adata in adapterdata['items']:
             aname = adata['adapter.adapterName']
@@ -115,9 +123,9 @@ def fetch_adapter_firmware(ipmicmd, certverify):
             for fundata in adata['adapter.functions']:
                 fdata = fundata.get('firmwares', ())
                 for firm in fdata:
-                    fname = firm['firmwareName']
+                    fname = firm['firmwareName'].rstrip()
                     if '.' in fname:
-                        fname = firm['description']
+                        fname = firm['description'].rstrip()
                     if fname in donenames:
                         # ignore redundant entry
                         continue
@@ -128,9 +136,41 @@ def fetch_adapter_firmware(ipmicmd, certverify):
                     if ('releaseDate' in firm and
                             firm['releaseDate'] and
                             firm['releaseDate'] != 'N/A'):
-                        bdata['date'] = datetime.strptime(firm['releaseDate'],
-                                                          '%m/%d/%Y')
+                        try:
+                            bdata['date'] = datetime.strptime(
+                                firm['releaseDate'], '%m/%d/%Y')
+                        except ValueError:
+                            try:
+                                bdata['date'] = datetime.strptime(
+                                    firm['releaseDate'], '%m %d %Y')
+                            except ValueError:
+                                pass
                     yield ('{0} {1}'.format(aname, fname), bdata)
+    storagedata = get_cached_data(ipmicmd, 'lenovo_cached_storage')
+    if not storagedata:
+        wc = get_web_session(ipmicmd, certverify, wc)
+        if wc:
+            storagedata = wc.grab_json_response(
+               '/designs/imm/dataproviders/raid_alldevices.php')
+            if storagedata:
+                ipmicmd.ipmi_session.lenovo_cached_storage = (
+                    storagedata, _monotonic_time())
+    if storagedata and 'items' in storagedata:
+        for adp in storagedata['items']:
+            adpname = adp['storage.vpd.productName']
+            if 'children' not in adp:
+                adp['children'] = ()
+            for diskent in adp['children']:
+                bdata = {}
+                diskname = '{0} Disk {1}'.format(
+                    adpname,
+                    diskent['storage.slotNo'])
+                bdata['version'] = diskent['storage.firmwares'][0][
+                    'versionStr']
+                yield (diskname, bdata)
+    if wc:
+        wc.request('GET', '/data/logout')
+
 
 
 def get_firmware_inventory(ipmicmd, bmcver, certverify):
@@ -169,5 +209,5 @@ def get_firmware_inventory(ipmicmd, bmcver, certverify):
         'build': '/v2/bios/pending_build_id'})
     if bdata:
         yield ('UEFI Pending Update', bdata)
-    for firm in fetch_adapter_firmware(ipmicmd, certverify):
+    for firm in fetch_agentless_firmware(ipmicmd, certverify):
         yield firm
