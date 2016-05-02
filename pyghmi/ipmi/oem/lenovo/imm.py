@@ -123,8 +123,11 @@ def fetch_adapter_firmware(ipmicmd, certverify):
                         continue
                     donenames.add(fname)
                     bdata = {}
-                    bdata['version'] = firm['versionStr']
-                    if 'releaseDate' in firm and firm['releaseDate'] != 'N/A':
+                    if 'versionStr' in firm and firm['versionStr']:
+                        bdata['version'] = firm['versionStr']
+                    if ('releaseDate' in firm and
+                            firm['releaseDate'] and
+                            firm['releaseDate'] != 'N/A'):
                         bdata['date'] = datetime.strptime(firm['releaseDate'],
                                                           '%m/%d/%Y')
                     yield ('{0} {1}'.format(aname, fname), bdata)
