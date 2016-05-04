@@ -17,6 +17,7 @@
 # This represents the server side of a session object
 # Split into a separate file to avoid overly manipulating the as-yet
 # client-centered session object
+import collections
 import hashlib
 import hmac
 import os
@@ -74,6 +75,7 @@ class ServerSession(ipmisession.Session):
         self.kg = kg
         self.socket = netsocket
         self.sockaddr = clientaddr
+        self.pktqueue = collections.deque([])
         ipmisession.Session.bmc_handlers[clientaddr] = self
         response = self.create_open_session_response(request)
         self.send_payload(response,
@@ -250,6 +252,7 @@ class IpmiServer(object):
         self.additionaldevices = 0
         self.mfgid = 0
         self.prodid = 0
+        self.pktqueue = collections.deque([])
         if bmcuuid is None:
             self.uuid = uuid.uuid4()
         else:
@@ -278,6 +281,11 @@ class IpmiServer(object):
         bodydata = struct.unpack('B' * len(header[17:]), header[17:])
         header += chr(ipmisession._checksum(*bodydata))
         ipmisession._io_sendto(self.serversocket, header, sockaddr)
+
+    def process_pktqueue(self):
+        while self.pktqueue:
+            pkt = self.pktqueue.popleft()
+            self.sessionless_data(pkt[0], pkt[1])
 
     def sessionless_data(self, data, sockaddr):
         """Examines unsolocited packet and decides appropriate action.
