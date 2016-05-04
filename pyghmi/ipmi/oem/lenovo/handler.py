@@ -319,6 +319,8 @@ class OEMHandler(generic.OEMHandler):
         if self.has_tsm:
             self._collect_tsm_inventory()
             return self.oem_inventory_info.get(component, None)
+        if self.has_imm:
+            imm.get_component_inventory(ipmicmd, certverify, component)
 
     def _collect_tsm_inventory(self):
         self.oem_inventory_info = {}
