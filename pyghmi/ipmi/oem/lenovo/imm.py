@@ -173,6 +173,77 @@ def fetch_agentless_firmware(ipmicmd, certverify):
         wc.request('GET', '/data/logout')
 
 
+def get_hw_inventory(ipmicmd, certverify):
+    hwmap = hardware_inventory_map(ipmicmd, certverify)
+    for key in hwmap:
+        yield (key, hwmap[key])
+
+def get_hw_descriptions(ipmicmd, certverify):
+    hwmap = hardware_inventory_map(ipmicmd, certverify)
+    for key in hwmap:
+        yield key
+
+
+def get_component_inventory(ipmicmd, certverify, compname):
+    hwmap = hardware_inventory_map(ipmicmd, certverify)
+    try:
+        return hwmap[compname]
+    except KeyError:
+        return None
+
+
+def hardware_inventory_map(ipmicmd, certverify):
+    hwmap = get_cached_data(ipmicmd, 'lenovo_cached_hwmap')
+    if hwmap:
+        return hwmap
+    hwmap = {}
+    wc = None
+    adapterdata = get_cached_data(ipmicmd, 'lenovo_cached_adapters')
+    if not adapterdata:
+        wc = get_web_session(ipmicmd, certverify, wc)
+        if wc:
+            adapterdata = wc.grab_json_response(
+                '/designs/imm/dataproviders/imm_adapters.php')
+            if adapterdata:
+                ipmicmd.ipmi_session.lenovo_cached_adapters = (
+                    adapterdata, _monotonic_time())
+    if adapterdata:
+        for adata in adapterdata['items']:
+            if not adata['adapter.oobSupported']:
+                continue
+            aname = adata['adapter.adapterName']
+            clabel = adata['adapter.connectorLabel']
+            if clabel != 'Onboard':
+                aslot = adata['adapter.slotNo']
+                if clabel == 'ML2':
+                    clabel = 'ML2 (Slot {0})'.format(aslot)
+                else:
+                    clabel = 'Slot {0}'.format(aslot)
+            for fundata in adata['adapter.functions']:
+                bdata = {'location': clabel}
+                pcislot = '{02x}:{02x}.{x}'.format(fundata['generic.busNo'],
+                                                   fundata['generic.devNo'],
+                                                   fundata['generic.funNo'])
+                if (fundata['serialNo'] and fundata['serialNo'] != 'N/A' and
+                            '---' not in fundata['serialNo']):
+                    bdata['serial'] = fundata['serialNo']
+                if fundata['partNo'] and fundata['PartNo'] != 'N/A':
+                    bdata['partnumber'] = fundata['partNo']
+                if 'network.pPorts' in fundata:
+                    for portinfo in fundata['network.pPorts']:
+                        ma = portinfo['permamentAddr']
+                        ma = ':'.join(
+                            [ma[i:i+2] for i in xrange(0, len(ma), 2)]).lower()
+                        pname = '{0} Port {1}'.format(
+                            aname, portinfo['portIndex'])
+                        bdata['macaddr'] = ma
+                        hwmap[pname] = bdata
+                elif clabel != 'Onboard':  # skip the various onboard non-nic
+                    hwmap[aname] = bdata
+        ipmicmd.ipmi_session.lenovo_cached_hwmap = (hwmap, _monotonic_time())
+    return hwmap
+
+
 def get_firmware_inventory(ipmicmd, bmcver, certverify):
     # First we fetch the system firmware found in imm properties
     # then check for agentless, if agentless, get adapter info using

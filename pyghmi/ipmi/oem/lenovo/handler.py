@@ -292,6 +292,8 @@ class OEMHandler(generic.OEMHandler):
             if not self.oem_inventory_info:
                 self._collect_tsm_inventory()
             return iter(self.oem_inventory_info)
+        elif self.has_imm:
+            return imm.get_hw_descriptions(self.ipmicmd, self._certverify)
         return ()
 
     def get_oem_inventory(self):
@@ -299,6 +301,9 @@ class OEMHandler(generic.OEMHandler):
             self._collect_tsm_inventory()
             for compname in self.oem_inventory_info:
                 yield (compname, self.oem_inventory_info[compname])
+        elif self.has_imm:
+            for inv in imm.get_hw_inventory(self.ipmicmd, self._certverify):
+                yield inv
 
     def get_sensor_data(self):
         if self.is_fpc:
@@ -319,6 +324,8 @@ class OEMHandler(generic.OEMHandler):
         if self.has_tsm:
             self._collect_tsm_inventory()
             return self.oem_inventory_info.get(component, None)
+        if self.has_imm:
+            imm.get_component_inventory(ipmicmd, certverify, component)
 
     def _collect_tsm_inventory(self):
         self.oem_inventory_info = {}
