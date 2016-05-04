@@ -116,6 +116,7 @@ led_status = {
     0xFF: "On"
 }
 led_status_default = "Blink"
+mac_format = '{0:02x}:{1:02x}:{2:02x}:{3:02x}:{4:02x}:{5:02x}'
 
 
 def _megarac_abbrev_image(name):
@@ -292,6 +293,8 @@ class OEMHandler(generic.OEMHandler):
             if not self.oem_inventory_info:
                 self._collect_tsm_inventory()
             return iter(self.oem_inventory_info)
+        elif self.has_imm:
+            return imm.get_hw_descriptions(self.ipmicmd, self._certverify)
         return ()
 
     def get_oem_inventory(self):
@@ -299,6 +302,9 @@ class OEMHandler(generic.OEMHandler):
             self._collect_tsm_inventory()
             for compname in self.oem_inventory_info:
                 yield (compname, self.oem_inventory_info[compname])
+        elif self.has_imm:
+            for inv in imm.get_hw_inventory(self.ipmicmd, self._certverify):
+                yield inv
 
     def get_sensor_data(self):
         if self.is_fpc:
@@ -319,6 +325,9 @@ class OEMHandler(generic.OEMHandler):
         if self.has_tsm:
             self._collect_tsm_inventory()
             return self.oem_inventory_info.get(component, None)
+        if self.has_imm:
+            return imm.get_component_inventory(self.ipmicmd, self._certverify,
+                                               component)
 
     def _collect_tsm_inventory(self):
         self.oem_inventory_info = {}
@@ -415,7 +424,34 @@ class OEMHandler(generic.OEMHandler):
                 byteguid.extend('\x00' * (16 - len(byteguid)))
                 if byteguid not in ('\x20' * 16, '\x00' * 16, '\xff' * 16):
                     fru['UUID'] = util.decode_wireformat_uuid(byteguid)
-            except (AttributeError, KeyError):
+            except (AttributeError, KeyError, IndexError):
+                pass
+            return fru
+        elif self.has_imm:
+            fru['oem_parser'] = 'lenovo'
+            try:
+                bextra = fru['board_extra']
+                fru['FRU Number'] = bextra[0]
+                fru['Revision'] = bextra[4]
+                macs = bextra[6]
+                macprefix = None
+                idx = 0
+                endidx = len(macs) - 5
+                macprefix = None
+                while idx < endidx:
+                    currmac = macs[idx:idx+6]
+                    if currmac == b'\x00\x00\x00\x00\x00\x00':
+                        break
+                    # VPD may veer off, detect and break off
+                    if macprefix is None:
+                        macprefix = currmac[:3]
+                    elif currmac[:3] != macprefix:
+                        break
+                    ms = mac_format.format(*currmac)
+                    ifidx = idx / 6 + 1
+                    fru['MAC Address {0}'.format(ifidx)] = ms
+                    idx = idx + 6
+            except (AttributeError, KeyError, IndexError):
                 pass
             return fru
         else:
