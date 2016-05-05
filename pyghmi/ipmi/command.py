@@ -29,6 +29,11 @@ import pyghmi.ipmi.sdr as sdr
 import socket
 import struct
 
+try:
+    xrange
+except NameError:
+    xrange = range
+
 
 boot_devices = {
     'net': 4,
@@ -1487,7 +1492,7 @@ class Command(object):
             data = response['data']
             if len(data) == 16:
                 # convert int array to string
-                n = ''.join(chr(data[i]) for i in range(0, len(data)))
+                n = ''.join(chr(data[i]) for i in xrange(0, len(data)))
                 # remove padded \x00 chars
                 n = n.rstrip("\x00")
                 if len(n) > 0:
@@ -1584,7 +1589,7 @@ class Command(object):
             channel = self.get_network_channel()
         uid_list = []
         max_ids = self.get_channel_max_user_count(channel)
-        for uid in range(1, max_ids):
+        for uid in xrange(1, max_ids):
             if name == self.get_user_name(uid=uid):
                 uid_list.append(uid)
         return uid_list
@@ -1609,7 +1614,7 @@ class Command(object):
             channel = self.get_network_channel()
         names = {}
         max_ids = self.get_channel_max_user_count(channel)
-        for uid in range(1, max_ids+1):
+        for uid in xrange(1, max_ids+1):
             name = self.get_user_name(uid=uid)
             if name is not None:
                 names[uid] = self.get_user(uid=uid, channel=channel)

@@ -17,6 +17,11 @@
 import socket
 import struct
 
+try:
+    xrange
+except NameError:
+    xrange = range
+
 
 def decode_wireformat_uuid(rawguid):
     """Decode a wire format UUID

@@ -37,23 +37,23 @@ class ServerSession(ipmisession.Session):
         return object.__new__(cls)
 
     def create_open_session_response(self, request):
-        clienttag = ord(request[0])
+        clienttag = request[0]
         # role = request[1]
-        self.clientsessionid = list(struct.unpack('4B', request[4:8]))
+        self.clientsessionid = request[4:8]
         # TODO(jbjohnso): intelligently handle integrity/auth/conf
         #for now, forcibly do cipher suite 3
-        self.managedsessionid = list(struct.unpack('4B', os.urandom(4)))
+        self.managedsessionid = os.urandom(4)
         #table 13-17, 1 for now (hmac-sha1), 3 should also be supported
         #table 13-18, integrity, 1 for now is hmac-sha1-96, 4 is sha256
         #confidentiality: 1 is aes-cbc-128, the only one
         self.privlevel = 4
-        response = ([clienttag, 0, self.privlevel, 0] +
+        response = (bytearray([clienttag, 0, self.privlevel, 0]) +
                     self.clientsessionid + self.managedsessionid +
-                    [
+                    bytearray([
                         0, 0, 0, 8, 1, 0, 0, 0,  # auth
                         1, 0, 0, 8, 1, 0, 0, 0,  # integrity
                         2, 0, 0, 8, 1, 0, 0, 0,  # privacy
-                    ])
+                    ]))
         return response
 
     def __init__(self, authdata, kg, clientaddr, netsocket, request, uuid,
@@ -77,7 +77,7 @@ class ServerSession(ipmisession.Session):
         self.sockaddr = clientaddr
         self.pktqueue = collections.deque([])
         ipmisession.Session.bmc_handlers[clientaddr] = self
-        response = self.create_open_session_response(request)
+        response = self.create_open_session_response(bytearray(request))
         self.send_payload(response,
                           constants.payload_types['rmcpplusopenresponse'],
                           retry=False)
@@ -104,12 +104,11 @@ class ServerSession(ipmisession.Session):
             # don't think about invalid usernames for now
             return
         uuidbytes = self.uuid.bytes
-        uuidbytes = list(struct.unpack('%dB' % len(uuidbytes), uuidbytes))
         self.uuiddata = uuidbytes
-        self.Rc = list(struct.unpack('16B', os.urandom(16)))
+        self.Rc = os.urandom(16)
         hmacdata = (self.clientsessionid + self.managedsessionid +
                     self.Rm + self.Rc + uuidbytes +
-                    [self.rolem, len(self.username)])
+                    bytearray([self.rolem, len(self.username)]))
         hmacdata = struct.pack('%dB' % len(hmacdata), *hmacdata)
         hmacdata += self.username
         self.kuid = self.authdata[self.username]
@@ -117,12 +116,11 @@ class ServerSession(ipmisession.Session):
             self.kg = self.kuid
         authcode = hmac.new(
             self.kuid, hmacdata, hashlib.sha1).digest()
-        authcode = list(struct.unpack('%dB' % len(authcode), authcode))
         # regretably, ipmi mandates the server send out an hmac first
         # akin to a leak of /etc/shadow, not too worrisome if the secret
         # is complex, but terrible for most likely passwords selected by
         # a human
-        newmessage = ([clienttag, 0, 0, 0] + self.clientsessionid +
+        newmessage = (bytearray([clienttag, 0, 0, 0]) + self.clientsessionid +
                       self.Rc + uuidbytes + authcode)
         self.send_payload(newmessage, constants.payload_types['rakp2'],
                           retry=False)
@@ -136,7 +134,7 @@ class ServerSession(ipmisession.Session):
         # respond correctly a TODO(jjohnson2), since Kg being used
         # yet incorrect is a scenario why rakp3 could be bad
         # even if rakp2 was good
-        RmRc = struct.pack('B' * len(self.Rm + self.Rc), *(self.Rm + self.Rc))
+        RmRc = self.Rm + self.Rc
         self.sik = hmac.new(self.kg,
                             RmRc +
                             struct.pack("2B", self.rolem,
@@ -145,8 +143,8 @@ class ServerSession(ipmisession.Session):
         self.k1 = hmac.new(self.sik, '\x01' * 20, hashlib.sha1).digest()
         self.k2 = hmac.new(self.sik, '\x02' * 20, hashlib.sha1).digest()
         self.aeskey = self.k2[0:16]
-        hmacdata = struct.pack('B' * len(self.Rc), *self.Rc) +\
-            struct.pack("4B", *self.clientsessionid) +\
+        hmacdata = self.Rc +\
+            self.clientsessionid +\
             struct.pack("2B", self.rolem,
                         len(self.username)) +\
             self.username
@@ -159,9 +157,7 @@ class ServerSession(ipmisession.Session):
         if data[1] != 0:
             # client did not like our response, so ignore the rakp3
             return
-        self.localsid = struct.unpack('<I',
-                                      struct.pack(
-                                          '4B', *self.managedsessionid))[0]
+        self.localsid = struct.unpack('<I', self.managedsessionid)[0]
         self.ipmicallback = self.handle_client_request
         self._send_rakp4(clienttag, 0)
 
@@ -186,11 +182,11 @@ class ServerSession(ipmisession.Session):
         pass
 
     def _send_rakp4(self, tagvalue, statuscode):
-        payload = [tagvalue, statuscode, 0, 0] + self.clientsessionid
+        payload = bytearray([tagvalue, statuscode, 0, 0]) + self.clientsessionid
         hmacdata = self.Rm + self.managedsessionid + self.uuiddata
         hmacdata = struct.pack('%dB' % len(hmacdata), *hmacdata)
         authdata = hmac.new(self.sik, hmacdata, hashlib.sha1).digest()[:12]
-        payload += struct.unpack('%dB' % len(authdata), authdata)
+        payload += authdata
         self.send_payload(payload, constants.payload_types['rakp4'],
                           retry=False)
         self.confalgo = 'aes'
