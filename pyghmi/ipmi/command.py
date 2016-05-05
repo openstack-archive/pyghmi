@@ -29,6 +29,11 @@ import pyghmi.ipmi.sdr as sdr
 import socket
 import struct
 
+try:
+    range = xrange
+except NameError:
+    pass
+
 
 boot_devices = {
     'net': 4,
@@ -803,7 +808,7 @@ class Command(object):
         that
         """
         if self._netchannel is None:
-            for channel in chain((0xe, ), xrange(1, 0xc)):
+            for channel in chain((0xe, ), range(1, 0xc)):
                 try:
                     rsp = self.xraw_command(
                         netfn=6, command=0x42, data=(channel,))
@@ -927,7 +932,7 @@ class Command(object):
         numpol = ord(rsp['data'][1])
         desiredchandest = (channel << 4) | destination
         availpolnum = None
-        for polnum in xrange(1, numpol + 1):
+        for polnum in range(1, numpol + 1):
             currpol = self.xraw_command(netfn=4, command=0x13,
                                         data=(9, polnum, 0))
             polidx, chandest = struct.unpack_from('>BB', currpol['data'][2:4])
@@ -1080,7 +1085,7 @@ class Command(object):
         return retstr
 
     def _chunkwise_dcmi_set(self, command, data):
-        chunks = [data[i:i+15] for i in xrange(0, len(data), 15)]
+        chunks = [data[i:i+15] for i in range(0, len(data), 15)]
         offset = 0
         for chunk in chunks:
             chunk = bytearray(chunk, 'utf-8')
