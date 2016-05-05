@@ -33,6 +33,15 @@ from Crypto.Cipher import AES
 import pyghmi.exceptions as exc
 from pyghmi.ipmi.private import constants
 
+try:
+    dict.iteritems
+
+    def dictitems(d):
+        return d.iteritems()
+except AttributeError:
+    def dictitems(d):
+        return d.items()
+
 
 initialtimeout = 0.5  # minimum timeout for first packet to retry in any given
                      # session.  This will be randomized to stagger out retries
@@ -63,7 +72,7 @@ def define_worker():
             Session._cleanup()
             self.running = False
             iosockets[0].sendto(
-                '\x01', (myself, iosockets[0].getsockname()[1]))
+                b'\x01', (myself, iosockets[0].getsockname()[1]))
             super(_IOWorker, self).join()
 
         def run(self):
@@ -139,7 +148,7 @@ def _io_wait(timeout, myaddr=None, evq=None):
     # it piggy back on the select() in the io thread, which is a truly
     # lazy wait even with eventlet involvement
     if deadline < selectdeadline:
-        iosockets[0].sendto('\x01', (myself, iosockets[0].getsockname()[1]))
+        iosockets[0].sendto(b'\x01', (myself, iosockets[0].getsockname()[1]))
     evt.wait()
 
 
@@ -308,7 +317,8 @@ class Session(object):
 
     @classmethod
     def _cleanup(cls):
-        for session in cls.bmc_handlers.itervalues():
+        for sesskey in cls.bmc_handlers:
+            session = cls.bmc_handlers[sesskey]
             session.cleaningup = True
             session.logout()
 
@@ -324,7 +334,7 @@ class Session(object):
         # slots to be recycled
         sorted_candidates = None
         if server is None:
-            sorted_candidates = sorted(cls.socketpool.iteritems(),
+            sorted_candidates = sorted(dictitems(cls.socketpool),
                                        key=operator.itemgetter(1))
         if sorted_candidates and sorted_candidates[0][1] < MAX_BMCS_PER_SOCKET:
             cls.socketpool[sorted_candidates[0][0]] += 1
@@ -357,7 +367,7 @@ class Session(object):
             # be there
             try:
                 iosockets[0].sendto(
-                    '\x01', ('::1', iosockets[0].getsockname()[1]))
+                    b'\x01', ('::1', iosockets[0].getsockname()[1]))
                 myself = '::1'
             except socket.error:
                 # AF_INET6, but no '::1', try the AF_INET6 version of 127
@@ -1034,7 +1044,7 @@ class Session(object):
         # no more time than that, so that whatever part(ies) need to service in
         # a deadline, will be honored
         if timeout != 0:
-            for session, parms in cls.waiting_sessions.iteritems():
+            for session, parms in dictitems(cls.waiting_sessions):
                 if parms['timeout'] <= curtime:
                     timeout = 0  # exit after one guaranteed pass
                     break
@@ -1042,7 +1052,7 @@ class Session(object):
                         timeout < parms['timeout'] - curtime):
                     continue  # timeout smaller than the current session needs
                 timeout = parms['timeout'] - curtime  # set new timeout value
-            for session, parms in cls.keepalive_sessions.iteritems():
+            for session, parms in dictitems(cls.keepalive_sessions):
                 if parms['timeout'] <= curtime:
                     timeout = 0
                     break
@@ -1069,7 +1079,7 @@ class Session(object):
                 relsession.process_pktqueue()
         sessionstodel = []
         sessionstokeepalive = []
-        for session, parms in cls.keepalive_sessions.iteritems():
+        for session, parms in dictitems(cls.keepalive_sessions):
             # if the session is busy inside a command, defer invoking keepalive
             # until incommand is no longer the case
             if parms['timeout'] < curtime and not session._isincommand():
@@ -1078,7 +1088,7 @@ class Session(object):
                 sessionstokeepalive.append(session)
         for session in sessionstokeepalive:
             session._keepalive()
-        for session, parms in cls.waiting_sessions.iteritems():
+        for session, parms in dictitems(cls.waiting_sessions):
             if parms['timeout'] < curtime:  # timeout has expired, time to
                                             # give up on it and trigger timeout
                                             # response in the respective
@@ -1151,8 +1161,9 @@ class Session(object):
 
     def process_pktqueue(self):
         while self.pktqueue:
-            pkt = self.pktqueue.popleft()
-            if not pkt[0][0] == '\x06' and pkt[0][2:4] == '\xff\x07':
+            pkt = list(self.pktqueue.popleft())
+            pkt[0] = bytearray(pkt[0])
+            if not (pkt[0][0] == 6 and pkt[0][2:4] == b'\xff\x07'):
                 continue
             if pkt[1] in self.bmc_handlers:
                 self._handle_ipmi_packet(pkt[0], sockaddr=pkt[1])
@@ -1180,24 +1191,24 @@ class Session(object):
             return  # here, we might have sent an ipv4 and ipv6 packet to kick
                    # things off ignore the second reply since we have one
                    # satisfactory answer
-        if data[4] in ('\x00', '\x02'):  # This is an ipmi 1.5 paylod
-            remsequencenumber = struct.unpack('<I', data[5:9])[0]
+        if data[4] in (0, 2):  # This is an ipmi 1.5 paylod
+            remsequencenumber = struct.unpack('<I', bytes(data[5:9]))[0]
             if (hasattr(self, 'remsequencenumber') and
                     remsequencenumber < self.remsequencenumber):
                 return -5  # remote sequence number is too low, reject it
             self.remsequencenumber = remsequencenumber
-            if ord(data[4]) != self.authtype:
+            if data[4] != self.authtype:
                 return -2  # BMC responded with mismatch authtype, for
                           # mutual authentication reject it. If this causes
                           # legitimate issues, it's the vendor's fault
-            remsessid = struct.unpack("<I", data[9:13])[0]
+            remsessid = struct.unpack("<I", bytes(data[9:13]))[0]
             if remsessid != self.sessionid:
                 return -1  # does not match our session id, drop it
             # now we need a mutable representation of the packet, rather than
             # copying pieces of the packet over and over
-            rsp = list(struct.unpack("!%dB" % len(data), data))
+            rsp = list(struct.unpack("!%dB" % len(data), bytes(data)))
             authcode = False
-            if data[4] == '\x02':  # we have authcode in this ipmi 1.5 packet
+            if data[4] == 2:  # we have authcode in this ipmi 1.5 packet
                 authcode = data[13:29]
                 del rsp[13:29]
                     # this is why we needed a mutable representation
@@ -1210,7 +1221,7 @@ class Session(object):
                 if expectedauthcode != authcode:
                     return
             self._parse_ipmi_payload(payload)
-        elif data[4] == '\x06':
+        elif data[4] == 6:
             self._handle_ipmi2_packet(data)
         else:
             return  # unrecognized data, assume evil
@@ -1226,9 +1237,7 @@ class Session(object):
     def _got_rmcp_openrequest(self, data):
         pass
 
-    def _handle_ipmi2_packet(self, rawdata):
-        data = list(struct.unpack("%dB" % len(rawdata), rawdata))
-                    #now need mutable array
+    def _handle_ipmi2_packet(self, data):
         ptype = data[5] & 0b00111111
         # the first 16 bytes are header information as can be seen in 13-8 that
         # we will toss out
@@ -1254,17 +1263,17 @@ class Session(object):
             encrypted = 0
             if data[5] & 0b10000000:
                 encrypted = 1
-            authcode = rawdata[-12:]
+            authcode = data[-12:]
             if self.k1 is None:  # we are in no shape to process a packet now
                 return
             expectedauthcode = hmac.new(
-                self.k1, rawdata[4:-12], hashlib.sha1).digest()[:12]
+                self.k1, bytes(data[4:-12]), hashlib.sha1).digest()[:12]
             if authcode != expectedauthcode:
                 return  # BMC failed to assure integrity to us, drop it
-            sid = struct.unpack("<I", rawdata[6:10])[0]
+            sid = struct.unpack("<I", bytes(data[6:10]))[0]
             if sid != self.localsid:  # session id mismatch, drop it
                 return
-            remseqnumber = struct.unpack("<I", rawdata[10:14])[0]
+            remseqnumber = struct.unpack("<I", bytes(data[10:14]))[0]
             if (hasattr(self, 'remseqnumber') and
                 (remseqnumber < self.remseqnumber) and
                     (self.remseqnumber != 0xffffffff)):
@@ -1273,8 +1282,8 @@ class Session(object):
             psize = data[14] + (data[15] << 8)
             payload = data[16:16 + psize]
             if encrypted:
-                iv = rawdata[16:32]
-                decrypter = AES.new(self.aeskey, AES.MODE_CBC, iv)
+                iv = data[16:32]
+                decrypter = AES.new(self.aeskey, AES.MODE_CBC, bytes(iv))
                 decrypted = decrypter.decrypt(
                     struct.pack("%dB" % len(payload[16:]),
                                 *payload[16:]))
@@ -1394,8 +1403,8 @@ class Session(object):
                             struct.pack("2B", self.nameonly | self.privlevel,
                                         userlen) +
                             self.userid, hashlib.sha1).digest()
-        self.k1 = hmac.new(self.sik, '\x01' * 20, hashlib.sha1).digest()
-        self.k2 = hmac.new(self.sik, '\x02' * 20, hashlib.sha1).digest()
+        self.k1 = hmac.new(self.sik, b'\x01' * 20, hashlib.sha1).digest()
+        self.k2 = hmac.new(self.sik, b'\x02' * 20, hashlib.sha1).digest()
         self.aeskey = self.k2[0:16]
         self.sessioncontext = "EXPECTINGRAKP4"
         self.lastpayload = None
@@ -1641,5 +1650,5 @@ if __name__ == "__main__":
     ipmis = Session(bmc=sys.argv[1],
                     userid=sys.argv[2],
                     password=os.environ['IPMIPASS'])
-    print ipmis.raw_command(command=2, data=[1], netfn=0)
-    print get_ipmi_error({'command': 8, 'code': 128, 'netfn': 1})
+    print(ipmis.raw_command(command=2, data=[1], netfn=0))
+    print(get_ipmi_error({'command': 8, 'code': 128, 'netfn': 1}))

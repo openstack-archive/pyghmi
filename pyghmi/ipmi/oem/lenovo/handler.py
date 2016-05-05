@@ -44,6 +44,10 @@ import pyghmi.util.webclient as wc
 import socket
 import struct
 import weakref
+try:
+    xrange
+except NameError:
+    xrange = range
 
 inventory.register_inventory_category(cpu)
 inventory.register_inventory_category(dimm)
@@ -367,7 +371,7 @@ class OEMHandler(generic.OEMHandler):
                 )
             except Exception:
                 # If we can't parse an inventory category, ignore it
-                print traceback.print_exc()
+                print(traceback.print_exc())
                 continue
 
             for item in items:
@@ -377,7 +381,7 @@ class OEMHandler(generic.OEMHandler):
                     self.oem_inventory_info[key] = item
                 except Exception:
                     # If we can't parse an inventory item, ignore it
-                    print traceback.print_exc()
+                    print(traceback.print_exc())
                     continue
 
     def get_leds(self):
@@ -522,7 +526,7 @@ class OEMHandler(generic.OEMHandler):
     def get_oem_domain_name(self):
         if self.has_tsm:
             name = ''
-            for i in range(1, 5):
+            for i in xrange(1, 5):
                 rsp = self.ipmicmd.xraw_command(netfn=0x32, command=0x6b,
                                                 data=(4, i))
                 name += rsp['data'][:]
@@ -536,7 +540,7 @@ class OEMHandler(generic.OEMHandler):
 
             # set the domain name content
             name = name.ljust(256, "\x00")
-            for i in range(0, 4):
+            for i in xrange(0, 4):
                 data = [4, i+1]
                 offset = i*64
                 data.extend([ord(x) for x in name[offset:offset+64]])
