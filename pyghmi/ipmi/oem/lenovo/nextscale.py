@@ -17,6 +17,11 @@
 import pyghmi.ipmi.sdr as sdr
 import struct
 
+try:
+    range = xrange
+except NameError:
+    pass
+
 
 def fpc_read_ac_input(ipmicmd):
     rsp = ipmicmd.xraw_command(netfn=0x32, command=0x90, data=(1,))
@@ -73,7 +78,7 @@ def get_sensor_names():
     for name in fpc_sensors:
         sensor = fpc_sensors[name]
         if 'elements' in sensor:
-            for elemidx in xrange(sensor['elements']):
+            for elemidx in range(sensor['elements']):
                 elemidx += 1
                 yield '{0} {1}'.format(name, elemidx)
         else:
@@ -85,7 +90,7 @@ def get_sensor_descriptions():
     for name in fpc_sensors:
         sensor = fpc_sensors[name]
         if 'elements' in sensor:
-            for elemidx in xrange(sensor['elements']):
+            for elemidx in range(sensor['elements']):
                 elemidx += 1
                 yield {'name': '{0} {1}'.format(name, elemidx),
                        'type': sensor['type']}
