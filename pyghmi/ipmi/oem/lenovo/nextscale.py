@@ -18,6 +18,11 @@ import pyghmi.constants as pygconst
 import pyghmi.ipmi.sdr as sdr
 import struct
 
+try:
+    xrange
+except NameError:
+    xrange = range
+
 
 def fpc_read_ac_input(ipmicmd):
     rsp = ipmicmd.xraw_command(netfn=0x32, command=0x90, data=(1,))
