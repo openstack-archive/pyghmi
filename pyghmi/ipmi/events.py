@@ -22,6 +22,11 @@ import pyghmi.ipmi.private.constants as ipmiconst
 import struct
 import time
 
+try:
+    xrange
+except NameError:
+    xrange = range
+
 
 psucfg_errors = {
     0: 'Vendor mismatch',
