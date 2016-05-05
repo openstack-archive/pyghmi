@@ -18,8 +18,12 @@
 
 __author__ = 'jjohnson2'
 
-import Cookie
-import httplib
+try:
+    import Cookie
+    import httplib
+except ImportError:
+    import http.client as httplib
+    import http.cookies as Cookie
 import json
 import pyghmi.exceptions as pygexc
 import socket

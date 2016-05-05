@@ -17,6 +17,11 @@
 import socket
 import struct
 
+try:
+    range = xrange
+except NameError:
+    pass
+
 
 def decode_wireformat_uuid(rawguid):
     """Decode a wire format UUID
@@ -54,4 +59,4 @@ def get_ipv4(hostname):
     """
     addrinfo = socket.getaddrinfo(hostname, None, socket.AF_INET,
                                   socket.SOCK_STREAM)
-    return [addrinfo[x][4][0] for x in xrange(len(addrinfo))]
+    return [addrinfo[x][4][0] for x in range(len(addrinfo))]
