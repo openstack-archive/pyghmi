@@ -40,7 +40,7 @@ class InvalidParameterValue(PyghmiException):
 
 
 class BmcErrorException(IpmiException):
-    # This denotes when library detects an invalid BMC behavior
+    # This denotes when library detects an invalid BMC behavior foo
     pass
 
 
