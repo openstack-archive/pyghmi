@@ -142,6 +142,6 @@ class Bmc(serversession.IpmiServer):
             traceback.print_exc()
 
     @classmethod
-    def listen(cls):
+    def listen(cls, timeout=30):
         while True:
-            ipmisession.Session.wait_for_rsp(30)
+            ipmisession.Session.wait_for_rsp(timeout)
