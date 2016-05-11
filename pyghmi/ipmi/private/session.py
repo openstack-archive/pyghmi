@@ -835,7 +835,7 @@ class Session(object):
         if (self in Session.keepalive_sessions and not needskeepalive and
                 not self._customkeepalives):
             Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
-                25 + (random.random() * 4.9)
+                50 + (random.random() * 4.9)
         self._xmit_packet(retry, delay_xmit=delay_xmit, timeout=timeout)
 
     def _ipmi15authcode(self, payload, checkremotecode=False):
@@ -947,7 +947,7 @@ class Session(object):
         Session.keepalive_sessions[self] = {}
         Session.keepalive_sessions[self]['ipmisession'] = self
         Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
-            25 + (random.random() * 4.9)
+            50 + (random.random() * 4.9)
         self.onlogon({'success': True})
 
     def _get_session_challenge(self):
@@ -1074,7 +1074,7 @@ class Session(object):
             # until incommand is no longer the case
             if parms['timeout'] < curtime and not session._isincommand():
                 cls.keepalive_sessions[session]['timeout'] = \
-                    _monotonic_time() + 25 + (random.random() * 4.9)
+                    _monotonic_time() + 50 + (random.random() * 4.9)
                 sessionstokeepalive.append(session)
         for session in sessionstokeepalive:
             session._keepalive()
