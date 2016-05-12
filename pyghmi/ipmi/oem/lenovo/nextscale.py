@@ -43,6 +43,10 @@ def fpc_read_psu_fan(ipmicmd, number):
     return struct.unpack_from('<H', rsp[:2])[0]
 
 
+def fpc_read_powerbank(ipmicmd):
+    rsp = ipmicmd.xraw_command(netfn=0x32, command=0xa2)
+    return struct.unpack_from('<H', rsp['data'][3:])[0]
+
 fpc_sensors = {
     'AC Power': {
         'type': 'Power',
@@ -64,7 +68,12 @@ fpc_sensors = {
         'units': 'RPM',
         'provider': fpc_read_psu_fan,
         'elements': 6,
-    }
+    },
+    'Total Power Capacity': {
+        'type': 'Power',
+        'units': 'W',
+        'provider': fpc_read_powerbank,
+    },
 }
 
 
