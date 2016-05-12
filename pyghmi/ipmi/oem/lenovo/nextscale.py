@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import pyghmi.ipmi.sdr as sdr
+import pyghmi.constants as pygconst
 import struct
 
 
@@ -41,6 +42,20 @@ def fpc_read_psu_fan(ipmicmd, number):
     rsp = ipmicmd.xraw_command(netfn=0x32, command=0xa5, data=(number,))
     rsp = rsp['data']
     return struct.unpack_from('<H', rsp[:2])[0]
+
+
+def fpc_get_nodeperm(ipmicmd, number):
+    rsp = ipmicmd.xraw_command(netfn=0x32, command=0xa7, data=(number,))
+    perminfo = ord(rsp['data'][1])
+    health = pygconst.Health.Ok
+    states = []
+    if rsp['data'][4] in ('\x02', '\x03'):
+        states.append('Insufficient Power')
+        health = pygconst.Health.Failed
+    if perminfo & 0x40:
+        states.append('Node Fault')
+        health = pygconst.Health.Failed
+    return (health, states)
 
 
 def fpc_read_powerbank(ipmicmd):
@@ -75,6 +90,13 @@ fpc_sensors = {
         'units': 'W',
         'provider': fpc_read_powerbank,
     },
+    'Node Power Permission': {
+        'type': 'Management Subsystem Health',
+        'returns': 'dict',
+        'units': None,
+        'provider': fpc_get_nodeperm,
+        'elements': 12,
+    },
 }
 
 
@@ -106,6 +128,8 @@ def get_sensor_descriptions():
 def get_sensor_reading(name, ipmicmd):
     value = None
     sensor = None
+    health = pygconst.Health.Ok
+    states = []
     if name in fpc_sensors and 'elements' not in fpc_sensors[name]:
         sensor = fpc_sensors[name]
         value = sensor['provider'](ipmicmd)
@@ -114,11 +138,14 @@ def get_sensor_reading(name, ipmicmd):
         idx = int(idx)
         if bname in fpc_sensors and idx <= fpc_sensors[bname]['elements']:
             sensor = fpc_sensors[bname]
-            value = sensor['provider'](ipmicmd, idx)
+            if 'returns' in sensor:
+                health, states = sensor['provider'](ipmicmd, idx)
+            else:
+                value = sensor['provider'](ipmicmd, idx)
     if sensor is not None:
         return sdr.SensorReading({'name': name, 'imprecision': None,
-                                  'value': value, 'states': [],
-                                  'state_ids': [], 'health': 0,
+                                  'value': value, 'states': states,
+                                  'state_ids': [], 'health': health,
                                   'type': sensor['type']},
                                  sensor['units'])
     raise Exception('Sensor not found: ' + name)
