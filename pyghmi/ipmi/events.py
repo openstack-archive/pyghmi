@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2015 Lenovo
+# Copyright 2016 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -299,20 +299,32 @@ def _fix_sel_time(records, ipmicmd):
     newtimestamp = 0
     lasttimestamp = None
     trimindexes = []
+    correctionenabled = True
     for index in reversed(xrange(len(records))):
         record = records[index]
         if 'timecode' not in record or record['timecode'] == 0xffffffff:
             continue
         if ('event' in record and record['event'] == 'Clock time change' and
                 record['event_data'] == 'After'):
+            if (lasttimestamp is not None and
+                    record['timecode'] > lasttimestamp):
+                # if the timestamp did something impossible, declare the rest
+                # of history not meaningfully correctable
+                correctionenabled = False
+                newtimestamp = 0
+                continue
             newtimestamp = record['timecode']
             trimindexes.append(index)
         elif ('event' in record and record['event'] == 'Clock time change' and
                 record['event_data'] == 'Before'):
+            if not correctionenabled:
+                continue
             if newtimestamp:
                 if record['timecode'] < 0x20000000:
                     correctearly = True
                     nowtime = correctednowtime
+                # we want time that occurred before this point to get the delta
+                # added to it to catch up
                 correctednowtime += newtimestamp - record['timecode']
                 newtimestamp = 0
             trimindexes.append(index)
@@ -320,7 +332,7 @@ def _fix_sel_time(records, ipmicmd):
             # clean up after potentially broken time sync pairs
             newtimestamp = 0
             if record['timecode'] < 0x20000000:  # uptime timestamp
-                if not correctearly:
+                if not correctearly or not correctionenabled:
                     correctednowtime = nowtime
                     continue
                 if (lasttimestamp is not None and
@@ -339,6 +351,9 @@ def _fix_sel_time(records, ipmicmd):
                 # We are in 'normal' time, assume we cannot go to
                 # pre-init time and do corrections unless time sync events
                 # guide us in safely
+                if (lasttimestamp is not None and
+                        record['timecode'] > lasttimestamp):
+                    correctionenabled = False
                 if inpreinit:
                     inpreinit = False
                     # We were in pre-init, now in real time, reset the
@@ -346,7 +361,8 @@ def _fix_sel_time(records, ipmicmd):
                     # 'wall clock' correction
                     correctednowtime = nowtime
                 correctearly = False
-                if correctednowtime < 0x20000000:
+                lasttimestamp = record['timecode']
+                if not correctionenabled or correctednowtime < 0x20000000:
                     # We can't correct time when the correction factor is
                     # rooted in a pre-init timestamp, just convert
                     record['timestamp'] = time.strftime(
