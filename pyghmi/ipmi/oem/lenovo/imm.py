@@ -116,7 +116,7 @@ def fetch_agentless_firmware(ipmicmd, certverify):
             if adapterdata:
                 ipmicmd.ipmi_session.lenovo_cached_adapters = (
                     adapterdata, _monotonic_time())
-    if adapterdata:
+    if adapterdata and 'items' in adapterdata:
         for adata in adapterdata['items']:
             aname = adata['adapter.adapterName']
             donenames = set([])
@@ -208,7 +208,7 @@ def hardware_inventory_map(ipmicmd, certverify):
             if adapterdata:
                 ipmicmd.ipmi_session.lenovo_cached_adapters = (
                     adapterdata, _monotonic_time())
-    if adapterdata:
+    if adapterdata and 'items' in adapterdata:
         for adata in adapterdata['items']:
             skipadapter = False
             if not adata['adapter.oobSupported']:
