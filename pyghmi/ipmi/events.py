@@ -515,6 +515,8 @@ class EventHandler(object):
             except pygexc.IpmiException as pi:
                 if pi.ipmicode == 203:
                     break
+                else:
+                    raise
             curr = struct.unpack_from('<H', buffer(rsp['data'][:2]))[0]
             targetlist.append(self._sel_decode(rsp['data'][2:]))
         return endat
