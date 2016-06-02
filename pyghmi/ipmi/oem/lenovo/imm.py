@@ -157,6 +157,8 @@ def fetch_agentless_firmware(ipmicmd, certverify):
                     storagedata, _monotonic_time())
     if storagedata and 'items' in storagedata:
         for adp in storagedata['items']:
+            if 'storage.vpd.productName' not in adp:
+                continue
             adpname = adp['storage.vpd.productName']
             if 'children' not in adp:
                 adp['children'] = ()
