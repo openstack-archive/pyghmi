@@ -28,7 +28,36 @@ import socket
 import struct
 import threading
 
-from Crypto.Cipher import AES
+try:
+    # try to use python cryptography when available.  It's better mantained
+    # and aligned to OpenSSL so it gets better support for new technology.
+    import cryptography.hazmat.primitives.ciphers as ciphers
+    from cryptography.hazmat.backends import default_backend
+
+    cryptbackend = default_backend()
+    def _encrypt(key, iv, data):
+        crypter = Cipher(algorithms.AES(key), modes.CBC(iv),
+                         backend=cryptbackend).encryptor()
+        return crypter.update(data) + crypter.finalize()
+
+
+    def _decrypt(key, iv, data):
+        decrypter = Cipher(algorithms.AES(key), modes.CBC(iv),
+                           backend=cryptbackend)
+        return decrypter.update(data) + decrypter.finalize()
+except ImportError:
+    # Older enterprise distributions are hard to support with new cryptography,
+    # continue use of python-crypto for such distributions for no
+    # cryptography really pushes a *lot* of things that are particularly
+    # not friendly with, say, EL6, which is python 2.6 centric
+    from Crypto.Cipher import AES
+    def _encrypt(key, iv, data):
+        crypter = AES.new(key, AES.MODE_CBC, iv)
+        return crypter.encrypt(data)
+
+    def _decrypt(key, iv, data):
+        decrypter = AES.new(key, AES.MODE_CBC, iv)
+        return decrypter.decrypt(data)
 
 import pyghmi.exceptions as exc
 from pyghmi.ipmi.private import constants
@@ -801,10 +830,9 @@ class Session(object):
                 iv = os.urandom(16)
                 message += list(struct.unpack("16B", iv))
                 payloadtocrypt = _aespad(payload)
-                crypter = AES.new(self.aeskey, AES.MODE_CBC, iv)
-                crypted = crypter.encrypt(struct.pack("%dB" %
-                                                      len(payloadtocrypt),
-                                                      *payloadtocrypt))
+                crypted = _encrypt(self.aeskey, iv,
+                                  struct.pack("%dB" % len(payloadtocrypt),
+                                              *payloadtocrypt))
                 crypted = list(struct.unpack("%dB" % len(crypted), crypted))
                 message += crypted
             else:  # no confidetiality algorithm
@@ -1274,10 +1302,9 @@ class Session(object):
             payload = data[16:16 + psize]
             if encrypted:
                 iv = rawdata[16:32]
-                decrypter = AES.new(self.aeskey, AES.MODE_CBC, iv)
-                decrypted = decrypter.decrypt(
-                    struct.pack("%dB" % len(payload[16:]),
-                                *payload[16:]))
+                decrypted = _decrypt(self.aeskey, iv,
+                                    struct.pack("%dB" % len(payload[16:]),
+                                                *payload[16:]))
                 payload = struct.unpack("%dB" % len(decrypted), decrypted)
                 padsize = payload[-1] + 1
                 payload = list(payload[:-padsize])
