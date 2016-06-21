@@ -717,7 +717,7 @@ class Session(object):
         if retry is None:
             retry = not self.servermode
         if self.servermode:
-            data = [code] + data
+            data = [code] + list(data)
             if netfn is None:
                 netfn = self.clientnetfn
             if command is None:
