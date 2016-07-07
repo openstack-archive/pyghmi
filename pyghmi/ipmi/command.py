@@ -253,6 +253,7 @@ class Command(object):
                      requested state change for 300 seconds.
                      If a non-zero number, adjust the wait time to the
                      requested number of seconds
+        :raises: IpmiException on an error
         :returns: dict -- A dict describing the response retrieved
         """
         if powerstate not in power_states:
@@ -285,7 +286,7 @@ class Command(object):
             while currpowerstate != waitpowerstate and waitattempts > 0:
                 response = self.raw_command(netfn=0, command=1, delay_xmit=1)
                 if 'error' in response:
-                    return response
+                    raise exc.IpmiException(response['error'])
                 currpowerstate = 'on' if (response['data'][0] & 1) else 'off'
                 waitattempts -= 1
             if currpowerstate != waitpowerstate:
