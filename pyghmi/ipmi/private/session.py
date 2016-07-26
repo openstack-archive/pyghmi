@@ -390,7 +390,7 @@ class Session(object):
         a client-provided callback.
         """
         if 'error' in response:
-            raise exc.IpmiException(response['error'])
+            raise exc.IpmiException(response['error'], session = self)
 
     def __new__(cls,
                 bmc,
@@ -690,10 +690,10 @@ class Session(object):
                     delay_xmit=None,
                     timeout=None):
         if not self.logged:
-            raise exc.IpmiException('Session no longer connected')
+            raise exc.IpmiException('Session no longer connected', session = self)
         self._cmdwait()
         if not self.logged:
-            raise exc.IpmiException('Session no longer connected')
+            raise exc.IpmiException('Session no longer connected', session = self)
         self.incommand = _monotonic_time() + self._getmaxtimeout()
         self.lastresponse = None
         self.ipmicallback = self._generic_callback
@@ -716,7 +716,7 @@ class Session(object):
         lastresponse = self.lastresponse
         self.incommand = False
         if retry and lastresponse is None:
-            raise exc.IpmiException('Session no longer connected')
+            raise exc.IpmiException('Session no longer connected', session = self)
         while self.evq:
             self.evq.popleft().set()
         return lastresponse
@@ -857,7 +857,7 @@ class Session(object):
         password = self.password
         padneeded = 16 - len(password)
         if padneeded < 0:
-            raise exc.IpmiException("Password is too long for ipmi 1.5")
+            raise exc.IpmiException("Password is too long for ipmi 1.5", session = self )
         password += '\x00' * padneeded
         passdata = struct.unpack("16B", password)
         if checkremotecode:
@@ -964,7 +964,7 @@ class Session(object):
         reqdata = [2]
         if len(self.userid) > 16:
             raise exc.IpmiException(
-                "Username too long for IPMI, must not exceed 16")
+                "Username too long for IPMI, must not exceed 16", session = self)
         padneeded = 16 - len(self.userid)
         userid = self.userid + ('\x00' * padneeded)
         reqdata += struct.unpack("!16B", userid)
@@ -1615,7 +1615,7 @@ class Session(object):
                     _io_sendto(self.socket, self.netpacket, sockaddr)
             except socket.gaierror:
                 raise exc.IpmiException(
-                    "Unable to transmit to specified address")
+                    "Unable to transmit to specified address", session = self)
         if retry:
             Session.waiting_sessions[self] = {}
             Session.waiting_sessions[self]['ipmisession'] = self

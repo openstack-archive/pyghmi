@@ -24,8 +24,9 @@ class PyghmiException(Exception):
 
 
 class IpmiException(PyghmiException):
-    def __init__(self, text='', code=0):
+    def __init__(self, text='', code=0, session = None):
         super(IpmiException, self).__init__(text)
+        self.session = session
         self.ipmicode = code
 
 
