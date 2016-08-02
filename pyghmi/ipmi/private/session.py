@@ -27,6 +27,7 @@ import select
 import socket
 import struct
 import threading
+import errno
 
 from Crypto.Cipher import AES
 
@@ -90,7 +91,12 @@ def define_worker():
                 if timeout < 0:
                     timeout = 0
                 selectdeadline = _monotonic_time() + timeout
-                tmplist, _, _ = select.select(iosockets, (), (), timeout)
+                try:
+                    tmplist, _, _ = select.select(iosockets, (), (), timeout)
+                except select.error as e:
+                    if e[0] == errno.EINTR:
+                        continue
+                    raise
                 # pessimistically move out the deadline
                 # doing it this early (before ioqueue is evaluated)
                 # this avoids other threads making a bad assumption
