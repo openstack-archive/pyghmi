@@ -72,6 +72,9 @@ class Bmc(serversession.IpmiServer):
                 rc = self.power_cycle()
             elif directive == 3:
                 rc = self.power_reset()
+            elif directive == 4:
+                # i.e. a NMI reset
+                rc = self.cold_reset()
             elif directive == 5:
                 rc = self.power_shutdown()
             if rc is None:
