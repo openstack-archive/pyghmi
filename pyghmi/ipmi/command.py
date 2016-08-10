@@ -178,7 +178,7 @@ class Command(object):
             'device_id': response['data'][0],
             'device_revision': response['data'][1] & 0b1111,
             'manufacturer_id': struct.unpack(
-                '<I', struct.pack('3B', *response['data'][6:9]) + '\x00')[0],
+                '<I', struct.pack('3B', *response['data'][6:9]) + b'\x00')[0],
             'product_id': struct.unpack(
                 '<H', struct.pack('2B', *response['data'][9:11]))[0],
         }
@@ -1007,7 +1007,7 @@ class Command(object):
                 parsedip = socket.inet_pton(socket.AF_INET, ip)
                 destdata.extend((0, 0))
                 destdata.extend(parsedip)
-                destdata.extend('\x00\x00\x00\x00\x00\x00')
+                destdata.extend(b'\x00\x00\x00\x00\x00\x00')
             except socket.error:
                 if self._supports_standard_ipv6:
                     parsedip = socket.inet_pton(socket.AF_INET6, ip)
@@ -1024,7 +1024,7 @@ class Command(object):
                 acknowledge_timeout is not None):
             currtype = self.xraw_command(netfn=0xc, command=2, data=(
                 channel, 18, destination, 0))
-            if currtype['data'][0] != '\x11':
+            if currtype['data'][0] != b'\x11':
                 raise exc.PyghmiException("Unknown parameter format")
             currtype = bytearray(currtype['data'][1:])
             if acknowledge_required is not None:
@@ -1053,7 +1053,7 @@ class Command(object):
         """Set the management controller identifier, per DCMI specification
 
         """
-        return self._chunkwise_dcmi_set(0xa, mci + '\x00')
+        return self._chunkwise_dcmi_set(0xa, mci + b'\x00')
 
     def get_asset_tag(self):
         """Get the system asset tag, per DCMI specification
@@ -1527,7 +1527,7 @@ class Command(object):
         if password:
             password = str(password)
             if 21 > len(password) > 16:
-                password = password.ljust(20, '\x00')
+                password = password.ljust(20, b'\x00')
                 data[0] |= 0b10000000
             elif len(password) > 20:
                 raise Exception('password has limit of 20 chars')
@@ -1674,7 +1674,7 @@ class Command(object):
             # however another convention that exists is all '\xff'
             # if this fails, pass up the error so that calling code knows
             # that the deletion did not go as planned for now
-            self.set_user_name(uid, '\xff' * 16)
+            self.set_user_name(uid, b'\xff' * 16)
         return True
 
     def disable_user(self, uid, mode):
