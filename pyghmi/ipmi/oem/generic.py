@@ -233,6 +233,14 @@ class OEMHandler(object):
     def attach_remote_media(self, imagename, username, password):
         raise exc.UnsupportedFunctionality()
 
+    def set_identify(self, on, duration):
+        """Provide an OEM override for set_identify
+
+        Some systems may require an override for set identify.
+
+        """
+        raise exc.UnsupportedFunctionality()
+
     def set_alert_ipv6_destination(self, ip, destination, channel):
         """Set an IPv6 alert destination
 

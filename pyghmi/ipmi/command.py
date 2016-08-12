@@ -438,6 +438,12 @@ class Command(object):
         :param duration: Set if wanting to request turn on for a duration
                          rather than indefinitely on
         """
+        self.oem_init()
+        try:
+            self._oem.set_identify(on, duration)
+            return
+        except exc.UnsupportedFunctionality:
+            pass
         if duration is not None:
             duration = int(duration)
             if duration > 255:
