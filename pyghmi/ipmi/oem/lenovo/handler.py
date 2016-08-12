@@ -276,6 +276,12 @@ class OEMHandler(generic.OEMHandler):
                 self.oemid['product_id']) in fpc_ids
 
     @property
+    def is_sd350(self):
+        return (19046, 32, 13616) == (self.oemid['manufacturer_id'],
+                                      self.oemid['device_id'],
+                                      self.oemid['product_id'])
+
+    @property
     def has_tsm(self):
         """True if this particular server have a TSM based service processor
         """
@@ -395,6 +401,12 @@ class OEMHandler(generic.OEMHandler):
                 status = led_status.get(ord(rsp['data'][0]),
                                         led_status_default)
                 yield (name, {'status': status})
+
+    def set_identify(self, on, duration):
+        if on and not duration and self.is_sd350:
+            self.ipmicmd.xraw_command(netfn=0x3a, command=6, data=(1,1))
+        else:
+            raise pygexc.UnsupportedFunctionality()
 
     def process_fru(self, fru):
         if fru is None:
