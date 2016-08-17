@@ -38,6 +38,9 @@ class Bmc(serversession.IpmiServer):
     def power_reset(self):
         raise NotImplementedError
 
+    def pulse_diag(self):
+        raise NotImplementedError
+
     def power_shutdown(self):
         raise NotImplementedError
 
@@ -73,8 +76,8 @@ class Bmc(serversession.IpmiServer):
             elif directive == 3:
                 rc = self.power_reset()
             elif directive == 4:
-                # i.e. a NMI reset
-                rc = self.cold_reset()
+                # i.e. Pulse a diagnostic interrupt(NMI) directly
+                rc = self.pulse_diag()
             elif directive == 5:
                 rc = self.power_shutdown()
             if rc is None:
