@@ -47,13 +47,12 @@ raid_drive_fields = (
         0x04: "12.0 Gb/s"
     }),
     EntryField("SlotNumber", "B"),
+    EntryField("ControllerIndex", "B"),
     EntryField("DeviceState", "B", mapper={
         0x00: "active",
         0x01: "stopped",
         0xff: "transitioning"
-    }),
-    # There seems to be an undocumented byte at the end
-    EntryField("Reserved", "B", include=False))
+    }))
 
 
 def parse_raid_drive_info(raw):
