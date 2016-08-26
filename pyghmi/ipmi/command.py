@@ -591,15 +591,19 @@ class Command(object):
         or None for items not present.
         """
         self.oem_init()
+
         yield ("System", self._get_zero_fru())
+
         if self._sdr is None:
             self._sdr = sdr.SDR(self)
+
         for fruid in self._sdr.fru:
             fruinf = fru.FRU(
                 ipmicmd=self, fruid=fruid, sdr=self._sdr.fru[fruid]).info
             if fruinf is not None:
                 fruinf = self._oem.process_fru(fruinf)
-            yield (self._sdr.fru[fruid].fru_name, fruinf)
+                yield (self._sdr.fru[fruid].fru_name, fruinf)
+
         for componentpair in self._oem.get_oem_inventory():
             yield componentpair
 
@@ -1053,16 +1057,26 @@ class Command(object):
             self._assure_alert_policy(channel, destination)
 
     def get_mci(self):
-        """Get the Management Controller Identifier, per DCMI specification
+        """Get the Management Controller Identifier, try the OEM command first,
+        if none, then get it per DCMI specification
 
         :returns: The identifier as a string
         """
+        self.oem_init()
+        identifier = self._oem.get_oem_identifier()
+        if identifier:
+            return identifier
         return self._chunkwise_dcmi_fetch(9)
 
     def set_mci(self, mci):
-        """Set the management controller identifier, per DCMI specification
+        """Set the management controller identifier, try the OEM command first,
+        if False, then set it per DCMI specification
 
         """
+        self.oem_init()
+        ret = self._oem.set_oem_identifier(mci)
+        if ret:
+            return
         return self._chunkwise_dcmi_set(0xa, mci + b'\x00')
 
     def get_asset_tag(self):
@@ -1174,7 +1188,7 @@ class Command(object):
             'dont_change': 0,
             'non_volatile': 1,
             'volatile': 2,
-            #'reserved': 3
+            # 'reserved': 3
         }
         b = 0
         b |= (access_update_modes[access_update_mode] << 6) & 0b11000000
@@ -1197,7 +1211,7 @@ class Command(object):
             'dont_change': 0,
             'non_volatile': 1,
             'volatile': 2,
-            #'reserved': 3
+            # 'reserved': 3
         }
         b |= (privilege_update_modes[privilege_update_mode] << 6) & 0b11000000
         privilege_levels = {
@@ -1282,7 +1296,7 @@ class Command(object):
             3: 'operator',
             4: 'administrator',
             5: 'proprietary',
-            #0x0F: 'no_access'
+            # 0x0F: 'no_access'
         }
         r['privilege_level'] = privilege_levels[data[1] & 0b00001111]
         return r
@@ -1327,8 +1341,8 @@ class Command(object):
             0x0a: 'reserved for USB 1.x',
             0x0b: 'reserved for USB 2.x',
             0x0c: 'System Interface (KCS, SMIC, or BT)',
-            ## 60h-7Fh: OEM
-            ## all other  reserved
+            # 60h-7Fh: OEM
+            # all other  reserved
         }
         t = data[1] & 0b01111111
         if t in channel_medium_types:
@@ -1440,7 +1454,7 @@ class Command(object):
             privilege_level: [reserved, callback, user,
                               operatorm administrator, proprietary, no_access]
         """
-        ## user access available during call-in or callback direct connection
+        # user access available during call-in or callback direct connection
         if channel is None:
             channel = self.get_network_channel()
         data = [channel, uid]
@@ -1550,6 +1564,7 @@ class Command(object):
                 # return false if password test failed
                 return False
             raise Exception(response['error'])
+
         return True
 
     def get_channel_max_user_count(self, channel=None):
@@ -1709,6 +1724,12 @@ class Command(object):
         bmcver = '{0}.{1}'.format(
             ord(mcinfo['data'][2]), hex(ord(mcinfo['data'][3]))[2:])
         return self._oem.get_oem_firmware(bmcver)
+
+    def get_service_log(self, log_stream):
+        """Retrieve OEM ServiceLog information
+        """
+        self.oem_init()
+        return self._oem.get_oem_service_log(log_stream)
 
     def get_capping_enabled(self):
         """Get PSU based power capping status
