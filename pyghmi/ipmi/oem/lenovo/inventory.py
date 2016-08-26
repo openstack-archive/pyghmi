@@ -119,9 +119,11 @@ def parse_inventory_category_entry(raw, fields):
     bytes_read = 0
     discard = False
     for field in fields:
-        value = struct.unpack_from(field.fmt, r)[0]
         read = struct.calcsize(field.fmt)
         bytes_read += read
+        if bytes_read > len(raw):
+            break
+        value = struct.unpack_from(field.fmt, r)[0]
         r = r[read:]
         # If this entry is not actually present, just parse and then discard it
         if field.presence and not bool(value):

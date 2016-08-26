@@ -49,6 +49,6 @@ def get_categories():
                 "command": 0x59,
                 "data": (0x00, 0xc1, 0x02, 0x00)
             },
-            "workaround_bmc_bug": True
+            "workaround_bmc_bug": lambda t: True
         }
     }
