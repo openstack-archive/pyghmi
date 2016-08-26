@@ -29,6 +29,7 @@ from pyghmi.ipmi.oem.lenovo import cpu
 from pyghmi.ipmi.oem.lenovo import dimm
 from pyghmi.ipmi.oem.lenovo import drive
 
+from pyghmi.ipmi.oem.lenovo import energy
 from pyghmi.ipmi.oem.lenovo import firmware
 from pyghmi.ipmi.oem.lenovo import imm
 from pyghmi.ipmi.oem.lenovo import inventory
@@ -113,6 +114,13 @@ leds = {
     "LED_FAN_FAULT_6": 0x15,
     "LED_FAN_FAULT_7": 0x16,
     "LED_FAN_FAULT_8": 0x17
+}
+
+ami_leds = {
+    "BMC_HEARTBEAT": 0x00,
+    "BMC_UID": 0x01,
+    "SYSTEM_FAULT": 0x02,
+    "HDD_FAULT": 0x03
 }
 
 led_status = {
@@ -232,13 +240,13 @@ class OEMHandler(generic.OEMHandler):
             event['component'] += ' {0}'.format(evdata[1] & 0b11111)
 
     def get_ntp_enabled(self):
-        if self.has_tsm:
+        if self.has_tsm or self.has_ami:
             ntpres = self.ipmicmd.xraw_command(netfn=0x32, command=0xa7)
             return ntpres['data'][0] == '\x01'
         return None
 
     def get_ntp_servers(self):
-        if self.has_tsm:
+        if self.has_tsm or self.has_ami:
             srvs = []
             ntpres = self.ipmicmd.xraw_command(netfn=0x32, command=0xa7)
             srvs.append(ntpres['data'][1:129].rstrip('\x00'))
@@ -247,7 +255,7 @@ class OEMHandler(generic.OEMHandler):
         return None
 
     def set_ntp_enabled(self, enabled):
-        if self.has_tsm:
+        if self.has_tsm or self.has_ami:
             if enabled:
                 self.ipmicmd.xraw_command(
                     netfn=0x32, command=0xa8, data=(3, 1), timeout=15)
@@ -258,7 +266,7 @@ class OEMHandler(generic.OEMHandler):
         return None
 
     def set_ntp_server(self, server, index=0):
-        if self.has_tsm:
+        if self.has_tsm or self.has_ami:
             if not (0 <= index <= 1):
                 raise pygexc.InvalidParameterValue("Index must be 0 or 1")
             cmddata = bytearray((1 + index, ))
@@ -296,8 +304,26 @@ class OEMHandler(generic.OEMHandler):
             return True
         return False
 
+    @property
+    def has_ami(self):
+        """True if this particular server is AMI based Lenovo server
+        """
+        if(self.oemid['manufacturer_id'] == 7154 and
+                self.oemid['device_id'] == 32):
+            try:
+                rsp = self.ipmicmd.xraw_command(netfn=0x3a, command=0x80)
+            except pygexc.IpmiException as ie:
+                if ie.ipmicode == 193:
+                    return False
+                raise
+            if ord(rsp['data'][0]) in range(5):
+                return True
+            else:
+                return False
+        return False
+
     def get_oem_inventory_descriptions(self):
-        if self.has_tsm:
+        if self.has_tsm or self.has_ami:
             # Thinkserver with TSM
             if not self.oem_inventory_info:
                 self._collect_tsm_inventory()
@@ -307,7 +333,7 @@ class OEMHandler(generic.OEMHandler):
         return ()
 
     def get_oem_inventory(self):
-        if self.has_tsm:
+        if self.has_tsm or self.has_ami:
             self._collect_tsm_inventory()
             for compname in self.oem_inventory_info:
                 yield (compname, self.oem_inventory_info[compname])
@@ -331,7 +357,7 @@ class OEMHandler(generic.OEMHandler):
         return ()
 
     def get_inventory_of_component(self, component):
-        if self.has_tsm:
+        if self.has_tsm or self.has_ami:
             self._collect_tsm_inventory()
             return self.oem_inventory_info.get(component, None)
         if self.has_imm:
@@ -341,7 +367,13 @@ class OEMHandler(generic.OEMHandler):
     def _collect_tsm_inventory(self):
         self.oem_inventory_info = {}
         for catid, catspec in inventory.categories.items():
-            if (catspec.get("workaround_bmc_bug", False)):
+
+            if not catspec.get("workaround_bmc_bug", False):
+                return
+
+            k = "ami" if self.has_ami else "lenovo"
+            if catspec["workaround_bmc_bug"](k):
+
                 rsp = None
                 tmp_command = dict(catspec["command"])
                 tmp_command["data"] = list(tmp_command["data"])
@@ -395,6 +427,16 @@ class OEMHandler(generic.OEMHandler):
             for (name, id_) in leds.items():
                 try:
                     rsp = self.ipmicmd.xraw_command(netfn=0x3A, command=0x02,
+                                                    data=(id_,))
+                except pygexc.IpmiException:
+                    continue  # Ignore LEDs we can't retrieve
+                status = led_status.get(ord(rsp['data'][0]),
+                                        led_status_default)
+                yield (name, {'status': status})
+        elif self.has_ami:
+            for (name, id_) in ami_leds.items():
+                try:
+                    rsp = self.ipmicmd.xraw_command(netfn=0x3A, command=0x05,
                                                     data=(id_,))
                 except pygexc.IpmiException:
                     continue  # Ignore LEDs we can't retrieve
@@ -489,7 +531,7 @@ class OEMHandler(generic.OEMHandler):
         return self._hasimm
 
     def get_oem_firmware(self, bmcver):
-        if self.has_tsm:
+        if self.has_tsm or self.has_ami:
             command = firmware.get_categories()["firmware"]
             rsp = self.ipmicmd.xraw_command(**command["command"])
             return command["parser"](rsp["data"])
@@ -633,6 +675,42 @@ class OEMHandler(generic.OEMHandler):
                 ipv6str = ':'.join([ipv6str[x:x+4] for x in xrange(0, 32, 4)])
             netdata['ipv6_addresses'] = [
                 '{0}/{1}'.format(ipv6str, ipv6_prefix)]
+
+    def get_sensor_reading(self, sensorname):
+        """Get an OEM sensor
+
+        If software wants to model some OEM behavior as a 'sensor' without
+        doing SDR, this hook provides that ability.  It should mimic
+        the behavior of 'get_sensor_reading' in command.py.
+        """
+        for sensor in self.get_sensor_data():
+            if sensor.name == sensorname:
+                return sensor
+
+    def get_sensor_descriptions(self):
+        """Get list of OEM sensor names and types
+
+        Iterate over dicts describing a label and type for OEM 'sensors'.  This
+        should mimic the behavior of the get_sensor_descriptions function
+        in command.py.
+        """
+        if self.has_ami:
+            energy_sensor = energy.Energy(self.ipmicmd)
+            for sensor in energy_sensor.get_energy_sensor():
+                yield {'name': sensor.name,
+                       'type': sensor.type}
+
+    def get_sensor_data(self):
+        """Get OEM sensor data
+
+        Iterate through all OEM 'sensors' and return data as if they were
+        normal sensors.  This should mimic the behavior of the get_sensor_data
+        function in command.py.
+        """
+        if self.has_ami:
+            energy_sensor = energy.Energy(self.ipmicmd)
+            for sensor in energy_sensor.get_energy_sensor():
+                yield sensor
 
     @property
     def has_megarac(self):

@@ -148,7 +148,7 @@ class FRU(object):
         # In our case, we don't need to think too hard about whether
         # the FRU is word or byte, we just process what we get back in the
         # payload
-        chunksize = 240
+        chunksize = 224
         # Selected as it is accomodated by most tested things
         # and many tested things broke after going much
         # bigger
@@ -187,8 +187,8 @@ class FRU(object):
             frusubtype = self.sdr.fru_type_and_modifier & 0xff
             if frutype > 0x10 or frutype < 0x8 or frusubtype not in (0, 1, 2):
                 return
-                #TODO(jjohnson2): strict mode to detect pyghmi and BMC
-                #gaps
+                # TODO(jjohnson2): strict mode to detect pyghmi and BMC
+                # gaps
                 # raise iexc.PyghmiException(
                 #     'Unsupported FRU device: {0:x}h, {1:x}h'.format(frutype,
                 #                                                    frusubtype
@@ -199,7 +199,7 @@ class FRU(object):
                 return
         if self.databytes[0] != 1:
             return
-            #TODO(jjohnson2): strict mode to flag potential BMC errors
+            # TODO(jjohnson2): strict mode to flag potential BMC errors
             # raise iexc.BmcErrorException("Invalid/Unsupported FRU format")
         # Ignore the internal use even if present.
         self._parse_chassis()
