@@ -33,7 +33,7 @@ pci_fields = (
     }),
     EntryField("BusNumber", "B"),
     EntryField("DeviceFunction", "B"),
-    EntryField("VendorID", "<H"),
+    EntryField("VendorID", "<H", presence=True),
     EntryField("DeviceID", "<H"),
     EntryField("SubSystemVendorID", "<H"),
     EntryField("SubSystemID", "<H"),
@@ -60,5 +60,6 @@ def get_categories():
                 "command": 0x59,
                 "data": (0x00, 0xc1, 0x03, 0x00)
             }
-        }
+        },
+        "workaround_bmc_bug": lambda t: t == "ami"
     }

@@ -183,6 +183,11 @@ class OEMHandler(object):
         # provide the generic BMC version, which is all that is possible
         yield ('BMC Version', {'version': bmcver})
 
+    def get_oem_service_log(self):
+        """Get Service Log information.
+        """
+        return ()
+
     def get_oem_capping_enabled(self):
         """Get PSU based power capping status
 
@@ -226,6 +231,18 @@ class OEMHandler(object):
         :param netdata: Dictionary to store additional network data
         """
         return
+
+    def get_oem_identifier(self):
+        """Get host name
+        """
+        return None
+
+    def set_oem_identifier(self, name):
+        """Set host name
+
+        :param name: host name to be set
+        """
+        return False
 
     def detach_remote_media(self):
         raise exc.UnsupportedFunctionality()
