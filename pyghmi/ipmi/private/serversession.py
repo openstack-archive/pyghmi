@@ -307,19 +307,20 @@ class IpmiServer(object):
                               bmc=self)
                 return
             data = data[13:]  # ditch 13 bytes so the payload works out
-        myaddr, netfnlun = struct.unpack('2B', data[14:16])
+        myaddr, netfnlun = struct.unpack('2B', bytes(data[14:16]))
         netfn = (netfnlun & 0b11111100) >> 2
         mylun = netfnlun & 0b11
         if netfn == 6:  # application request
             if data[19] == 0x38:  # cmd = get channel auth capabilities
-                verchannel, level = struct.unpack('2B', data[20:22])
+                verchannel, level = struct.unpack('2B', bytes(data[20:22]))
                 version = verchannel & 0b10000000
                 if version != 0b10000000:
                     return
                 channel = verchannel & 0b1111
                 if channel != 0xe:
                     return
-                (clientaddr, clientlun) = struct.unpack('BB', data[17:19])
+                (clientaddr, clientlun) = struct.unpack(
+                    'BB', bytes(data[17:19]))
                 level &= 0b1111
                 self.send_auth_cap(myaddr, mylun, clientaddr, clientlun,
                                    sockaddr)
