@@ -1166,7 +1166,7 @@ class Session(object):
             if not (pkt[0][0] == 6 and pkt[0][2:4] == b'\xff\x07'):
                 continue
             if pkt[1] in self.bmc_handlers:
-                self._handle_ipmi_packet(pkt[0], sockaddr=pkt[1])
+                self._handle_ipmi_packet(pkt[0], sockaddr=pkt[1], qent=pkt)
             elif pkt[2] in self.bmc_handlers:
                 self.sessionless_data(pkt[0], pkt[1])
 
@@ -1182,7 +1182,7 @@ class Session(object):
             if mysocket in cls.bmc_handlers:
                 cls.bmc_handlers[mysocket].sessionless_data(data, sockaddr)
 
-    def _handle_ipmi_packet(self, data, sockaddr=None):
+    def _handle_ipmi_packet(self, data, sockaddr=None, qent=None):
         if self.sockaddr is None and sockaddr is not None:
             self.sockaddr = sockaddr
         elif (self.sockaddr is not None and
@@ -1193,6 +1193,17 @@ class Session(object):
                    # satisfactory answer
         if data[4] in (0, 2):  # This is an ipmi 1.5 paylod
             remsequencenumber = struct.unpack('<I', bytes(data[5:9]))[0]
+            remsessid = struct.unpack("<I", bytes(data[9:13]))[0]
+            if (remsequencenumber == 0 and remsessid == 0 and
+                qent[2] in Session.bmc_handlers):
+                # So a new ipmi client happens to get a previously seen and
+                # still active UDP source port.  Clear ourselves out and punt
+                # to IpmiServer
+                del Session.bmc_handlers[sockaddr]
+                iserver = Session.bmc_handlers[qent[2]]
+                iserver.pktqueue.append(qent)
+                iserver.process_pktqueue()
+                return
             if (hasattr(self, 'remsequencenumber') and
                     remsequencenumber < self.remsequencenumber):
                 return -5  # remote sequence number is too low, reject it
@@ -1201,7 +1212,7 @@ class Session(object):
                 return -2  # BMC responded with mismatch authtype, for
                           # mutual authentication reject it. If this causes
                           # legitimate issues, it's the vendor's fault
-            remsessid = struct.unpack("<I", bytes(data[9:13]))[0]
+
             if remsessid != self.sessionid:
                 return -1  # does not match our session id, drop it
             # now we need a mutable representation of the packet, rather than
