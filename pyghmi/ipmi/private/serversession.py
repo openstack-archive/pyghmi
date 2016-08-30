@@ -192,6 +192,7 @@ class ServerSession(ipmisession.Session):
                           retry=False)
         self.confalgo = 'aes'
         self.integrityalgo = 'sha1'
+        self.sequencenumber = 1
         self.sessionid = struct.unpack(
             '<I', struct.pack('4B', *self.clientsessionid))[0]
 
@@ -268,12 +269,14 @@ class IpmiServer(object):
             (address, port, 0, 0))
         ipmisession.Session.bmc_handlers[self.serversocket] = self
 
-    def send_auth_cap(self, myaddr, mylun, clientaddr, clientlun, sockaddr):
+    def send_auth_cap(self, myaddr, mylun, clientaddr, clientlun, clientseq,
+                      sockaddr):
         header = bytearray(
             b'\x06\x00\xff\x07\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10')
         headerdata = [clientaddr, clientlun | (7 << 2)]
         headersum = ipmisession._checksum(*headerdata)
-        header += bytearray(headerdata + [headersum, myaddr, mylun, 0x38])
+        header += bytearray(headerdata + [headersum, myaddr,
+                                          mylun | (clientseq << 2), 0x38])
         header += self.authcap
         bodydata = struct.unpack('B' * len(header[17:]), bytes(header[17:]))
         header.append(ipmisession._checksum(*bodydata))
@@ -322,9 +325,11 @@ class IpmiServer(object):
                     return
                 (clientaddr, clientlun) = struct.unpack(
                     'BB', bytes(data[17:19]))
+                clientseq = clientlun >> 2
+                clientlun &= 0b11  # Lun is only the least significant bits
                 level &= 0b1111
                 self.send_auth_cap(myaddr, mylun, clientaddr, clientlun,
-                                   sockaddr)
+                                   clientseq, sockaddr)
 
     def set_kg(self, kg):
         """Sets the Kg for the BMC to use
