@@ -131,6 +131,10 @@ class Console(object):
         #code anyway...
         #NOTE(jbjohnso):
         #We will use a special purpose keepalive
+        if self.ipmi_session.sol_handler is not None:
+            # If there is erroneously another SOL handler already, notify
+            # it of newly established session
+            self.ipmi_session.sol_handler({'error': 'Session Disconnected'})
         self.keepaliveid = self.ipmi_session.register_keepalive(
             cmd={'netfn': 6, 'command': 0x4b, 'data': (1, 1)},
             callback=self._got_payload_instance_info)
@@ -270,6 +274,12 @@ class Console(object):
 
     def _print_error(self, error):
         self.broken = True
+        if self.ipmi_session:
+            self.ipmi_session.unregister_keepalive(self.keepaliveid)
+            if (self.ipmi_session.sol_handler and
+                    self.ipmi_session.sol_handler.__self__ is self):
+                self.ipmi_session.sol_handler = None
+            self.ipmi_session = None
         if type(error) == dict:
             self._print_data(error)
         else:
