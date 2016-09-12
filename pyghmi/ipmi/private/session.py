@@ -496,6 +496,14 @@ class Session(object):
         if self.logged:
             self.logged = 0  # mark session as busted
             self.logging = False
+            for ka in list(self._customkeepalives):
+                # Be thorough and notify parties through their custom
+                # keepalives.  In practice, this *should* be the same, but
+                # if a code somehow makes duplicate SOL handlers,
+                # this would notify all the handlers rather than just the
+                # last one to take ownership
+                self._customkeepalives[ka][1](
+                    {'error': 'Session Disconnected'})
             self._customkeepalives = None
             if not self.broken:
                 self.socketpool[self.socket] -= 1
@@ -506,8 +514,6 @@ class Session(object):
                 for sockaddr in self.allsockaddrs:
                     if sockaddr in Session.bmc_handlers:
                         del Session.bmc_handlers[sockaddr]
-                if self.sol_handler:
-                    self.sol_handler({'error': 'Session Disconnected'})
         elif not self.broken:
             self.broken = True
             self.socketpool[self.socket] -= 1
