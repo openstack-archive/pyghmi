@@ -146,7 +146,6 @@ class Console(object):
     def _got_payload_instance_info(self, response):
         if 'error' in response:
             self.activated = False
-            self.ipmi_session.unregister_keepalive(self.keepaliveid)
             self._print_error(response['error'])
             return
         currowner = struct.unpack(
@@ -154,7 +153,6 @@ class Console(object):
         if currowner[0] != self.ipmi_session.sessionid:
             # the session is deactivated or active for something else
             self.activated = False
-            self.ipmi_session.unregister_keepalive(self.keepaliveid)
             self._print_error('SOL deactivated')
             return
         # ok, still here, that means session is alive, but another
@@ -184,7 +182,8 @@ class Console(object):
     def close(self):
         """Shut down an SOL session,
         """
-        self.ipmi_session.unregister_keepalive(self.keepaliveid)
+        if self.ipmi_session:
+            self.ipmi_session.unregister_keepalive(self.keepaliveid)
         if self.activated:
             try:
                 self.ipmi_session.raw_command(netfn=6, command=0x49,
