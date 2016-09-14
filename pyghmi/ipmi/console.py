@@ -146,7 +146,8 @@ class Console(object):
     def _got_payload_instance_info(self, response):
         if 'error' in response:
             self.activated = False
-            self.ipmi_session.unregister_keepalive(self.keepaliveid)
+            if self.ipmi_session:
+                self.ipmi_session.unregister_keepalive(self.keepaliveid)
             self._print_error(response['error'])
             return
         currowner = struct.unpack(
