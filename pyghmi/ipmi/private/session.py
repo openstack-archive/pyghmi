@@ -671,14 +671,20 @@ class Session(object):
             incrementtime += 1
         return cumulativetime + 1
 
-    def _cmdwait(self):
+    def _cmdwait(self, waitall=False):
         while self._isincommand():
-            _io_wait(self._isincommand(), self.sockaddr, self.evq)
+            if waitall:
+                Session.wait_for_rsp(self._isincommand())
+            else:
+                _io_wait(self._isincommand(), self.sockaddr, self.evq)
 
-    def awaitresponse(self, retry):
+    def awaitresponse(self, retry, waitall=False):
         while retry and self.lastresponse is None and self.logged:
             timeout = self.expiration - _monotonic_time()
-            _io_wait(timeout, self.sockaddr)
+            if waitall:
+                Session.wait_for_rsp(timeout)
+            else:
+                _io_wait(timeout, self.sockaddr)
             while self.iterwaiters:
                 waiter = self.iterwaiters.pop()
                 waiter({'success': True})
@@ -695,10 +701,11 @@ class Session(object):
                     data=(),
                     retry=True,
                     delay_xmit=None,
-                    timeout=None):
+                    timeout=None,
+                    waitall=False):
         if not self.logged:
             raise exc.IpmiException('Session no longer connected')
-        self._cmdwait()
+        self._cmdwait(waitall)
         if not self.logged:
             raise exc.IpmiException('Session no longer connected')
         self.incommand = _monotonic_time() + self._getmaxtimeout()
@@ -719,7 +726,7 @@ class Session(object):
         #of only the constructor needing a callback.  From then on,
         #synchronous usage of the class acts in a greenthread style governed by
         #order of data on the network
-        self.awaitresponse(retry)
+        self.awaitresponse(retry, waitall)
         lastresponse = self.lastresponse
         self.incommand = False
         if retry and lastresponse is None:
@@ -1149,7 +1156,7 @@ class Session(object):
                 if self.incommand:
                     # if currently in command, no cause to keepalive
                     return
-                self.raw_command(netfn=6, command=1)
+                self.raw_command(netfn=6, command=1, waitall=True)
             else:
                 kaids = list(self._customkeepalives.keys())
                 for keepalive in kaids:
@@ -1162,6 +1169,7 @@ class Session(object):
                         # raw command ultimately caused a keepalive to
                         # deregister
                         continue
+                    cmd['waitall'] = True
                     callback(self.raw_command(**cmd))
         except exc.IpmiException:
             self._mark_broken()
