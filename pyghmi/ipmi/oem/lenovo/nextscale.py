@@ -49,6 +49,29 @@ def fpc_read_psu_fan(ipmicmd, number):
     return struct.unpack_from('<H', rsp[:2])[0]
 
 
+def fpc_get_psustatus(ipmicmd, number):
+    rsp = ipmicmd.xraw_command(netfn=0x32, command=0x91)
+    mask = 1 << (number - 1)
+    statdata = bytearray(rsp['data'])
+    presence = statdata[3] & mask == mask
+    pwrgood = statdata[4] & mask == mask
+    throttle = (statdata[6] | statdata[2]) & mask == mask
+    health = pygconst.Health.Ok
+    states = []
+    if presence and not pwrgood:
+        health = pygconst.Health.Critical
+        states.append('Power input lost')
+    if throttle:
+        health = pygconst.Health.Critical
+        states.append('Throttled')
+    if presence:
+        states.append('Present')
+    else:
+        states.append('Absent')
+        health = pygconst.Health.Critical
+    return (health, states)
+
+
 def fpc_get_nodeperm(ipmicmd, number):
     rsp = ipmicmd.xraw_command(netfn=0x32, command=0xa7, data=(number,))
     perminfo = ord(rsp['data'][1])
@@ -97,11 +120,18 @@ fpc_sensors = {
     },
     'Node Power Permission': {
         'type': 'Management Subsystem Health',
-        'returns': 'dict',
+        'returns': 'tuple',
         'units': None,
         'provider': fpc_get_nodeperm,
         'elements': 12,
     },
+    'Power Supply': {
+        'type': 'Power Supply',
+        'returns': 'tuple',
+        'units': None,
+        'provider': fpc_get_psustatus,
+        'elements': 6,
+    }
 }
 
 
