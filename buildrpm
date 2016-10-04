@@ -1,0 +1,7 @@
+cd `dirname $0`
+VERSION=`python setup.py --version`
+python setup.py sdist
+cp dist/pyghmi-$VERSION.tar.gz ~/rpmbuild/SOURCES
+rpmbuild -bs python-pyghmi.spec
+rm $1/python-pyghmi-*rpm
+cp ~/rpmbuild/SRPMS/python-pyghmi-$VERSION-1.src.rpm $1/
