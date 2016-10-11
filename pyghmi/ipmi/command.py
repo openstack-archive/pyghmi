@@ -33,6 +33,10 @@ try:
     xrange
 except NameError:
     xrange = range
+try:
+    buffer
+except NameError:
+    buffer = memoryview
 
 
 boot_devices = {
