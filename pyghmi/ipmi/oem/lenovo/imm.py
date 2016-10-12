@@ -242,7 +242,7 @@ def hardware_inventory_map(ipmicmd, certverify):
                         for lp in portinfo['logicalPorts']:
                             ma = lp['networkAddr']
                             ma = ':'.join(
-                                [ma[i:i+2] for i in xrange(
+                                [ma[i:i+2] for i in range(
                                     0, len(ma), 2)]).lower()
                             bdata['MAC Address {0}'.format(
                                 portinfo['portIndex'])] = ma

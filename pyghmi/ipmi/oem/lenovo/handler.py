@@ -346,7 +346,7 @@ class OEMHandler(generic.OEMHandler):
                 tmp_command = dict(catspec["command"])
                 tmp_command["data"] = list(tmp_command["data"])
                 count = 0
-                for i in xrange(0x01, 0xff):
+                for i in range(0x01, 0xff):
                     tmp_command["data"][-1] = i
                     try:
                         partrsp = self.ipmicmd.xraw_command(**tmp_command)
@@ -538,7 +538,7 @@ class OEMHandler(generic.OEMHandler):
     def get_oem_domain_name(self):
         if self.has_tsm:
             name = ''
-            for i in xrange(1, 5):
+            for i in range(1, 5):
                 rsp = self.ipmicmd.xraw_command(netfn=0x32, command=0x6b,
                                                 data=(4, i))
                 name += rsp['data'][:]
@@ -552,7 +552,7 @@ class OEMHandler(generic.OEMHandler):
 
             # set the domain name content
             name = name.ljust(256, "\x00")
-            for i in xrange(0, 4):
+            for i in range(0, 4):
                 data = [4, i+1]
                 offset = i*64
                 data.extend([ord(x) for x in name[offset:offset+64]])
@@ -630,7 +630,7 @@ class OEMHandler(generic.OEMHandler):
             else:
                 # fall back to a dumber, but more universal formatter
                 ipv6str = binascii.b2a_hex(ipv6_addr)
-                ipv6str = ':'.join([ipv6str[x:x+4] for x in xrange(0, 32, 4)])
+                ipv6str = ':'.join([ipv6str[x:x+4] for x in range(0, 32, 4)])
             netdata['ipv6_addresses'] = [
                 '{0}/{1}'.format(ipv6str, ipv6_prefix)]
 
@@ -688,7 +688,7 @@ class OEMHandler(generic.OEMHandler):
         self.ipmicmd.xraw_command(netfn=0x32, command=0x9f,
                                   data=(1, selector, 0, 1))
         # now do the set
-        for x in xrange(0, 256, 64):
+        for x in range(0, 256, 64):
             currdata = padded[x:x+64]
             currchunk = x // 64 + 1
             cmddata = [1, selector, currchunk] + currdata
@@ -702,7 +702,7 @@ class OEMHandler(generic.OEMHandler):
                                         data=(7, 1, 0))
         imgnames = rsp['data'][1:]
         shortnames = []
-        for idx in xrange(0, len(imgnames), 22):
+        for idx in range(0, len(imgnames), 22):
             shortnames.append(imgnames[idx+2:idx+22].rstrip('\0'))
         return shortnames
 

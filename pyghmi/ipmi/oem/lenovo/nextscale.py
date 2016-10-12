@@ -140,7 +140,7 @@ def get_sensor_names():
     for name in fpc_sensors:
         sensor = fpc_sensors[name]
         if 'elements' in sensor:
-            for elemidx in xrange(sensor['elements']):
+            for elemidx in range(sensor['elements']):
                 elemidx += 1
                 yield '{0} {1}'.format(name, elemidx)
         else:
@@ -152,7 +152,7 @@ def get_sensor_descriptions():
     for name in fpc_sensors:
         sensor = fpc_sensors[name]
         if 'elements' in sensor:
-            for elemidx in xrange(sensor['elements']):
+            for elemidx in range(sensor['elements']):
                 elemidx += 1
                 yield {'name': '{0} {1}'.format(name, elemidx),
                        'type': sensor['type']}

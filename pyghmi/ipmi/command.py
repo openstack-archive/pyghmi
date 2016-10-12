@@ -938,7 +938,7 @@ class Command(object):
         numpol = ord(rsp['data'][1])
         desiredchandest = (channel << 4) | destination
         availpolnum = None
-        for polnum in xrange(1, numpol + 1):
+        for polnum in range(1, numpol + 1):
             currpol = self.xraw_command(netfn=4, command=0x13,
                                         data=(9, polnum, 0))
             polidx, chandest = struct.unpack_from('>BB', currpol['data'][2:4])
@@ -1091,7 +1091,7 @@ class Command(object):
         return retstr
 
     def _chunkwise_dcmi_set(self, command, data):
-        chunks = [data[i:i+15] for i in xrange(0, len(data), 15)]
+        chunks = [data[i:i+15] for i in range(0, len(data), 15)]
         offset = 0
         for chunk in chunks:
             chunk = bytearray(chunk, 'utf-8')
@@ -1498,7 +1498,7 @@ class Command(object):
             data = response['data']
             if len(data) == 16:
                 # convert int array to string
-                n = ''.join(chr(data[i]) for i in xrange(0, len(data)))
+                n = ''.join(chr(data[i]) for i in range(0, len(data)))
                 # remove padded \x00 chars
                 n = n.rstrip("\x00")
                 if len(n) > 0:
@@ -1595,7 +1595,7 @@ class Command(object):
             channel = self.get_network_channel()
         uid_list = []
         max_ids = self.get_channel_max_user_count(channel)
-        for uid in xrange(1, max_ids):
+        for uid in range(1, max_ids):
             if name == self.get_user_name(uid=uid):
                 uid_list.append(uid)
         return uid_list
@@ -1620,7 +1620,7 @@ class Command(object):
             channel = self.get_network_channel()
         names = {}
         max_ids = self.get_channel_max_user_count(channel)
-        for uid in xrange(1, max_ids+1):
+        for uid in range(1, max_ids+1):
             name = self.get_user_name(uid=uid)
             if name is not None:
                 names[uid] = self.get_user(uid=uid, channel=channel)
