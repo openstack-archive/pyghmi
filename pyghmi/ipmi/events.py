@@ -23,9 +23,9 @@ import struct
 import time
 
 try:
-    xrange
+    range = xrange
 except NameError:
-    xrange = range
+    pass
 try:
     buffer
 except NameError:
@@ -309,7 +309,7 @@ def _fix_sel_time(records, ipmicmd):
     lasttimestamp = None
     trimindexes = []
     correctionenabled = True
-    for index in reversed(xrange(len(records))):
+    for index in reversed(range(len(records))):
         record = records[index]
         if 'timecode' not in record or record['timecode'] == 0xffffffff:
             continue
