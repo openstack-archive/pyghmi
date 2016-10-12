@@ -45,9 +45,9 @@ import socket
 import struct
 import weakref
 try:
-    xrange
+    range = xrange
 except NameError:
-    xrange = range
+    pass
 try:
     buffer
 except NameError:

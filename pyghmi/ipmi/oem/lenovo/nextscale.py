@@ -19,9 +19,9 @@ import pyghmi.ipmi.sdr as sdr
 import struct
 
 try:
-    xrange
+    range = xrange
 except NameError:
-    xrange = range
+    pass
 
 
 def fpc_read_ac_input(ipmicmd):

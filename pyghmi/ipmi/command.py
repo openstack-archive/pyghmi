@@ -30,9 +30,9 @@ import socket
 import struct
 
 try:
-    xrange
+    range = xrange
 except NameError:
-    xrange = range
+    pass
 try:
     buffer
 except NameError:
@@ -818,7 +818,7 @@ class Command(object):
         that
         """
         if self._netchannel is None:
-            for channel in chain((0xe, ), xrange(1, 0xc)):
+            for channel in chain((0xe, ), range(1, 0xc)):
                 try:
                     rsp = self.xraw_command(
                         netfn=6, command=0x42, data=(channel,))
