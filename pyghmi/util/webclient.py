@@ -63,6 +63,8 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         rsp = self.getresponse()
         if rsp.status == 200:
             return json.loads(rsp.read())
+        rsp.read()
+        return {}
 
     def request(self, method, url, body=None, headers=None):
         if headers is None:
