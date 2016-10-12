@@ -21,6 +21,10 @@ try:
     xrange
 except NameError:
     xrange = range
+try:
+    buffer
+except NameError:
+    buffer = memoryview
 
 
 def decode_wireformat_uuid(rawguid):

@@ -48,6 +48,10 @@ try:
     xrange
 except NameError:
     xrange = range
+try:
+    buffer
+except NameError:
+    buffer = memoryview
 
 inventory.register_inventory_category(cpu)
 inventory.register_inventory_category(dimm)
