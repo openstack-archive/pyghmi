@@ -39,6 +39,10 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         self.cert_reqs = ssl.CERT_NONE  # verification will be done ssh style..
         self._certverify = verifycallback
         self.cookies = {}
+        self.stdheaders = {}
+
+    def set_header(self, key, value):
+        self.stdheaders[key] = value
 
     def connect(self):
         plainsock = socket.create_connection((self.host, self.port))
@@ -68,7 +72,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
 
     def request(self, method, url, body=None, headers=None):
         if headers is None:
-            headers = {}
+            headers = self.stdheaders
         if self.cookies:
             cookies = []
             for ckey in self.cookies:

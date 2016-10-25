@@ -55,6 +55,8 @@ def get_imm_webclient(imm, certverify, uid, password):
     if rsp.status == 200:
         rspdata = json.loads(rsp.read())
         if rspdata['authResult'] == '0' and rspdata['status'] == 'ok':
+            if 'token2_name' in rspdata and 'token2_value' in rspdata:
+                wc.set_header(rspdata['token2_name'], rspdata['token2_value'])
             return wc
 
 
