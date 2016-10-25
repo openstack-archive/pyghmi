@@ -62,8 +62,11 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
                     self.cookies[k] = c[k].value
         return rsp
 
-    def grab_json_response(self, url):
-        self.request('GET', url)
+    def grab_json_response(self, url, data=None):
+        if data:
+            self.request('POST', url, data)
+        else:
+            self.request('GET', url)
         rsp = self.getresponse()
         if rsp.status == 200:
             return json.loads(rsp.read())
