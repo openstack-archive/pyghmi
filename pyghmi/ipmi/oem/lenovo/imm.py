@@ -107,6 +107,24 @@ def get_web_session(ipmicmd, certverify, wc):
     return wc
 
 
+def attach_remote_media(ipmicmd, certverify, url, user, password):
+    wc = get_web_session(ipmicmd, certverify, None)
+    url = url.replace(':', '\:')
+    params = urllib.urlencode({
+        'RP_VmAllocateMountUrl({0},{1},1,,)'.format(ipmicmd.ipmi_session.userid,
+                                                    url): ''
+    })
+    wc.request('POST', '/data?set', params)
+    wc.request('GET', '/data/logout')
+
+
+def detach_remote_media(ipmicmd, certverify):
+    wc = get_web_session(ipmicmd, certverify, None)
+    mnt = wc.grab_json_response('/designs/imm/dataproviders/imm_rp_images.php')
+    print(repr(mnt[]))
+    wc.request('GET', '/data/logout')
+
+
 def fetch_agentless_firmware(ipmicmd, certverify):
     wc = None
     adapterdata = get_cached_data(ipmicmd, 'lenovo_cached_adapters')
