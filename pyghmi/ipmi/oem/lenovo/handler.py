@@ -128,7 +128,11 @@ mac_format = '{0:02x}:{1:02x}:{2:02x}:{3:02x}:{4:02x}:{5:02x}'
 
 
 def _megarac_abbrev_image(name):
-    if len(name) <= 16:
+    # MegaRAC platform in some places needs an abbreviated filename
+    # Their scheme in such a scenario is a max of 20.  Truncation is
+    # acheived by taking the first sixteen, then skipping ahead to the last
+    # 4 (presumably to try to keep '.iso' or '.img' in the name).
+    if len(name) <= 20:
         return name
     return name[:16] + name[-4:]
 
