@@ -128,7 +128,7 @@ mac_format = '{0:02x}:{1:02x}:{2:02x}:{3:02x}:{4:02x}:{5:02x}'
 
 
 def _megarac_abbrev_image(name):
-    if len(name) <= 16:
+    if len(name) <= 20:
         return name
     return name[:16] + name[-4:]
 
