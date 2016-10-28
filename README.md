@@ -38,14 +38,14 @@ firmware version information is not a part of standard IPMI, but some servers
 are known to support it via custom OEM commands. If this is the case, follow
 these steps:
 - Add your generic retrieval function (stub) to the `OEMHandler` class in
-- `pyghmi/ipmi/oem/generic.py`. And please, document its intent, parameters and
-- expected return values.
+  `pyghmi/ipmi/oem/generic.py`. And please, document its intent, parameters and
+  expected return values.
 - Implement the specific methods that your server supports in subdirectories in
-- the `oem` folder (consider the `lenovo` submodule as an example). A OEM folder
-- will contain at least one class inheriting from `OEMHandler`, and optionally
-- helpers for running and parsing custom OEM commands.
+  the `oem` folder (consider the `lenovo` submodule as an example). A OEM folder
+  will contain at least one class inheriting from `OEMHandler`, and optionally
+  helpers for running and parsing custom OEM commands.
 - Register mapping policies in `pyghmi/ipmi/oem/lookup.py` so pyghmi knows how
-- to associate a BMC session with the specific OEM code you implemented.
+  to associate a BMC session with the specific OEM code you implemented.
 
 A good way of testing the new feature is using `bin/pyghmiutil`. Just add an
 extension for the new feature you just implemented (as a new command) and call
