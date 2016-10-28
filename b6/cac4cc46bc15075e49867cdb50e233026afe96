@@ -1,0 +1,10 @@
+Code-Review+2: Mathieu Mitchell <mmitchell@iweb.com>
+Code-Review+1: Bob Fournier <bfournie@redhat.com>
+Code-Review+2: Jarrod Johnson <jjohnson2@lenovo.com>
+Workflow+1: Jarrod Johnson <jjohnson2@lenovo.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Fri, 28 Oct 2016 13:36:58 +0000
+Reviewed-on: https://review.openstack.org/391462
+Project: openstack/pyghmi
+Branch: refs/heads/master
