@@ -107,6 +107,38 @@ def get_web_session(ipmicmd, certverify, wc):
     return wc
 
 
+def attach_remote_media(ipmicmd, certverify, url, user, password):
+    wc = get_web_session(ipmicmd, certverify, None)
+    url = url.replace(':', '\:')
+    params = urllib.urlencode({
+        'RP_VmAllocateMountUrl({0},{1},1,,)'.format(
+            ipmicmd.ipmi_session.userid, url): ''
+    })
+    result = wc.grab_json_response('/data?set', params)
+    if result['return'] != 'Success':
+        raise Exception(result['reason'])
+    wc.grab_json_response('/data/logout')
+
+
+def detach_remote_media(ipmicmd, certverify):
+    wc = get_web_session(ipmicmd, certverify, None)
+    mnt = wc.grab_json_response('/designs/imm/dataproviders/imm_rp_images.php')
+    removeurls = []
+    for item in mnt['items']:
+        if 'urls' in item:
+            for url in item['urls']:
+                removeurls.append(url['url'])
+    for url in removeurls:
+        url = url.replace(':', '\:')
+        params = urllib.urlencode({
+            'RP_VmAllocateUnMountUrl({0},{1},0,)'.format(
+                ipmicmd.ipmi_session.userid, url): ''})
+        result = wc.grab_json_response('/data?set', params)
+        if result['return'] != 'Success':
+            raise Exception(result['reason'])
+    wc.grab_json_response('/data/logout')
+
+
 def fetch_agentless_firmware(ipmicmd, certverify):
     wc = None
     adapterdata = get_cached_data(ipmicmd, 'lenovo_cached_adapters')
@@ -174,7 +206,7 @@ def fetch_agentless_firmware(ipmicmd, certverify):
                     'versionStr']
                 yield (diskname, bdata)
     if wc:
-        wc.request('GET', '/data/logout')
+        wc.grab_json_response('/data/logout')
 
 
 def get_hw_inventory(ipmicmd, certverify):
@@ -253,6 +285,8 @@ def hardware_inventory_map(ipmicmd, certverify):
             if not skipadapter:
                 hwmap[aname] = bdata
         ipmicmd.ipmi_session.lenovo_cached_hwmap = (hwmap, _monotonic_time())
+    if wc:
+        wc.grab_json_response('/data/logout')
     return hwmap
 
 

@@ -761,7 +761,10 @@ class OEMHandler(generic.OEMHandler):
                                   data=(1, 1))
 
     def attach_remote_media(self, url, username, password):
-        if self.has_megarac:
+        if self.has_imm:
+            imm.attach_remote_media(self.ipmicmd, self._certverify, url,
+                                    username, password)
+        elif self.has_megarac:
             proto, host, path = util.urlsplit(url)
             if proto == 'smb':
                 proto = 'cifs'
@@ -783,7 +786,9 @@ class OEMHandler(generic.OEMHandler):
                     raise
 
     def detach_remote_media(self):
-        if self.has_megarac:
+        if self.has_imm:
+            imm.detach_remote_media(self.ipmicmd, self._certverify)
+        elif self.has_megarac:
             self.ipmicmd.xraw_command(
                 netfn=0x32, command=0x9f, data=(8, 10, 0, 0))
             self.ipmicmd.xraw_command(netfn=0x32, command=0x9f, data=(8, 11))
