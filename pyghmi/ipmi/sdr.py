@@ -693,7 +693,10 @@ class SDR(object):
                 raise exc.BmcErrorException("Incorrect SDR record id from BMC")
             recid = newrecid
         for sid in self.broken_sensor_ids:
-            del self.sensors[sid]
+            try:
+                del self.sensors[sid]
+            except KeyError:
+                pass
 
     def get_sensor_numbers(self):
         return self.sensors.iterkeys()
