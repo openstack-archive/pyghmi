@@ -493,7 +493,8 @@ class OEMHandler(generic.OEMHandler):
         if len(bdata['data'][:]) != 3:
             self._hasimm = False
             return False
-        self._hasimm = ord(bdata['data'][1]) & 1 == 1
+        rdata = bytearray(bdata['data'][:])
+        self._hasimm = (rdata[1] & 1 == 1) or (rdata[1] & 16 == 16)
         return self._hasimm
 
     def get_oem_firmware(self, bmcver):

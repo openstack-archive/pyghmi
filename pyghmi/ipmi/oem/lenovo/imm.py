@@ -21,6 +21,30 @@ import pyghmi.util.webclient as webclient
 import urllib
 
 
+def _parse_builddate(strval):
+    try:
+        return datetime.strptime(strval, '%Y/%m/%d %H:%M:%S')
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(strval, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(strval, '%Y/%m/%d')
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(strval, '%m/%d/%Y')
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(strval, '%m %d %Y')
+    except ValueError:
+        pass
+    return None
+
+
 def get_imm_property(ipmicmd, propname):
     propname = propname.encode('utf-8')
     proplen = len(propname) | 0b10000000
@@ -63,14 +87,14 @@ def get_imm_webclient(imm, certverify, uid, password):
 def parse_imm_buildinfo(buildinfo):
     buildid = buildinfo[:9].rstrip(' \x00')
     bdt = ' '.join(buildinfo[9:].replace('\x00', ' ').split())
-    bdate = datetime.strptime(bdt, '%Y/%m/%d %H:%M:%S')
+    bdate = _parse_builddate(bdt)
     return (buildid, bdate)
 
 
 def datefromprop(propstr):
     if propstr is None:
         return None
-    return datetime.strptime(propstr, '%Y/%m/%d')
+    return _parse_builddate(propstr)
 
 
 def fetch_grouped_properties(ipmicmd, groupinfo):
@@ -171,14 +195,10 @@ def fetch_agentless_firmware(ipmicmd, certverify):
                             firm['releaseDate'] and
                             firm['releaseDate'] != 'N/A'):
                         try:
-                            bdata['date'] = datetime.strptime(
-                                firm['releaseDate'], '%m/%d/%Y')
+                            bdata['date'] = _parse_builddate(
+                                firm['releaseDate'])
                         except ValueError:
-                            try:
-                                bdata['date'] = datetime.strptime(
-                                    firm['releaseDate'], '%m %d %Y')
-                            except ValueError:
-                                pass
+                            pass
                     yield ('{0} {1}'.format(aname, fname), bdata)
     storagedata = get_cached_data(ipmicmd, 'lenovo_cached_storage')
     if not storagedata:
