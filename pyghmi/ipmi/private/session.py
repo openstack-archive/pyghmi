@@ -282,6 +282,14 @@ def _checksum(*data):  # Two's complement over the data
     return csum
 
 
+def is_ipv4(address):
+    try:
+        socket.inet_aton(address)
+    except (ValueError, socket.error):
+        return False
+    return True
+
+
 class Session(object):
     """A class to manage common IPMI session logistics
 
@@ -329,6 +337,10 @@ class Session(object):
         global iosockets
         global ipv6support
         global myself
+
+        if server is not None:
+            ipv6support = not is_ipv4(server[0])
+
         # seek for the least used socket.  As sessions close, they may free
         # up slots in seemingly 'full' sockets.  This scheme allows those
         # slots to be recycled
