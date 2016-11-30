@@ -329,6 +329,7 @@ class Session(object):
         global iosockets
         global ipv6support
         global myself
+
         # seek for the least used socket.  As sessions close, they may free
         # up slots in seemingly 'full' sockets.  This scheme allows those
         # slots to be recycled
@@ -340,6 +341,13 @@ class Session(object):
             cls.socketpool[sorted_candidates[0][0]] += 1
             return sorted_candidates[0][0]
         # we need a new socket
+        if server:
+            # Regardless of whether ipv6 is supported or not, we
+            # must try to honor the address format of the given
+            # server, rather than trying to create an automatic one
+            tmpsocket = socket.socket(server[0], socket.SOCK_DGRAM)
+            if server[0] == socket.AF_INET6:
+                tmpsocket.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         if ipv6support:
             tmpsocket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
             tmpsocket.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
@@ -360,7 +368,7 @@ class Session(object):
             tmpsocket.bind(('', 0))
             cls.socketpool[tmpsocket] = 1
         else:
-            tmpsocket.bind(server)
+            tmpsocket.bind(server[4])
         iosockets.append(tmpsocket)
         if myself is None:
             # we have confirmed kernel IPv6 support, but ::1 may still not
