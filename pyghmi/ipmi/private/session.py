@@ -323,12 +323,17 @@ class Session(object):
             session.logout()
 
     @classmethod
-    def _assignsocket(cls, server=None):
+    def _assignsocket(cls, server=None, force_ipv4=False):
         global iothread
         global iothreadready
         global iosockets
         global ipv6support
         global myself
+
+        # Force the use of IPv4
+        if force_ipv4:
+            ipv6support = False
+
         # seek for the least used socket.  As sessions close, they may free
         # up slots in seemingly 'full' sockets.  This scheme allows those
         # slots to be recycled
@@ -360,7 +365,7 @@ class Session(object):
             tmpsocket.bind(('', 0))
             cls.socketpool[tmpsocket] = 1
         else:
-            tmpsocket.bind(server)
+            tmpsocket.bind(server[:2])
         iosockets.append(tmpsocket)
         if myself is None:
             # we have confirmed kernel IPv6 support, but ::1 may still not

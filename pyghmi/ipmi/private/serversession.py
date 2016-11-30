@@ -230,7 +230,8 @@ class IpmiServer(object):
     #authentication type fixed to ipmi2, ipmi1 forbidden
     # 0b10000000
 
-    def __init__(self, authdata, port=623, bmcuuid=None, address='::'):
+    def __init__(self, authdata, port=623, bmcuuid=None, address='::',
+                 use_ipv4=False):
         """Create a new ipmi bmc instance.
 
         :param authdata: A dict or object with .get() to provide password
@@ -239,8 +240,11 @@ class IpmiServer(object):
                         reasonable subset.
         :param port: The default port number to bind to.  Defaults to the
                      standard 623
-        :param address: The IPv6 address to bind to. Defaults to '::' (all
-                        zeroes)
+        :param address: The IP address to bind to. Defaults to '::' (all
+                        zeroes). This method defaults to IP version 6, if
+                        you want to use IP version 4 check the "use_ipv4"
+                        parameter.
+        :param use_ipv4: Whether to use IP version 4 instead of IP version 6.
         """
         self.revision = 0
         self.deviceid = 0
@@ -266,7 +270,7 @@ class IpmiServer(object):
         self.kg = None
         self.timeout = 60
         self.serversocket = ipmisession.Session._assignsocket(
-            (address, port, 0, 0))
+            (address, port, 0, 0), force_ipv4=use_ipv4)
         ipmisession.Session.bmc_handlers[self.serversocket] = self
 
     def send_auth_cap(self, myaddr, mylun, clientaddr, clientlun, clientseq,
