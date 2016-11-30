@@ -1,5 +1,18 @@
+# Compiled python files
+*.py[co]
+
+# Editors
+.*.sw[klmop]
+*~
+
+# Packages/installer info
+*.egg[s]
+*.egg-info
+dist
+sdist
+
+# Other
+.testrepository
 AUTHORS
 ChangeLog
-dist/
-python_ipmi.egg-info/
 .tox
