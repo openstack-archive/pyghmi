@@ -329,6 +329,15 @@ class Session(object):
         global iosockets
         global ipv6support
         global myself
+
+        # If specified, check if the "server" has an IP version 4
+        if server is not None:
+            try:
+                socket.inet_aton(server[0])
+                ipv6support = False
+            except socket.error:
+                pass
+
         # seek for the least used socket.  As sessions close, they may free
         # up slots in seemingly 'full' sockets.  This scheme allows those
         # slots to be recycled
