@@ -1,0 +1,9 @@
+Code-Review+1: Lucas Alvares Gomes <lucasagomes@gmail.com>
+Code-Review+2: Jarrod Johnson <jjohnson2@lenovo.com>
+Workflow+1: Jarrod Johnson <jjohnson2@lenovo.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Thu, 01 Dec 2016 15:13:07 +0000
+Reviewed-on: https://review.openstack.org/404837
+Project: openstack/pyghmi
+Branch: refs/heads/master
