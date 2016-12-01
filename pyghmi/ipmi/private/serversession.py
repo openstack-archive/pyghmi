@@ -23,6 +23,7 @@ import hmac
 import os
 import pyghmi.ipmi.private.constants as constants
 import pyghmi.ipmi.private.session as ipmisession
+import socket
 import struct
 import uuid
 
@@ -239,7 +240,7 @@ class IpmiServer(object):
                         reasonable subset.
         :param port: The default port number to bind to.  Defaults to the
                      standard 623
-        :param address: The IPv6 address to bind to. Defaults to '::' (all
+        :param address: The IP address to bind to. Defaults to '::' (all
                         zeroes)
         """
         self.revision = 0
@@ -265,8 +266,9 @@ class IpmiServer(object):
                                    authstatus, chancap, *oemdata)
         self.kg = None
         self.timeout = 60
-        self.serversocket = ipmisession.Session._assignsocket(
-            (address, port, 0, 0))
+        addrinfo = socket.getaddrinfo(address, port, 0,
+                                      socket.SOCK_DGRAM)[0]
+        self.serversocket = ipmisession.Session._assignsocket(addrinfo)
         ipmisession.Session.bmc_handlers[self.serversocket] = self
 
     def send_auth_cap(self, myaddr, mylun, clientaddr, clientlun, clientseq,
