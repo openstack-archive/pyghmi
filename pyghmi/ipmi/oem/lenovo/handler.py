@@ -148,6 +148,8 @@ class OEMHandler(generic.OEMHandler):
         self.oem_inventory_info = None
         self._mrethidx = None
         self._hasimm = None
+        if self.has_imm:
+            self.immhandler = imm.IMMClient(ipmicmd)
 
     @property
     def _megarac_eth_index(self):
@@ -311,7 +313,7 @@ class OEMHandler(generic.OEMHandler):
                 self._collect_tsm_inventory()
             return iter(self.oem_inventory_info)
         elif self.has_imm:
-            return imm.get_hw_descriptions(self.ipmicmd, self._certverify)
+            return self.immhandler.get_hw_descriptions()
         return ()
 
     def get_oem_inventory(self):
@@ -320,7 +322,7 @@ class OEMHandler(generic.OEMHandler):
             for compname in self.oem_inventory_info:
                 yield (compname, self.oem_inventory_info[compname])
         elif self.has_imm:
-            for inv in imm.get_hw_inventory(self.ipmicmd, self._certverify):
+            for inv in self.immhandler.get_hw_inventory():
                 yield inv
 
     def get_sensor_data(self):
@@ -343,8 +345,7 @@ class OEMHandler(generic.OEMHandler):
             self._collect_tsm_inventory()
             return self.oem_inventory_info.get(component, None)
         if self.has_imm:
-            return imm.get_component_inventory(self.ipmicmd, self._certverify,
-                                               component)
+            return self.immhandler.get_component_inventory(component)
 
     def _collect_tsm_inventory(self):
         self.oem_inventory_info = {}
@@ -503,8 +504,7 @@ class OEMHandler(generic.OEMHandler):
             rsp = self.ipmicmd.xraw_command(**command["command"])
             return command["parser"](rsp["data"])
         elif self.has_imm:
-            return imm.get_firmware_inventory(self.ipmicmd, bmcver,
-                                              self._certverify)
+            return self.immhandler.get_firmware_inventory(bmcver)
         return super(OEMHandler, self).get_oem_firmware(bmcver)
 
     def get_oem_capping_enabled(self):
@@ -577,10 +577,10 @@ class OEMHandler(generic.OEMHandler):
     def _get_ts_remote_console(self, bmc, username, password):
         # We don't establish non-secure connections without checking
         # certificates
-        if not self._certverify:
+        if not self.ipmicmd.certverify:
             return
         conn = wc.SecureHTTPConnection(bmc, 443,
-                                       verifycallback=self._certverify)
+                                       verifycallback=self.ipmicmd.certverify)
         conn.connect()
         params = urllib.urlencode({
             'WEBVAR_USERNAME': username,
@@ -763,8 +763,7 @@ class OEMHandler(generic.OEMHandler):
 
     def attach_remote_media(self, url, username, password):
         if self.has_imm:
-            imm.attach_remote_media(self.ipmicmd, self._certverify, url,
-                                    username, password)
+            self.immhandler.attach_remote_media(url, username, password)
         elif self.has_megarac:
             proto, host, path = util.urlsplit(url)
             if proto == 'smb':
@@ -788,7 +787,7 @@ class OEMHandler(generic.OEMHandler):
 
     def detach_remote_media(self):
         if self.has_imm:
-            imm.detach_remote_media(self.ipmicmd, self._certverify)
+            self.immhandler.detach_remote_media()
         elif self.has_megarac:
             self.ipmicmd.xraw_command(
                 netfn=0x32, command=0x9f, data=(8, 10, 0, 0))

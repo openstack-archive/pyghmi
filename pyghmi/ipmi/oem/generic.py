@@ -29,22 +29,6 @@ class OEMHandler(object):
     def __init__(self, oemid, ipmicmd):
         pass
 
-    def register_key_handler(self, callback, type='tls'):
-        """Assign a verification handler for a public key
-
-        When the library attempts to communicate with the management target
-        using a non-IPMI protocol, it will try to verify a key.  This
-        allows a caller to register a key handler for accepting or rejecting
-        a public key/certificate.  The callback will be passed the peer public
-        key or certificate.
-
-        :param callback:  The function to call with public key/certificate
-        :param type: Whether the callback is meant to handle 'tls' or 'ssh',
-                     defaults to 'tls'
-        """
-        if type == 'tls':
-            self._certverify = callback
-
     def get_video_launchdata(self):
         return {}
 
