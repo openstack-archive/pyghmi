@@ -120,6 +120,7 @@ class Command(object):
         self._oem = None
         self._netchannel = None
         self._ipv6support = None
+        self.certverify = None
         if onlogon is not None:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,
@@ -151,9 +152,7 @@ class Command(object):
                      defaults to 'tls'
         """
         if type == 'tls':
-            self._certverify = callback
-        self.oem_init()
-        self._oem.register_key_handler(callback, type)
+            self.certverify = callback
 
     def logged(self, response):
         self.onlogon(response, self)
