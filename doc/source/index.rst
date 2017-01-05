@@ -11,9 +11,9 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-.. automodule:: ipmi.command
+.. automodule:: pyghmi.ipmi.command
 
-.. autoclass:: ipmi.command
+.. autoclass:: pygmi.ipmi.command
     :members:
 
 Indices and tables
