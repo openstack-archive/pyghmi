@@ -51,7 +51,7 @@ copyright = u'2013, Jarrod Johnson <jbjohnso@us.ibm.com>'
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
-from ipmi.version import version_info
+from pyghmi.version import version_info
 # The full version, including alpha/beta/rc tags.
 release = version_info.release_string()
 # The short X.Y version.
