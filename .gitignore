@@ -16,3 +16,4 @@ sdist
 AUTHORS
 ChangeLog
 .tox
+doc/build
