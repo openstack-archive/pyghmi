@@ -600,17 +600,24 @@ class SDR(object):
         # since that provides usefully distinct state and this does not
         self.fw_major = rsp['data'][2] & 0b1111111
         self.fw_minor = "%02X" % rsp['data'][3]  # BCD encoding, oddly enough
-        if rsp['data'][1] & 0b10000000:
-            # For lack of any system with 'device sdrs', raise an
-            # exception when they are encountered for now, implement or
-            # ignore later
-            raise NotImplementedError
         self.ipmiversion = rsp['data'][4]  # 51h = 1.5, 02h = 2.0
         self.mfg_id = rsp['data'][8] << 16 + rsp['data'][7] << 8 + \
             rsp['data'][6]
         self.prod_id = rsp['data'][10] << 8 + rsp['data'][9]
         if len(rsp['data']) > 11:
             self.aux_fw = self.decode_aux(rsp['data'][11:15])
+        if rsp['data'][1] & 0b10000000 and rsp['data'][5] & 0b10 != 0:
+            # The device has device sdrs, also does not support SDR repository
+            # device, so we are meant to use an alternative mechanism to get
+            # SDR data
+            if rsp['data'][5] & 1:
+                # The device has sensor device support, so in theory we should
+                # be able to proceed
+                # However at the moment, we haven't done so
+                raise NotImplementedError
+            return # We have Device SDR, without SDR Repository device, but
+                   # also without sensor device support, no idea how to
+                   # continue
         self.get_sdr()
 
     def get_sdr_reservation(self):
