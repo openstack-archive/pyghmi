@@ -193,6 +193,8 @@ class SensorReading(object):
         self.value = None
         self.imprecision = None
         self.states = []
+        self.state_ids = []
+        self.unavailable = 0
         try:
             self.health = reading['health']
             self.states = reading['states']
@@ -215,6 +217,7 @@ class SensorReading(object):
             'imprecision': self.imprecision,
             'name': self.name,
             'type': self.type,
+            'unavailable': self.unavailable,
             'health': self.health
         })
 
