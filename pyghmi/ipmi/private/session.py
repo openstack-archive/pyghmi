@@ -65,6 +65,8 @@ MAX_BMCS_PER_SOCKET = 64  # no more than this many BMCs will share a socket
                          # this could be adjusted based on rmem_max
                          # value, leading to fewer filehandles
 
+if not socket.has_ipv6:
+    ipv6support = False  # python is built without ipv6 support
 
 def define_worker():
     class _IOWorker(threading.Thread):
