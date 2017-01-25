@@ -35,6 +35,7 @@ import pyghmi.exceptions as exc
 import pyghmi.ipmi.private.constants as ipmiconst
 import struct
 import weakref
+import six
 
 TYPE_UNKNOWN = 0
 TYPE_SENSOR = 1
@@ -195,6 +196,7 @@ class SensorReading(object):
         self.states = []
         self.state_ids = []
         self.unavailable = 0
+        print(reading)
         try:
             self.health = reading['health']
             self.states = reading['states']
@@ -709,7 +711,7 @@ class SDR(object):
                 pass
 
     def get_sensor_numbers(self):
-        return self.sensors.iterkeys()
+        return six.iterkeys(self.sensors)
 
     def add_sdr(self, sdrbytes):
         newent = SDREntry(sdrbytes, self.ipmicmd)
