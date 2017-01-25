@@ -196,7 +196,6 @@ class SensorReading(object):
         self.states = []
         self.state_ids = []
         self.unavailable = 0
-        print(reading)
         try:
             self.health = reading['health']
             self.states = reading['states']
