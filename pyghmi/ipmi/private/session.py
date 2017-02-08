@@ -65,6 +65,8 @@ MAX_BMCS_PER_SOCKET = 64  # no more than this many BMCs will share a socket
                          # this could be adjusted based on rmem_max
                          # value, leading to fewer filehandles
 
+MAX_IDLE = 29  # maximum time to allow idle, more than this and BMC may assume
+               # incorrect idle
 
 def define_worker():
     class _IOWorker(threading.Thread):
@@ -737,10 +739,10 @@ class Session(object):
         self.awaitresponse(retry, waitall)
         lastresponse = self.lastresponse
         self.incommand = False
-        if retry and lastresponse is None:
-            raise exc.IpmiException('Session no longer connected')
         while self.evq:
             self.evq.popleft().set()
+        if retry and lastresponse is None:
+            raise exc.IpmiException('Session no longer connected')
         return lastresponse
 
     def _send_ipmi_net_payload(self, netfn=None, command=None, data=(), code=0,
@@ -867,7 +869,7 @@ class Session(object):
         if (self in Session.keepalive_sessions and not needskeepalive and
                 not self._customkeepalives):
             Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
-                50 + (random.random() * 4.9)
+                MAX_IDLE - (random.random() * 4.9)
         self._xmit_packet(retry, delay_xmit=delay_xmit, timeout=timeout)
 
     def _ipmi15authcode(self, payload, checkremotecode=False):
@@ -979,7 +981,7 @@ class Session(object):
         Session.keepalive_sessions[self] = {}
         Session.keepalive_sessions[self]['ipmisession'] = self
         Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
-            50 + (random.random() * 4.9)
+            MAX_IDLE - (random.random() * 4.9)
         self.onlogon({'success': True})
 
     def _get_session_challenge(self):
@@ -1106,7 +1108,7 @@ class Session(object):
             # until incommand is no longer the case
             if parms['timeout'] < curtime and not session._isincommand():
                 cls.keepalive_sessions[session]['timeout'] = \
-                    _monotonic_time() + 50 + (random.random() * 4.9)
+                    _monotonic_time() + MAX_IDLE - (random.random() * 4.9)
                 sessionstokeepalive.append(session)
         for session in sessionstokeepalive:
             session._keepalive()
