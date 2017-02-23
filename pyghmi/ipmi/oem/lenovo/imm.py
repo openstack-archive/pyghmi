@@ -96,6 +96,8 @@ class IMMClient(object):
                                   'SessionTimeout': 60
                                   })
         headers = {'Connection': 'keep-alive',
+                   'Referer': 'https://{0}/designs/imm/index.php'.format(
+                       self.imm),
                    'Content-Type': 'application/x-www-form-urlencoded'}
         wc.request('POST', '/data/login', adata, headers)
         rsp = wc.getresponse()
