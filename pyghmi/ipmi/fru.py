@@ -229,12 +229,12 @@ class FRU(object):
             if lang in (0, 25):
                 try:
                     retinfo = retinfo.decode('iso-8859-1')
-                except UnicodeDecodeError:
+                except (DecodeError, LookupError):
                     pass
             else:
                 try:
                     retinfo = retinfo.decode('utf-16le')
-                except UnicodeDecodeError:
+                except (UnicodeDecodeError, LookupError):
                     pass
             # Some things lie about being text.  Do the best we can by
             # removing trailing spaces and nulls like makes sense for text
