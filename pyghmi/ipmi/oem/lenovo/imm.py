@@ -16,7 +16,7 @@
 
 from datetime import datetime
 import json
-from pyghmi.ipmi.private.session import _monotonic_time
+from pyghmi.ipmi.private.util import _monotonic_time
 import pyghmi.util.webclient as webclient
 import urllib
 import weakref

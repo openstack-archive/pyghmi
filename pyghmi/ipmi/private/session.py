@@ -17,7 +17,6 @@
 # This represents the low layer message framing portion of IPMI
 
 import collections
-import ctypes
 import hashlib
 import hmac
 import operator
@@ -32,6 +31,7 @@ from Crypto.Cipher import AES
 
 import pyghmi.exceptions as exc
 from pyghmi.ipmi.private import constants
+from pyghmi.ipmi.private.util import get_ipmi_error, _monotonic_time
 
 try:
     dict.iteritems
@@ -205,11 +205,6 @@ def _io_recvfrom(mysocket, size):
     except socket.error:
         return None
 
-wintime = None
-try:
-    wintime = ctypes.windll.kernel32.GetTickCount64
-except AttributeError:
-    pass
 
 try:
     IPPROTO_IPV6 = socket.IPPROTO_IPV6
@@ -217,20 +212,6 @@ except AttributeError:
     IPPROTO_IPV6 = 41  # This is the Win32 version of IPPROTO_IPV6, the only
     # platform where python *doesn't* have this in socket that pyghmi is
     # targetting.
-
-
-def _monotonic_time():
-    """Provides a monotonic timer
-
-    This code is concerned with relative, not absolute time.
-    This function facilitates that prior to python 3.3
-    """
-    # Python does not provide one until 3.3, so we make do
-    # for most OSes, os.times()[4] works well.
-    # for microsoft, GetTickCount64
-    if wintime:
-        return wintime() / 1000.0
-    return os.times()[4]
 
 
 def _poller(timeout=0):
@@ -256,25 +237,6 @@ def _aespad(data):
         padval += 1
     newdata.append(neededpad)
     return newdata
-
-
-def get_ipmi_error(response, suffix=""):
-    if 'error' in response:
-        return response['error'] + suffix
-    code = response['code']
-    if code == 0:
-        return False
-    command = response['command']
-    netfn = response['netfn']
-    if ((netfn, command) in constants.command_completion_codes
-            and code in constants.command_completion_codes[(netfn, command)]):
-        res = constants.command_completion_codes[(netfn, command)][code]
-        res += suffix
-    elif code in constants.ipmi_completion_codes:
-        res = constants.ipmi_completion_codes[code] + suffix
-    else:
-        res = "Unknown code 0x%2x encountered" % code
-    return res
 
 
 def _checksum(*data):  # Two's complement over the data

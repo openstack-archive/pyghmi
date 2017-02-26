@@ -23,7 +23,11 @@ import pyghmi.exceptions as exc
 import pyghmi.ipmi.events as sel
 import pyghmi.ipmi.fru as fru
 from pyghmi.ipmi.oem.lookup import get_oem_handler
-from pyghmi.ipmi.private import session
+try:
+    from pyghmi.ipmi.private import session
+except ImportError:
+    session = None
+from pyghmi.ipmi.private import localsession
 import pyghmi.ipmi.private.util as pygutil
 import pyghmi.ipmi.sdr as sdr
 import socket
@@ -103,15 +107,16 @@ class Command(object):
     callback_args parameter. However, callback_args can optionally be populated
     if desired.
 
-    :param bmc: hostname or ip address of the BMC
-    :param userid: username to use to connect
-    :param password: password to connect to the BMC
+    :param bmc: hostname or ip address of the BMC (default is local)
+    :param userid: username to use to connect (default to no user)
+    :param password: password to connect to the BMC (defaults to no password)
     :param onlogon: function to run when logon completes in an asynchronous
                     fashion.  This will result in a greenthread behavior.
     :param kg: Optional parameter to use if BMC has a particular Kg configured
     """
 
-    def __init__(self, bmc, userid, password, port=623, onlogon=None, kg=None):
+    def __init__(self, bmc=None, userid=None, password=None, port=623,
+                 onlogon=None, kg=None):
         # TODO(jbjohnso): accept tuples and lists of each parameter for mass
         # operations without pushing the async complexities up the stack
         self.onlogon = onlogon
@@ -121,7 +126,9 @@ class Command(object):
         self._netchannel = None
         self._ipv6support = None
         self.certverify = None
-        if onlogon is not None:
+        if bmc is None:
+            self.ipmi_session = localsession.Session()
+        elif onlogon is not None:
             self.ipmi_session = session.Session(bmc=bmc,
                                                 userid=userid,
                                                 password=password,
