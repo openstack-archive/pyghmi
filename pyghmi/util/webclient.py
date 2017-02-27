@@ -35,6 +35,8 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
 
     def __init__(self, host, port=None, key_file=None, cert_file=None,
                  ca_certs=None, strict=None, verifycallback=None, **kwargs):
+        if 'timeout' not in kwargs:
+            kwargs['timeout'] = 60
         httplib.HTTPConnection.__init__(self, host, port, strict, **kwargs)
         self.cert_reqs = ssl.CERT_NONE  # verification will be done ssh style..
         self._certverify = verifycallback
@@ -45,7 +47,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         self.stdheaders[key] = value
 
     def connect(self):
-        plainsock = socket.create_connection((self.host, self.port))
+        plainsock = socket.create_connection((self.host, self.port), 60)
         self.sock = ssl.wrap_socket(plainsock, cert_reqs=self.cert_reqs)
         # txtcert = self.sock.getpeercert()  # currently not possible
         bincert = self.sock.getpeercert(binary_form=True)
