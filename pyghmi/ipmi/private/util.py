@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2015 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import ctypes
+import os
 import socket
 import struct
+
+from pyghmi.ipmi.private import constants
 
 try:
     range = xrange
@@ -25,6 +28,13 @@ try:
     buffer
 except NameError:
     buffer = memoryview
+
+
+wintime = None
+try:
+    wintime = ctypes.windll.kernel32.GetTickCount64
+except AttributeError:
+    pass
 
 
 def decode_wireformat_uuid(rawguid):
@@ -64,3 +74,36 @@ def get_ipv4(hostname):
     addrinfo = socket.getaddrinfo(hostname, None, socket.AF_INET,
                                   socket.SOCK_STREAM)
     return [addrinfo[x][4][0] for x in range(len(addrinfo))]
+
+
+def get_ipmi_error(response, suffix=""):
+    if 'error' in response:
+        return response['error'] + suffix
+    code = response['code']
+    if code == 0:
+        return False
+    command = response['command']
+    netfn = response['netfn']
+    if ((netfn, command) in constants.command_completion_codes
+            and code in constants.command_completion_codes[(netfn, command)]):
+        res = constants.command_completion_codes[(netfn, command)][code]
+        res += suffix
+    elif code in constants.ipmi_completion_codes:
+        res = constants.ipmi_completion_codes[code] + suffix
+    else:
+        res = "Unknown code 0x%2x encountered" % code
+    return res
+
+
+def _monotonic_time():
+    """Provides a monotonic timer
+
+    This code is concerned with relative, not absolute time.
+    This function facilitates that prior to python 3.3
+    """
+    # Python does not provide one until 3.3, so we make do
+    # for most OSes, os.times()[4] works well.
+    # for microsoft, GetTickCount64
+    if wintime:
+        return wintime() / 1000.0
+    return os.times()[4]
