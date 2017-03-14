@@ -46,7 +46,7 @@ firmware_progress = {
     2: 'Disk initialization',
     3: 'Non-primary Processor initialization',
     4: 'User authentication',
-    5: 'Entering setup',
+    5: 'In setup',
     6: 'USB initialization',
     7: 'PCI initialization',
     8: 'Option ROM initialization',
