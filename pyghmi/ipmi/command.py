@@ -841,8 +841,11 @@ class Command(object):
                     try:
                         # Some implementations denote an inactive channel
                         # by refusing to do parameter retrieval
-                        self.xraw_command(
-                            netfn=0xc, command=2, data=(channel, 5, 0, 0))
+                        if channel != 0xe:
+                            # skip checking if channel is active if we are
+                            # actively using the channel
+                            self.xraw_command(
+                                netfn=0xc, command=2, data=(channel, 5, 0, 0))
                         # If still here, the channel seems serviceable...
                         # However some implementations may still have
                         # ambiguous channel info, that will need to be
