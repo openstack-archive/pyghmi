@@ -464,6 +464,10 @@ class OEMHandler(generic.OEMHandler):
                 macprefix = None
                 while idx < endidx:
                     currmac = macs[idx:idx+6]
+                    if not isinstance(currmac, bytearray):
+                        # invalid vpd format, abort attempts to extract
+                        # mac in this way
+                        break
                     if currmac == b'\x00\x00\x00\x00\x00\x00':
                         break
                     # VPD may veer off, detect and break off
