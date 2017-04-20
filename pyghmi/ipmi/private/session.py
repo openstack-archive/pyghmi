@@ -288,7 +288,7 @@ class Session(object):
 
     @classmethod
     def _cleanup(cls):
-        for sesskey in cls.bmc_handlers:
+        for sesskey in list(cls.bmc_handlers):
             session = cls.bmc_handlers[sesskey]
             session.cleaningup = True
             session.logout()
