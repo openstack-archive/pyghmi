@@ -368,8 +368,10 @@ class Session(object):
         """Handle synchronous callers in liue of
         a client-provided callback.
         """
-        if 'error' in response:
-            raise exc.IpmiException(response['error'])
+        # Be a stub, the __init__ will catch and respond to ensure response
+        # is given in the same thread as was called
+        return
+
 
     def __new__(cls,
                 bmc,
@@ -415,6 +417,7 @@ class Session(object):
                 else:
                     self.iterwaiters.append(onlogon)
             return
+        self.broken = False
         self.privlevel = 4
         self.maxtimeout = 3  # be aggressive about giving up on initial packet
         self.incommand = False
@@ -465,13 +468,16 @@ class Session(object):
         if not self.async:
             while self.logging:
                 Session.wait_for_rsp()
+        if self.broken:
+            raise exc.IpmiException(self.errormsg)
 
-    def _mark_broken(self):
+    def _mark_broken(self, error=None):
         # since our connection has failed retries
         # deregister our keepalive facility
         Session.keepalive_sessions.pop(self, None)
         Session.waiting_sessions.pop(self, None)
         self.logging = False
+        self.errormsg = error
         if self.logged:
             self.logged = 0  # mark session as busted
             self.logging = False
@@ -500,7 +506,7 @@ class Session(object):
 
     def onlogon(self, parameter):
         if 'error' in parameter:
-            self._mark_broken()
+            self._mark_broken(parameter['error'])
         while self.logonwaiters:
             waiter = self.logonwaiters.pop()
             waiter(parameter)
