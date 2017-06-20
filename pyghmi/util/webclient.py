@@ -77,7 +77,9 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
 
     def request(self, method, url, body=None, headers=None):
         if headers is None:
-            headers = self.stdheaders
+            headers = self.stdheaders.copy()
+        if method == 'GET' and 'Content-Type' in headers:
+            del headers['Content-Type']
         if self.cookies:
             cookies = []
             for ckey in self.cookies:

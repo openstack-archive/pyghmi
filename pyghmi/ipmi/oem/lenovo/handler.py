@@ -143,12 +143,16 @@ class OEMHandler(generic.OEMHandler):
         # will need to retain data to differentiate
         # variations.  For example System X versus Thinkserver
         self.oemid = oemid
+        self._fpc_variant = None
         self.ipmicmd = weakref.proxy(ipmicmd)
         self._has_megarac = None
         self.oem_inventory_info = None
         self._mrethidx = None
         self._hasimm = None
-        if self.has_imm:
+        self._hasxcc = None
+        if self.has_xcc:
+            self.immhandler = imm.XCCClient(ipmicmd)
+        elif self.has_imm:
             self.immhandler = imm.IMMClient(ipmicmd)
 
     @property
@@ -281,9 +285,15 @@ class OEMHandler(generic.OEMHandler):
     def is_fpc(self):
         """True if the target is a Lenovo nextscale fan power controller
         """
-        fpc_ids = ((19046, 32, 1063),)
-        return (self.oemid['manufacturer_id'], self.oemid['device_id'],
-                self.oemid['product_id']) in fpc_ids
+        fpc_id = (19046, 32, 1063)
+        smm_id = (19046, 32, 1180)
+        currid = (self.oemid['manufacturer_id'], self.oemid['device_id'],
+                  self.oemid['product_id'])
+        if currid == fpc_id:
+            self._fpc_variant = 6
+        elif currid == smm_id:
+            self._fpc_variant = 2
+        return self._fpc_variant
 
     @property
     def is_sd350(self):
@@ -327,17 +337,19 @@ class OEMHandler(generic.OEMHandler):
 
     def get_sensor_data(self):
         if self.is_fpc:
-            for name in nextscale.get_sensor_names():
-                yield nextscale.get_sensor_reading(name, self.ipmicmd)
+            for name in nextscale.get_sensor_names(self._fpc_variant):
+                yield nextscale.get_sensor_reading(name, self.ipmicmd,
+                                                   self._fpc_variant)
 
     def get_sensor_descriptions(self):
         if self.is_fpc:
-            return nextscale.get_sensor_descriptions()
+            return nextscale.get_sensor_descriptions(self._fpc_variant)
         return ()
 
     def get_sensor_reading(self, sensorname):
         if self.is_fpc:
-            return nextscale.get_sensor_reading(sensorname, self.ipmicmd)
+            return nextscale.get_sensor_reading(sensorname, self.ipmicmd,
+                                                self._fpc_variant)
         return ()
 
     def get_inventory_of_component(self, component):
@@ -487,6 +499,30 @@ class OEMHandler(generic.OEMHandler):
             return fru
 
     @property
+    def has_xcc(self):
+        if self._hasxcc is not None:
+            return self._hasxcc
+        try:
+            bdata = self.ipmicmd.xraw_command(netfn=0x3a, command=0xc1)
+        except pygexc.IpmiException:
+            self._hasxcc = False
+            self._hasimm = False
+            return False
+        if len(bdata['data'][:]) != 3:
+            self._hasimm = False
+            self._hasxcc = False
+            return False
+        rdata = bytearray(bdata['data'][:])
+        self._hasxcc = rdata[1] & 16 == 16
+        if self._hasxcc:
+            # For now, have imm calls go to xcc, since they are providing same
+            # interface.  Longer term the hope is that all the Lenovo
+            # stuff will branch at init, and not have conditionals
+            # in all the functions
+            self._hasimm = self._hasxcc
+        return self._hasxcc
+
+    @property
     def has_imm(self):
         if self._hasimm is not None:
             return self._hasimm
@@ -499,7 +535,7 @@ class OEMHandler(generic.OEMHandler):
             self._hasimm = False
             return False
         rdata = bytearray(bdata['data'][:])
-        self._hasimm = (rdata[1] & 1 == 1) or (rdata[1] & 8 == 8)
+        self._hasimm = (rdata[1] & 1 == 1) or (rdata[1] & 16 == 16)
         return self._hasimm
 
     def get_oem_firmware(self, bmcver):
@@ -509,6 +545,9 @@ class OEMHandler(generic.OEMHandler):
             return command["parser"](rsp["data"])
         elif self.has_imm:
             return self.immhandler.get_firmware_inventory(bmcver)
+        elif self.is_fpc:
+            return nextscale.get_fpc_firmware(bmcver, self.ipmicmd,
+                                              self._fpc_variant)
         return super(OEMHandler, self).get_oem_firmware(bmcver)
 
     def get_oem_capping_enabled(self):
