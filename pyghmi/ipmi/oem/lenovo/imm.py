@@ -16,13 +16,15 @@
 
 from datetime import datetime
 import json
-from pyghmi.ipmi.private.util import _monotonic_time
+import pyghmi.ipmi.private.util as util
 import pyghmi.util.webclient as webclient
 import urllib
 import weakref
 
 
 class IMMClient(object):
+    logouturl = '/data/logout'
+    bmcname = 'IMM'
 
     def __init__(self, ipmicmd):
         self.ipmicmd = weakref.proxy(ipmicmd)
@@ -48,6 +50,10 @@ class IMMClient(object):
             pass
         try:
             return datetime.strptime(strval, '%m/%d/%Y')
+        except ValueError:
+            pass
+        try:
+            return datetime.strptime(strval, '%Y-%m-%d')
         except ValueError:
             pass
         try:
@@ -133,7 +139,7 @@ class IMMClient(object):
     def get_cached_data(self, attribute):
         try:
             kv = self.datacache[attribute]
-            if kv[1] > _monotonic_time() - 30:
+            if kv[1] > util._monotonic_time() - 30:
                 return kv[0]
         except KeyError:
             return None
@@ -147,7 +153,7 @@ class IMMClient(object):
         result = self.wc.grab_json_response('/data?set', params)
         if result['return'] != 'Success':
             raise Exception(result['reason'])
-        self.wc.grab_json_response('/data/logout')
+        self.weblogout()
 
     def detach_remote_media(self):
         mnt = self.wc.grab_json_response(
@@ -165,7 +171,7 @@ class IMMClient(object):
             result = self.wc.grab_json_response('/data?set', params)
             if result['return'] != 'Success':
                 raise Exception(result['reason'])
-        self.wc.grab_json_response('/data/logout')
+        self.weblogout()
 
     def fetch_agentless_firmware(self):
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
@@ -175,7 +181,7 @@ class IMMClient(object):
                     '/designs/imm/dataproviders/imm_adapters.php')
                 if adapterdata:
                     self.datacache['lenovo_cached_adapters'] = (
-                        adapterdata, _monotonic_time())
+                        adapterdata, util._monotonic_time())
         if adapterdata and 'items' in adapterdata:
             for adata in adapterdata['items']:
                 aname = adata['adapter.adapterName']
@@ -209,7 +215,7 @@ class IMMClient(object):
                     '/designs/imm/dataproviders/raid_alldevices.php')
                 if storagedata:
                     self.datacache['lenovo_cached_storage'] = (
-                        storagedata, _monotonic_time())
+                        storagedata, util._monotonic_time())
         if storagedata and 'items' in storagedata:
             for adp in storagedata['items']:
                 if 'storage.vpd.productName' not in adp:
@@ -227,9 +233,7 @@ class IMMClient(object):
                     bdata['version'] = diskent['storage.firmwares'][0][
                         'versionStr']
                     yield (diskname, bdata)
-        if self.wc:
-            self.wc.grab_json_response('/data/logout')
-            self._wc = None
+        self.weblogout()
 
     def get_hw_inventory(self):
         hwmap = self.hardware_inventory_map()
@@ -250,7 +254,7 @@ class IMMClient(object):
 
     def weblogout(self):
         if self._wc:
-            self._wc.grab_json_response('/data/logout')
+            self._wc.grab_json_response(self.logouturl)
             self._wc = None
 
     def hardware_inventory_map(self):
@@ -265,7 +269,7 @@ class IMMClient(object):
                     '/designs/imm/dataproviders/imm_adapters.php')
                 if adapterdata:
                     self.datacache['lenovo_cached_adapters'] = (
-                        adapterdata, _monotonic_time())
+                        adapterdata, util._monotonic_time())
         if adapterdata and 'items' in adapterdata:
             for adata in adapterdata['items']:
                 skipadapter = False
@@ -305,7 +309,7 @@ class IMMClient(object):
                         skipadapter = True
                 if not skipadapter:
                     hwmap[aname] = bdata
-            self.datacache['lenovo_cached_hwmap'] = (hwmap, _monotonic_time())
+            self.datacache['lenovo_cached_hwmap'] = (hwmap, util._monotonic_time())
         self.weblogout()
         return hwmap
 
@@ -317,24 +321,26 @@ class IMMClient(object):
         immverdata = self.parse_imm_buildinfo(rsp['data'])
         bdata = {
             'version': bmcver, 'build': immverdata[0], 'date': immverdata[1]}
-        yield ('IMM', bdata)
+        yield (self.bmcname, bdata)
         bdata = self.fetch_grouped_properties({
             'build': '/v2/ibmc/dm/fw/imm2/backup_build_id',
             'version': '/v2/ibmc/dm/fw/imm2/backup_build_version',
             'date': '/v2/ibmc/dm/fw/imm2/backup_build_date'})
         if bdata:
-            yield ('IMM Backup', bdata)
+            yield ('{0} Backup'.format(self.bmcname), bdata)
             bdata = self.fetch_grouped_properties({
                 'build': '/v2/ibmc/trusted_buildid',
             })
         if bdata:
-            yield ('IMM Trusted Image', bdata)
+            yield ('{0} Trusted Image'.format(self.bmcname), bdata)
         bdata = self.fetch_grouped_properties({
             'build': '/v2/bios/build_id',
             'version': '/v2/bios/build_version',
             'date': '/v2/bios/build_date'})
         if bdata:
             yield ('UEFI', bdata)
+        else:
+            yield ('UEFI', {'version': 'unknown'})
         bdata = self.fetch_grouped_properties({
             'build': '/v2/ibmc/dm/fw/bios/backup_build_id',
             'version': '/v2/ibmc/dm/fw/bios/backup_build_version'})
@@ -346,5 +352,130 @@ class IMMClient(object):
             'build': '/v2/bios/pending_build_id'})
         if bdata:
             yield ('UEFI Pending Update', bdata)
+        fpga = self.ipmicmd.xraw_command(netfn=0x3a, command=0x6b, data=(0,))
+        fpga = '{0}.{1}.{2}'.format(*[ord(x) for x in fpga['data']])
+        yield ('FPGA', {'version': fpga})
         for firm in self.fetch_agentless_firmware():
             yield firm
+
+
+class XCCClient(IMMClient):
+    logouturl = '/api/providers/logout'
+    bmcname = 'XCC'
+
+    def get_webclient(self):
+        cv = self.ipmicmd.certverify
+        wc = webclient.SecureHTTPConnection(self.imm, 443, verifycallback=cv)
+        try:
+            wc.connect()
+        except Exception:
+            return None
+        adata = json.dumps({'username': self.username,
+                            'password': self.password
+                            })
+        headers = {'Connection': 'keep-alive',
+                   'Content-Type': 'application/json'}
+        wc.request('POST', '/api/login', adata, headers)
+        rsp = wc.getresponse()
+        if rsp.status == 200:
+            rspdata = json.loads(rsp.read())
+            wc.set_header('Content-Type', 'application/json')
+            wc.set_header('Authorization', 'Bearer ' + rspdata['access_token'])
+            if '_csrf_token' in wc.cookies:
+                wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+            return wc
+
+    def attach_remote_media(self, url, user, password):
+        proto, host, path = util.urlsplit(url)
+        if proto == 'smb':
+            proto = 'cifs'
+        rq = {'Option': '', 'Domain': '', 'Write': 0}
+        # nfs == 1, cifs == 0
+        if proto == 'nfs':
+            rq['Protocol'] = 1
+            rq['Url'] = '{0}:{1}'.format(host, path)
+        elif proto == 'cifs':
+            rq['Protocol'] = 0
+            rq['Credential'] = '{0}:{1}'.format(user, password)
+            rq['Url'] = '//{0}{1}'.format(host, path)
+        elif proto in ('http', 'https'):
+            rq['Protocol'] = 7
+            rq['Url'] = url
+        else:
+            raise Exception('TODO')
+        rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_connect',
+                                        json.dumps(rq))
+        if 'return' not in rt or rt['return'] != 0:
+            raise Exception('Unhandled return: ' + repr(rt))
+        rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_mountall',
+                                        '{}')
+        if 'return' not in rt or rt['return'] != 0:
+            raise Exception('Unhandled return: ' + repr(rt))
+
+    def get_firmware_inventory(self, bmcver):
+        # First we fetch the system firmware found in imm properties
+        # then check for agentless, if agentless, get adapter info using
+        # https, using the caller TLS verification scheme
+        rsp = self.ipmicmd.xraw_command(netfn=0x3a, command=0x50)
+        immverdata = self.parse_imm_buildinfo(rsp['data'])
+        bdata = {
+            'version': bmcver, 'build': immverdata[0], 'date': immverdata[1]}
+        yield (self.bmcname, bdata)
+        bdata = self.fetch_grouped_properties({
+            'build': '/v2/ibmc/dm/fw/imm3/backup_pending_build_id',
+            'version': '/v2/ibmc/dm/fw/imm3/backup_pending_build_version',
+            'date': '/v2/ibmc/dm/fw/imm3/backup_pending_build_date'})
+        if bdata:
+            yield ('{0} Backup'.format(self.bmcname), bdata)
+        else:
+            bdata = self.fetch_grouped_properties({
+                'build': '/v2/ibmc/dm/fw/imm3/backup_build_id',
+                'version': '/v2/ibmc/dm/fw/imm3/backup_build_version',
+                'date': '/v2/ibmc/dm/fw/imm3/backup_build_date'})
+            if bdata:
+                yield ('{0} Backup'.format(self.bmcname), bdata)
+                bdata = self.fetch_grouped_properties({
+                    'build': '/v2/ibmc/trusted_buildid',
+                })
+        if bdata:
+            bdata = self.fetch_grouped_properties({
+                'build': '/v2/ibmc/trusted_buildid',
+            })
+        if bdata:
+            yield ('{0} Trusted Image'.format(self.bmcname), bdata)
+        bdata = self.fetch_grouped_properties({
+            'build': '/v2/bios/build_id',
+            'version': '/v2/bios/build_version',
+            'date': '/v2/bios/build_date'})
+        if bdata:
+            yield ('UEFI', bdata)
+        # Note that the next pending could be pending for either primary
+        # or backup, so can't promise where it will go
+        bdata = self.fetch_grouped_properties({
+            'build': '/v2/bios/pending_build_id'})
+        if bdata:
+            yield ('UEFI Pending Update', bdata)
+        bdata = self.fetch_grouped_properties({
+            'build': '/v2/tdm/build_id',
+            'version': '/v2/tdm/build_version',
+            'date': '/v2/tdm/build_date'})
+        if bdata:
+            yield ('LXPM', bdata)
+        fpga = self.ipmicmd.xraw_command(netfn=0x3a, command=0x6b, data=(0,))
+        fpga = '{0}.{1}.{2}'.format(*[ord(x) for x in fpga['data']])
+        yield ('FPGA', {'version': fpga})
+        for firm in self.fetch_agentless_firmware():
+            yield firm
+
+    def detach_remote_media(self):
+        rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_getdisk')
+        if 'items' in rt:
+            slots = []
+            for mount in rt['items']:
+                slots.append(mount['slotId'])
+            for slot in slots:
+                rt = self.wc.grab_json_response(
+                    '/api/providers/rp_vm_remote_unmount',
+                    json.dumps({'Slot': slot}))
+                if 'return' not in rt or rt['return'] != 0:
+                    raise Exception("Unrecognized return: " + repr(rt))

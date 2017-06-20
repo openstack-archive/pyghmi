@@ -372,6 +372,15 @@ class Session(object):
         # is given in the same thread as was called
         return
 
+    @classmethod
+    def _is_session_valid(cls, session):
+        sess = cls.keepalive_sessions.get(session, None)
+        if sess is not None and 'timeout' in sess:
+            if sess['timeout'] < _monotonic_time():
+                # session would have timed out by now, don't use it
+                return False
+        return True
+
     def __new__(cls,
                 bmc,
                 userid,
@@ -390,7 +399,8 @@ class Session(object):
                 self = cls.bmc_handlers[sockaddr]
                 if (self.bmc == bmc and self.userid == userid and
                         self.password == password and self.kgo == kg and
-                        (self.logged or self.logging)):
+                        (self.logged or self.logging) and
+                        cls._is_session_valid(self)):
                     trueself = self
                 else:
                     del cls.bmc_handlers[sockaddr]

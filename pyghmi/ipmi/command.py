@@ -1490,9 +1490,7 @@ class Command(object):
             raise Exception('name must be less than or = 16 chars')
         name = name.ljust(16, "\x00")
         data.extend([ord(x) for x in name])
-        response = self.raw_command(netfn=0x06, command=0x45, data=data)
-        if 'error' in response:
-            raise Exception(response['error'])
+        self.xraw_command(netfn=0x06, command=0x45, data=data)
         return True
 
     def get_user_name(self, uid, return_none_on_error=True):
@@ -1554,12 +1552,16 @@ class Command(object):
             else:
                 password = password.ljust(16, "\x00")
             data.extend([ord(x) for x in password])
-        response = self.raw_command(netfn=0x06, command=0x47, data=data)
-        if 'error' in response:
+        try:
+            self.xraw_command(netfn=0x06, command=0x47, data=data)
+        except exc.IpmiException as ie:
             if mode == 'test_password':
-                # return false if password test failed
                 return False
-            raise Exception(response['error'])
+            elif mode in ('enable', 'disable') and ie.ipmicode == 0xcc:
+                # Some BMCs see redundant calls to password disable/enable
+                # as invalid
+                return True
+            raise
         return True
 
     def get_channel_max_user_count(self, channel=None):
@@ -1689,7 +1691,9 @@ class Command(object):
         try:
             # First try to set name to all \x00 explicitly
             self.set_user_name(uid, '')
-        except Exception:
+        except exc.IpmiException as ie:
+            if ie.ipmicode != 0xcc:
+                raise
             # An invalid data field in request  is frequently reported.
             # however another convention that exists is all '\xff'
             # if this fails, pass up the error so that calling code knows
