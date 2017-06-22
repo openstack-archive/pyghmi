@@ -38,7 +38,7 @@ class Console(object):
     :param kg: optional parameter for BMCs configured to require it
     """
 
-    #TODO(jbjohnso): still need an exit and a data callin function
+    # TODO(jbjohnso): still need an exit and a data callin function
     def __init__(self, bmc, userid, password,
                  iohandler, port=623,
                  force=False, kg=None):
@@ -70,19 +70,19 @@ class Console(object):
         if 'error' in response:
             self._print_error(response['error'])
             return
-        #Send activate sol payload directive
-        #netfn= 6 (application)
-        #command = 0x48 (activate payload)
-        #data = (1, sol payload type
+        # Send activate sol payload directive
+        # netfn= 6 (application)
+        # command = 0x48 (activate payload)
+        # data = (1, sol payload type
         #        1, first instance
         #        0b11000000, -encrypt, authenticate,
         #                      disable serial/modem alerts, CTS fine
         #        0, 0, 0 reserved
         response = self.ipmi_session.raw_command(netfn=0x6, command=0x48,
                                                  data=(1, 1, 192, 0, 0, 0))
-        #given that these are specific to the command,
-        #it's probably best if one can grep the error
-        #here instead of in constants
+        # given that these are specific to the command,
+        # it's probably best if one can grep the error
+        # here instead of in constants
         sol_activate_codes = {
             0x81: 'SOL is disabled',
             0x82: 'Maximum SOL session count reached',
@@ -118,19 +118,19 @@ class Console(object):
             self._print_error(response['error'])
             return
         self.activated = True
-        #data[0:3] is reserved except for the test mode, which we don't use
+        # data[0:3] is reserved except for the test mode, which we don't use
         data = response['data']
         self.maxoutcount = (data[5] << 8) + data[4]
-           #BMC tells us this is the maximum allowed size
-        #data[6:7] is the promise of how small packets are going to be, but we
-        #don't have any reason to worry about it
+        # BMC tells us this is the maximum allowed size
+        # data[6:7] is the promise of how small packets are going to be, but we
+        # don't have any reason to worry about it
         if (data[8] + (data[9] << 8)) not in (623, 28418):
-            #TODO(jbjohnso): support atypical SOL port number
+            # TODO(jbjohnso): support atypical SOL port number
             raise NotImplementedError("Non-standard SOL Port Number")
-        #ignore data[10:11] for now, the vlan detail, shouldn't matter to this
-        #code anyway...
-        #NOTE(jbjohnso):
-        #We will use a special purpose keepalive
+        # ignore data[10:11] for now, the vlan detail, shouldn't matter to this
+        # code anyway...
+        # NOTE(jbjohnso):
+        # We will use a special purpose keepalive
         if self.ipmi_session.sol_handler is not None:
             # If there is erroneously another SOL handler already, notify
             # it of newly established session
@@ -296,9 +296,9 @@ class Console(object):
     def _got_sol_payload(self, payload):
         """SOL payload callback
         """
-        #TODO(jbjohnso) test cases to throw some likely scenarios at functions
-        #for example, retry with new data, retry with no new data
-        #retry with unexpected sequence number
+        # TODO(jbjohnso) test cases to throw some likely scenarios at functions
+        # for example, retry with new data, retry with no new data
+        # retry with unexpected sequence number
         if type(payload) == dict:  # we received an error condition
             self.activated = False
             self._print_error(payload)
@@ -310,15 +310,16 @@ class Console(object):
         poweredoff = payload[3] & 0b100000
         deactivated = payload[3] & 0b10000
         breakdetected = payload[3] & 0b100
-        #for now, ignore overrun.  I assume partial NACK for this reason or for
-        #no reason would be treated the same, new payload with partial data
+        # for now, ignore overrun.  I assume partial NACK for this reason or
+        # for no reason would be treated the same, new payload with partial
+        # data.
         remdata = ""
         remdatalen = 0
         if newseq != 0:  # this packet at least has some data to send to us..
             if len(payload) > 4:
                 remdatalen = len(payload[4:])  # store remote len before dupe
-                    #retry logic, we must ack *this* many even if it is
-                    #a retry packet with new partial data
+                # retry logic, we must ack *this* many even if it is
+                # a retry packet with new partial data
                 remdata = struct.pack("%dB" % remdatalen, *payload[4:])
             if newseq == self.remseq:  # it is a retry, but could have new data
                 if remdatalen > self.lastsize:
@@ -331,16 +332,16 @@ class Console(object):
             if remdata:  # Do not subject callers to empty data
                 self._print_data(remdata)
             ackpayload = (0, self.remseq, remdatalen, 0)
-            #Why not put pending data into the ack? because it's rare
-            #and might be hard to decide what to do in the context of
-            #retry situation
+            # Why not put pending data into the ack? because it's rare
+            # and might be hard to decide what to do in the context of
+            # retry situation
             try:
                 self.send_payload(ackpayload, retry=False)
             except exc.IpmiException:
-                #if the session is broken, then close the SOL session
+                # if the session is broken, then close the SOL session
                 self.close()
         if self.myseq != 0 and ackseq == self.myseq:  # the bmc has something
-                                                      # to say about last xmit
+            # to say about last xmit
             self.awaitingack = False
             if nacked and not breakdetected:  # the BMC was in some way unhappy
                 if poweredoff:
@@ -379,9 +380,9 @@ class Console(object):
         to provide their own event loop behavior, though this could be used
         within the greenthread implementation of caller's choice if desired.
         """
-        #wait_for_rsp promises to return a false value when no sessions are
-        #alive anymore
-        #TODO(jbjohnso): wait_for_rsp is not returning a true value for our own
-        #session
+        # wait_for_rsp promises to return a false value when no sessions are
+        # alive anymore
+        # TODO(jbjohnso): wait_for_rsp is not returning a true value for our
+        # own session
         while (1):
             session.Session.wait_for_rsp(timeout=600)
