@@ -16,7 +16,10 @@
 # sake of typical internal management devices.  Compatibility back to python
 # 2.6 as is found in commonly used enterprise linux distributions.
 
-__author__ = 'jjohnson2'
+import json
+import pyghmi.exceptions as pygexc
+import socket
+import ssl
 
 try:
     import Cookie
@@ -24,10 +27,8 @@ try:
 except ImportError:
     import http.client as httplib
     import http.cookies as Cookie
-import json
-import pyghmi.exceptions as pygexc
-import socket
-import ssl
+
+__author__ = 'jjohnson2'
 
 
 class SecureHTTPConnection(httplib.HTTPConnection, object):

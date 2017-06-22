@@ -42,11 +42,11 @@ class ServerSession(ipmisession.Session):
         # role = request[1]
         self.clientsessionid = request[4:8]
         # TODO(jbjohnso): intelligently handle integrity/auth/conf
-        #for now, forcibly do cipher suite 3
+        # for now, forcibly do cipher suite 3
         self.managedsessionid = os.urandom(4)
-        #table 13-17, 1 for now (hmac-sha1), 3 should also be supported
-        #table 13-18, integrity, 1 for now is hmac-sha1-96, 4 is sha256
-        #confidentiality: 1 is aes-cbc-128, the only one
+        # table 13-17, 1 for now (hmac-sha1), 3 should also be supported
+        # table 13-18, integrity, 1 for now is hmac-sha1-96, 4 is sha256
+        # confidentiality: 1 is aes-cbc-128, the only one
         self.privlevel = 4
         response = (bytearray([clienttag, 0, self.privlevel, 0]) +
                     self.clientsessionid + self.managedsessionid +
@@ -97,7 +97,7 @@ class ServerSession(ipmisession.Session):
         self.maxpriv = self.rolem & 0b111
         namepresent = data[27]
         if namepresent == 0:
-            #ignore null username for now
+            # ignore null username for now
             return
         self.username = bytes(data[28:])
         if self.username.decode('utf-8') not in self.authdata:
@@ -152,7 +152,7 @@ class ServerSession(ipmisession.Session):
                                     ).digest()
         authcode = struct.pack("%dB" % len(data[8:]), *data[8:])
         if expectedauthcode != authcode:
-            #TODO(jjohnson2): RMCP error back at invalid rakp3
+            # TODO(jjohnson2): RMCP error back at invalid rakp3
             return
         clienttag = data[0]
         if data[1] != 0:
@@ -207,7 +207,7 @@ class ServerSession(ipmisession.Session):
         After the session inactivity timeout, this invalidate the client
         session.
         """
-        #for now, we will have a non-configurable 60 second timeout
+        # for now, we will have a non-configurable 60 second timeout
         pass
 
     def _handle_channel_auth_cap(self, request):
@@ -226,9 +226,9 @@ class ServerSession(ipmisession.Session):
 
 
 class IpmiServer(object):
-    #auth capabilities for now is a static payload
-    #for now always completion code 0, otherwise ignore
-    #authentication type fixed to ipmi2, ipmi1 forbidden
+    # auth capabilities for now is a static payload
+    # for now always completion code 0, otherwise ignore
+    # authentication type fixed to ipmi2, ipmi1 forbidden
     # 0b10000000
 
     def __init__(self, authdata, port=623, bmcuuid=None, address='::'):

@@ -42,31 +42,37 @@ except AttributeError:
     def dictitems(d):
         return d.items()
 
-
-initialtimeout = 0.5  # minimum timeout for first packet to retry in any given
-                     # session.  This will be randomized to stagger out retries
-                     # in case of congestion
-iothread = None  # the thread in which all IO will be performed
-                 # While the model as-is works fine for it's own coroutine
-                 # structure, when combined with threading or something like
-                 # eventlet, it becomes difficult for the calling code to cope
-                 # This thread will tuck away the threading situation such that
-                 # calling code doesn't have to do any gymnastics to cope with
-                 # the nature of things.
-iothreadready = False  # whether io thread is yet ready to work
-iothreadwaiters = []  # threads waiting for iothreadready
+# minimum timeout for first packet to retry in any given
+# session.  This will be randomized to stagger out retries
+# in case of congestion
+initialtimeout = 0.5
+# the thread in which all IO will be performed
+# While the model as-is works fine for it's own coroutine
+# structure, when combined with threading or something like
+# eventlet, it becomes difficult for the calling code to cope
+# This thread will tuck away the threading situation such that
+# calling code doesn't have to do any gymnastics to cope with
+# the nature of things.
+iothread = None
+# whether io thread is yet ready to work
+iothreadready = False
+# threads waiting for iothreadready
+iothreadwaiters = []
 ioqueue = collections.deque([])
 myself = None
 ipv6support = None
 selectdeadline = 0
 running = True
-iosockets = []  # set of iosockets that will be shared amongst Session objects
-MAX_BMCS_PER_SOCKET = 64  # no more than this many BMCs will share a socket
-                         # this could be adjusted based on rmem_max
-                         # value, leading to fewer filehandles
+# set of iosockets that will be shared amongst Session objects
+iosockets = []
+# no more than this many BMCs will share a socket
+# this could be adjusted based on rmem_max
+# value, leading to fewer filehandles
+MAX_BMCS_PER_SOCKET = 64
 
-MAX_IDLE = 29  # maximum time to allow idle, more than this and BMC may assume
-               # incorrect idle
+# maximum time to allow idle, more than this and BMC may assume
+MAX_IDLE = 29
+# incorrect idle
 
 
 def define_worker():
@@ -134,6 +140,7 @@ def define_worker():
                                 directediowaiters[workitem[2]].append(workitem)
                             else:
                                 directediowaiters[workitem[2]] = [workitem]
+
     return _IOWorker
 
 
@@ -160,7 +167,7 @@ def _io_wait(timeout, myaddr=None, evq=None):
 
 
 def _io_sendto(mysocket, packet, sockaddr):
-    #Want sendto to act reasonably sane..
+    # Want sendto to act reasonably sane..
     mysocket.setblocking(1)
     if hasattr(mysocket, 'fd'):
         mysocket = mysocket.fd
@@ -235,7 +242,7 @@ def _aespad(data):
     currlen = len(data) + 1  # need to count the pad length field as well
     neededpad = currlen % 16
     if neededpad:  # if it happens to be zero, hurray, but otherwise invert the
-                  # sense of the padding
+        # sense of the padding
         neededpad = 16 - neededpad
     padval = 1
     while padval <= neededpad:
@@ -279,11 +286,11 @@ class Session(object):
     keepalive_sessions = {}
     peeraddr_to_nodes = {}
     iterwaiters = []
-    #NOTE(jbjohnso):
-    #socketpool is a mapping of sockets to usage count
+    # NOTE(jbjohnso):
+    # socketpool is a mapping of sockets to usage count
     socketpool = {}
-    #this will be a lock.  Delay the assignment so that a calling framework
-    #can do something like reassign our threading and select modules
+    # this will be a lock.  Delay the assignment so that a calling framework
+    # can do something like reassign our threading and select modules
     socketchecking = None
 
     @classmethod
@@ -398,7 +405,7 @@ class Session(object):
             if sockaddr in cls.bmc_handlers:
                 self = cls.bmc_handlers[sockaddr]
                 if (self.bmc == bmc and self.userid == userid and
-                        self.password == password and self.kgo == kg and
+                    self.password == password and self.kgo == kg and
                         (self.logged or self.logging) and
                         cls._is_session_valid(self)):
                     trueself = self
@@ -437,7 +444,7 @@ class Session(object):
         self.lastpayload = None
         self._customkeepalives = None
         self.evq = collections.deque([])  # queue of events denoting line to
-                                          # run a cmd
+        # run a cmd
         self.bmc = bmc
         self.broken = False
         # a private queue for packets for which this session handler
@@ -492,11 +499,11 @@ class Session(object):
             self.logging = False
             if self._customkeepalives:
                 for ka in list(self._customkeepalives):
-                # Be thorough and notify parties through their custom
-                # keepalives.  In practice, this *should* be the same, but
-                # if a code somehow makes duplicate SOL handlers,
-                # this would notify all the handlers rather than just the
-                # last one to take ownership
+                    # Be thorough and notify parties through their custom
+                    # keepalives.  In practice, this *should* be the same, but
+                    # if a code somehow makes duplicate SOL handlers,
+                    # this would notify all the handlers rather than just the
+                    # last one to take ownership
                     self._customkeepalives[ka][1](
                         {'error': 'Session Disconnected'})
             self._customkeepalives = None
@@ -568,10 +575,10 @@ class Session(object):
         head = [constants.IPMI_BMC_ADDRESS,
                 constants.netfn_codes['application'] << 2]
         check_sum = _checksum(*head)
-        #NOTE(fengqian): according IPMI Figure 14-11, rqSWID is set to 81h
+        # NOTE(fengqian): according IPMI Figure 14-11, rqSWID is set to 81h
         boday = [0x81, self.seqlun, constants.IPMI_SEND_MESSAGE_CMD,
                  0x40 | channel]
-        #NOTE(fengqian): Track request
+        # NOTE(fengqian): Track request
         self._add_request_entry((constants.netfn_codes['application'] + 1,
                                  self.seqlun, constants.IPMI_SEND_MESSAGE_CMD))
         return head + [check_sum] + boday
@@ -597,17 +604,17 @@ class Session(object):
         """
         bridge_msg = []
         self.expectedcmd = command
-        self.expectednetfn = netfn + \
-            1  # in ipmi, the response netfn is always one
-                                   # higher than the request payload, we assume
-                                   # we are always the requestor for now
+        # in ipmi, the response netfn is always one
+        self.expectednetfn = netfn + 1
+        # higher than the request payload, we assume
+        # we are always the requestor for now
         seqincrement = 7  # IPMI spec forbids gaps bigger then 7 in seq number.
-                       # Risk the taboo rather than violate the rules
+        # Risk the taboo rather than violate the rules
         while (not self.servermode and
                 (netfn, command, self.seqlun) in self.tabooseq and
                self.tabooseq[(netfn, command, self.seqlun)] and seqincrement):
             self.tabooseq[(self.expectednetfn, command, self.seqlun)] -= 1
-                     # Allow taboo to eventually expire after a few rounds
+            # Allow taboo to eventually expire after a few rounds
             self.seqlun += 4  # the last two bits are lun, so add 4 to add 1
             self.seqlun &= 0xff  # we only have one byte, wrap when exceeded
             seqincrement -= 1
@@ -616,7 +623,7 @@ class Session(object):
             addr = bridge_request.get('addr', 0x0)
             channel = bridge_request.get('channel', 0x0)
             bridge_msg = self._make_bridge_request_msg(channel, netfn, command)
-            #NOTE(fengqian): For bridge request, rsaddr is specified and
+            # NOTE(fengqian): For bridge request, rsaddr is specified and
             # rqaddr is BMC address.
             rqaddr = constants.IPMI_BMC_ADDRESS
             rsaddr = addr
@@ -625,7 +632,7 @@ class Session(object):
             rsaddr = constants.IPMI_BMC_ADDRESS
         if self.servermode:
             rsaddr = self.clientaddr
-        #figure 13-4, first two bytes are rsaddr and
+        # figure 13-4, first two bytes are rsaddr and
         # netfn, for non-bridge request, rsaddr is always 0x20 since we are
         # addressing BMC while rsaddr is specified forbridge request
         header = [rsaddr, netfn << 2]
@@ -636,7 +643,7 @@ class Session(object):
         payload = header + [headsum] + reqbody + [bodysum]
         if bridge_request:
             payload = bridge_msg + payload
-            #NOTE(fengqian): For bridge request, another check sum is needed.
+            # NOTE(fengqian): For bridge request, another check sum is needed.
             tail_csum = _checksum(*payload[3:])
             payload.append(tail_csum)
 
@@ -714,12 +721,12 @@ class Session(object):
             timeout = None
         else:  # if not retry, give it a second before surrending
             timeout = 1
-        #The event loop is shared amongst pyghmi session instances
-        #within a process.  In this way, synchronous usage of the interface
-        #plays well with asynchronous use.  In fact, this produces the behavior
-        #of only the constructor needing a callback.  From then on,
-        #synchronous usage of the class acts in a greenthread style governed by
-        #order of data on the network
+        # The event loop is shared amongst pyghmi session instances
+        # within a process.  In this way, synchronous usage of the interface
+        # plays well with asynchronous use.  In fact, this produces the
+        # behavior of only the constructor needing a callback.  From then on,
+        # synchronous usage of the class acts in a greenthread style governed
+        # by order of data on the network
         self.awaitresponse(retry, waitall)
         lastresponse = self.lastresponse
         self.incommand = False
@@ -759,12 +766,12 @@ class Session(object):
         :param timeout: Specify a custom timeout for long-running request
         """
         if payload and self.lastpayload:
-                             # we already have a packet outgoing, make this
-                             # a pending payload
-                             # this way a simplistic BMC won't get confused
-                             # and we also avoid having to do more complicated
-                             # retry mechanism where each payload is
-                             # retried separately
+            # we already have a packet outgoing, make this
+            # a pending payload
+            # this way a simplistic BMC won't get confused
+            # and we also avoid having to do more complicated
+            # retry mechanism where each payload is
+            # retried separately
             self.pendingpayloads.append((payload, payload_type, retry))
             return
         if payload_type is None:
@@ -784,7 +791,7 @@ class Session(object):
         if self.ipmiversion == 2.0:
             message.append(payload_type)
             if baretype == 2:
-                #TODO(jbjohnso): OEM payload types
+                # TODO(jbjohnso): OEM payload types
                 raise NotImplementedError("OEM Payloads")
             elif baretype not in constants.payload_types.values():
                 raise NotImplementedError(
@@ -797,23 +804,22 @@ class Session(object):
                 message += self._ipmi15authcode(payload)
             message.append(len(payload))
             message += payload
-            totlen = 34 + \
-                len(message)  # Guessing the ipmi spec means the whole
-                                   # packet and assume no tag in old 1.5 world
+            # Guessing the ipmi spec means the whole
+            totlen = 34 + len(message)
+            # packet and assume no tag in old 1.5 world
             if totlen in (56, 84, 112, 128, 156):
                 message.append(0)  # Legacy pad as mandated by ipmi spec
         elif self.ipmiversion == 2.0:
             psize = len(payload)
             if self.confalgo:
-                pad = (
-                    psize + 1) % 16  # pad has to cope with one byte field like
-                                   # the _aespad function
+                pad = (psize + 1) % 16  # pad has to cope with one byte
+                # field like the _aespad function
                 if pad:  # if no pad needed, then we take no more action
                     pad = 16 - pad
-                newpsize = psize + pad + \
-                    17  # new payload size grew according to pad
-                                      # size, plus pad length, plus 16 byte IV
-                                      #(Table 13-20)
+                # new payload size grew according to pad
+                newpsize = psize + pad + 17
+                # size, plus pad length, plus 16 byte IV
+                # (Table 13-20)
                 message.append(newpsize & 0xff)
                 message.append(newpsize >> 8)
                 iv = os.urandom(16)
@@ -830,26 +836,26 @@ class Session(object):
                 message.append(psize >> 8)
                 message += list(payload)
             if self.integrityalgo:  # see table 13-8,
-                                   # RMCP+ packet format
-                                   # TODO(jbjohnso): SHA256 which is now
-                                   # allowed
+                # RMCP+ packet format
+                # TODO(jbjohnso): SHA256 which is now
+                # allowed
                 neededpad = (len(message) - 2) % 4
                 if neededpad:
                     neededpad = 4 - neededpad
                 message += [0xff] * neededpad
                 message.append(neededpad)
                 message.append(7)  # reserved, 7 is the required value for the
-                                  # specification followed
+                # specification followed
                 integdata = message[4:]
                 authcode = hmac.new(self.k1,
                                     struct.pack("%dB" % len(integdata),
                                                 *integdata),
                                     hashlib.sha1).digest()[:12]  # SHA1-96
-                                    # per RFC2404 truncates to 96 bits
+                # per RFC2404 truncates to 96 bits
                 message += struct.unpack("12B", authcode)
         self.netpacket = struct.pack("!%dB" % len(message), *message)
-        #advance idle timer since we don't need keepalive while sending packets
-        #out naturally
+        # advance idle timer since we don't need keepalive while sending
+        # packets out naturally
         if (self in Session.keepalive_sessions and not needskeepalive and
                 not self._customkeepalives):
             Session.keepalive_sessions[self]['timeout'] = _monotonic_time() + \
@@ -857,10 +863,10 @@ class Session(object):
         self._xmit_packet(retry, delay_xmit=delay_xmit, timeout=timeout)
 
     def _ipmi15authcode(self, payload, checkremotecode=False):
-        #checkremotecode is used to verify remote code,
-        #otherwise this function is used to general authcode for local
+        # checkremotecode is used to verify remote code,
+        # otherwise this function is used to general authcode for local
         if self.authtype == 0:  # Only for things before auth in ipmi 1.5, not
-                                # like 2.0 cipher suite 0
+            # like 2.0 cipher suite 0
             return ()
         password = self.password
         padneeded = 16 - len(password)
@@ -920,13 +926,14 @@ class Session(object):
         self.sessionid = struct.unpack("<I", struct.pack("4B", *data[0:4]))[0]
         self.authtype = 2
         self._activate_session(data[4:])
+
     # NOTE(jbjohnso):
     # This sends the activate session payload.  We pick '1' as the requested
     # sequence number without perturbing our real sequence number
 
     def _activate_session(self, data):
         rqdata = [2, 4] + list(data) + [1, 0, 0, 0]
-                 # TODO(jbjohnso): this always requests admin level (1.5)
+        # TODO(jbjohnso): this always requests admin level (1.5)
         self.ipmicallback = self._activated_session
         self._send_ipmi_net_payload(netfn=0x6, command=0x3a, data=rqdata)
 
@@ -982,7 +989,7 @@ class Session(object):
     def _open_rmcpplus_request(self):
         self.authtype = 6
         self.localsid += 1  # have unique local session ids to ignore aborted
-                            # login attempts from the past
+        # login attempts from the past
         self.rmcptag += 1
         data = [
             self.rmcptag,
@@ -994,7 +1001,7 @@ class Session(object):
             0, 0, 0, 8, 1, 0, 0, 0,  # table 13-17, SHA-1
             1, 0, 0, 8, 1, 0, 0, 0,  # SHA-1 integrity
             2, 0, 0, 8, 1, 0, 0, 0,  # AES privacy
-            #2,0,0,8,0,0,0,0, #no privacy confalgo
+            # 2,0,0,8,0,0,0,0, #no privacy confalgo
         ]
         self.sessioncontext = 'OPENSESSION'
         self.send_payload(
@@ -1035,12 +1042,12 @@ class Session(object):
                         unspecified, will autodetect based on earliest timeout
         """
         global iosockets
-        #Assume:
-        #Instance A sends request to packet B
-        #Then Instance C sends request to BMC D
-        #BMC D was faster, so data comes back before BMC B
-        #Instance C gets to go ahead of Instance A, because
-        #Instance C can get work done, but instance A cannot
+        # Assume:
+        # Instance A sends request to packet B
+        # Then Instance C sends request to BMC D
+        # BMC D was faster, so data comes back before BMC B
+        # Instance C gets to go ahead of Instance A, because
+        # Instance C can get work done, but instance A cannot
 
         curtime = _monotonic_time()
         # There ar a number of parties that each has their own timeout
@@ -1098,12 +1105,11 @@ class Session(object):
             session._keepalive()
         for session, parms in dictitems(cls.waiting_sessions):
             if parms['timeout'] < curtime:  # timeout has expired, time to
-                                            # give up on it and trigger timeout
-                                            # response in the respective
-                                            # session
-                sessionstodel.append(
-                    session)  # defer deletion until after loop
-                                              # to avoid confusing the for loop
+                # give up on it and trigger timeout
+                # response in the respective session
+                # defer deletion until after loop
+                sessionstodel.append(session)
+                # to avoid confusing the for loop
         for session in sessionstodel:
             cls.waiting_sessions.pop(session, None)
         # one loop iteration to make sure recursion doesn't induce redundant
@@ -1113,7 +1119,7 @@ class Session(object):
         return len(cls.waiting_sessions)
 
     def register_keepalive(self, cmd, callback):
-        '''Register  custom keepalive IPMI command
+        """Register  custom keepalive IPMI command
 
         This is mostly intended for use by the console code.
         calling code would have an easier time just scheduling in their
@@ -1124,7 +1130,7 @@ class Session(object):
         :param callback: A function to be called with results of the keepalive
 
         :returns: value to identify registration for unregister_keepalive
-        '''
+        """
         regid = random.random()
         if self._customkeepalives is None:
             self._customkeepalives = {regid: (cmd, callback)}
@@ -1198,8 +1204,8 @@ class Session(object):
               sockaddr is not None and
               self.sockaddr != sockaddr):
             return  # here, we might have sent an ipv4 and ipv6 packet to kick
-                   # things off ignore the second reply since we have one
-                   # satisfactory answer
+            # things off ignore the second reply since we have one
+            # satisfactory answer
         if data[4] in (0, 2):  # This is an ipmi 1.5 paylod
             remsequencenumber = struct.unpack('<I', bytes(data[5:9]))[0]
             remsessid = struct.unpack("<I", bytes(data[9:13]))[0]
@@ -1218,9 +1224,10 @@ class Session(object):
                 return -5  # remote sequence number is too low, reject it
             self.remsequencenumber = remsequencenumber
             if data[4] != self.authtype:
-                return -2  # BMC responded with mismatch authtype, for
-                          # mutual authentication reject it. If this causes
-                          # legitimate issues, it's the vendor's fault
+                # BMC responded with mismatch authtype, for
+                # mutual authentication reject it. If this causes
+                # legitimate issues, it's the vendor's fault
+                return -2
 
             if remsessid != self.sessionid:
                 return -1  # does not match our session id, drop it
@@ -1231,7 +1238,7 @@ class Session(object):
             if data[4] == 2:  # we have authcode in this ipmi 1.5 packet
                 authcode = data[13:29]
                 del rsp[13:29]
-                    # this is why we needed a mutable representation
+                # this is why we needed a mutable representation
             payload = list(rsp[14:14 + rsp[13]])
             if authcode:
                 expectedauthcode = self._ipmi15authcode(payload,
@@ -1251,7 +1258,7 @@ class Session(object):
         pass
 
     def _got_rakp3(self, data):
-        #stub, client sessions ignore rakp3
+        # stub, client sessions ignore rakp3
         pass
 
     def _got_rmcp_openrequest(self, data):
@@ -1277,8 +1284,8 @@ class Session(object):
             # If endorsing a shared secret scheme, then at the very least it
             # needs to do mutual assurance
             if not (data[5] & 0b01000000):  # This would be the line that might
-                                         # trip up some insecure BMC
-                                         # implementation
+                # trip up some insecure BMC
+                # implementation
                 return
             encrypted = 0
             if data[5] & 0b10000000:
@@ -1379,8 +1386,8 @@ class Session(object):
     def _got_rakp2(self, data):
         if not (self.sessioncontext in ('EXPECTINGRAKP2', 'EXPECTINGRAKP4')):
             return -9  # if we are not expecting rakp2, ignore. In a retry
-                      # scenario, replying from stale RAKP2 after sending
-                      # RAKP3 seems to be best
+            # scenario, replying from stale RAKP2 after sending
+            # RAKP3 seems to be best
         if data[0] != self.rmcptag:  # ignore mismatched tags for retry logic
             return -9
         if data[1] != 0:  # if not successful, consider next move
@@ -1391,7 +1398,7 @@ class Session(object):
                 self.login()
                 return
             if data[1] == 2:  # invalid sessionid 99% of the time means a retry
-                             # scenario invalidated an in-flight transaction
+                # scenario invalidated an in-flight transaction
                 return
             if data[1] in constants.rmcp_codes:
                 errstr = constants.rmcp_codes[data[1]]
@@ -1456,12 +1463,12 @@ class Session(object):
             return -9
         if data[1] != 0:
             if data[1] == 2 and self.logontries:  # if we retried RAKP3 because
-               # RAKP4 got dropped, BMC can consider it done and we must
-               # restart
+                # RAKP4 got dropped, BMC can consider it done and we must
+                # restart
                 self._relog()
             if data[1] == 15 and self.logontries:  # ignore 15 value if we are
-                    # retrying.  xCAT did but I can't recall why exactly
-                    # TODO(jbjohnso) jog my memory to update the comment
+                # retrying.  xCAT did but I can't recall why exactly
+                # TODO(jbjohnso) jog my memory to update the comment
                 return
             if data[1] in constants.rmcp_codes:
                 errstr = constants.rmcp_codes[data[1]]
@@ -1506,18 +1513,18 @@ class Session(object):
         if self._lookup_request_entry(entry):
             self._remove_request_entry(entry)
 
-            #NOTE(fengqian): for bridge request, we need to handle the response
-            #twice. First response shows if message send correctly, second
-            #response is the real response.
-            #If the message is send crrectly, we will discard the first
-            #response or else error message will be parsed and return.
-            if ((entry[0] in [0x06, 0x07]) and (entry[2] == 0x34)
-               and (payload[-2] == 0x0)):
+            # NOTE(fengqian): for bridge request, we need to handle the
+            # response twice. First response shows if message send correctly,
+            # second response is the real response.
+            # If the message is send crrectly, we will discard the first
+            # response or else error message will be parsed and return.
+            if (entry[0] in [0x06, 0x07]) and (entry[2] == 0x34)\
+                    and (payload[-2] == 0x0):
                 return -1
             else:
                 self._parse_payload(payload)
-                #NOTE(fengqian): recheck if the certain entry is removed in
-                #case that bridge request failed.
+                # NOTE(fengqian): recheck if the certain entry is removed in
+                # case that bridge request failed.
                 if self.request_entry:
                     self._remove_request_entry((self.expectednetfn,
                                                 self.seqlun, self.expectedcmd))
@@ -1531,17 +1538,17 @@ class Session(object):
             self.hasretried = 0
             self.tabooseq[
                 (self.expectednetfn, self.expectedcmd, self.seqlun)] = 16
-             # try to skip it for at most 16 cycles of overflow
+            # try to skip it for at most 16 cycles of overflow
         # We want to now remember that we do not have an expected packet
         self.expectednetfn = 0x1ff  # bigger than one byte means it can never
-                                    # match the one byte value by mistake
+        # match the one byte value by mistake
         self.expectedcmd = 0x1ff
         if not self.servermode:
             self.seqlun += 4  # prepare seqlun for next transmit
             self.seqlun &= 0xff  # when overflowing, wrap around
         Session.waiting_sessions.pop(self, None)
         self.lastpayload = None  # render retry mechanism utterly incapable of
-                                 # doing anything, though it shouldn't matter
+        # doing anything, though it shouldn't matter
         self.last_payload_type = None
         response = {}
         response['netfn'] = payload[1] >> 2
@@ -1593,21 +1600,21 @@ class Session(object):
             self.lastpayload = None
             self._relog()
         else:  # in IPMI case, the only recourse is to act as if the packet is
-              # idempotent.  SOL has more sophisticated retry handling
-             # the biggest risks are reset sp which is often fruitless to retry
-             # and chassis reset, which sometimes will shoot itself
-             # systematically in the head in a shared port case making replies
-             # impossible
+            # idempotent.  SOL has more sophisticated retry handling
+            # the biggest risks are reset sp which is often fruitless to retry
+            # and chassis reset, which sometimes will shoot itself
+            # systematically in the head in a shared port case making replies
+            # impossible
             self.hasretried = 1  # remember so that we can track taboo
-                              # combinations
-                              # of sequence number, netfn, and lun due to
-                              # ambiguity on the wire
+            # combinations
+            # of sequence number, netfn, and lun due to
+            # ambiguity on the wire
             self.send_payload()
         self.nowait = False
 
     def _xmit_packet(self, retry=True, delay_xmit=None, timeout=None):
         if self.sequencenumber:  # seq number of zero will be left alone, it is
-                                # special, otherwise increment
+            # special, otherwise increment
             self.sequencenumber += 1
         if delay_xmit is not None:
             Session.waiting_sessions[self] = {}
@@ -1618,7 +1625,7 @@ class Session(object):
         if self.sockaddr:
             _io_sendto(self.socket, self.netpacket, self.sockaddr)
         else:  # he have not yet picked a working sockaddr for this connection,
-              # try all the candidates that getaddrinfo provides
+            # try all the candidates that getaddrinfo provides
             self.allsockaddrs = []
             try:
                 for res in socket.getaddrinfo(self.bmc,
@@ -1667,6 +1674,7 @@ class Session(object):
 
 if __name__ == "__main__":
     import sys
+
     ipmis = Session(bmc=sys.argv[1],
                     userid=sys.argv[2],
                     password=os.environ['IPMIPASS'])
