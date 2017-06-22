@@ -84,8 +84,8 @@ def get_ipmi_error(response, suffix=""):
         return False
     command = response['command']
     netfn = response['netfn']
-    if ((netfn, command) in constants.command_completion_codes
-            and code in constants.command_completion_codes[(netfn, command)]):
+    if ((netfn, command) in constants.command_completion_codes and
+            code in constants.command_completion_codes[(netfn, command)]):
         res = constants.command_completion_codes[(netfn, command)][code]
         res += suffix
     elif code in constants.ipmi_completion_codes:

@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pyghmi.constants as const
+
 IPMI_BMC_ADDRESS = 0x20
 IPMI_SEND_MESSAGE_CMD = 0x34
-
-import pyghmi.constants as const
 
 
 payload_types = {
