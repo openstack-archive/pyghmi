@@ -46,8 +46,8 @@ def ones_complement(value, bits):
     # complement prevalent in ipmi spec
     signbit = 0b1 << (bits - 1)
     if value & signbit:
-        #if negative, subtract 1, then take 1s
-        #complement given bits width
+        # if negative, subtract 1, then take 1s
+        # complement given bits width
         return 0 - (value ^ ((0b1 << bits) - 1))
     else:
         return value
@@ -58,8 +58,8 @@ def twos_complement(value, bits):
     # complement prevalent in ipmi spec
     signbit = 0b1 << (bits - 1)
     if value & signbit:
-        #if negative, subtract 1, then take 1s
-        #complement given bits width
+        # if negative, subtract 1, then take 1s
+        # complement given bits width
         return 0 - ((value - 1) ^ ((0b1 << bits) - 1))
     else:
         return value
@@ -261,7 +261,7 @@ class SDREntry(object):
             raise NotImplementedError
         self.rectype = entrybytes[3]
         self.linearization = None
-        #most important to get going are 1, 2, and 11
+        # most important to get going are 1, 2, and 11
         self.sdrtype = TYPE_SENSOR  # assume a sensor
         if self.rectype == 1:  # full sdr
             self.full_decode(entrybytes[5:])
@@ -312,7 +312,7 @@ class SDREntry(object):
 
     def association_decode(self, entry):
         # table 43-4 Entity Associaition Record
-        #TODO(jbjohnso): actually represent this data
+        # TODO(jbjohnso): actually represent this data
         self.sdrtype = TYPE_UNKNOWN
 
     def compact_decode(self, entry):
@@ -337,10 +337,10 @@ class SDREntry(object):
         except KeyError:
             self.sensor_type = "UNKNOWN type " + str(entry[7])
         self.reading_type = entry[8]  # table 42-1
-            # 0: unspecified
-            # 1: generic threshold based
-            # 0x6f: discrete sensor-specific from table 42-3, sensor offsets
-            # all others per table 42-2, generic discrete
+        # 0: unspecified
+        # 1: generic threshold based
+        # 0x6f: discrete sensor-specific from table 42-3, sensor offsets
+        # all others per table 42-2, generic discrete
         # numeric format is one of:
         # 0 - unsigned, 1 - 1s complement, 2 - 2s complement, 3 - ignore number
         # compact records are supposed to always write it as '3', presumably
@@ -371,8 +371,8 @@ class SDREntry(object):
             self.modunit
 
     def full_decode(self, entry):
-        #offsets are table from spec, minus 6
-        #TODO(jbjohnso): table 43-13, put in constants to interpret entry[3]
+        # offsets are table from spec, minus 6
+        # TODO(jbjohnso): table 43-13, put in constants to interpret entry[3]
         self._common_decode(entry)
         # now must extract the formula data to transform values
         # entry[18 to entry[24].
@@ -543,7 +543,7 @@ class SDREntry(object):
             (entry[4] & 0b11110000) << 2
         self.accuracyexp = (entry[4] & 0b1100) >> 2
         self.direction = entry[4] & 0b11
-            #0 = n/a, 1 = input, 2 = output
+        # 0 = n/a, 1 = input, 2 = output
         self.resultexponent = twos_complement((entry[5] & 0b11110000) >> 4, 4)
         bexponent = twos_complement(entry[5] & 0b1111, 4)
         # might as well do the math to 'b' now rather than wait for later
@@ -594,7 +594,7 @@ class SDR(object):
         self.read_info()
 
     def read_info(self):
-        #first, we want to know the device id
+        # first, we want to know the device id
         rsp = self.ipmicmd.xraw_command(netfn=6, command=1)
         rsp['data'] = bytearray(rsp['data'])
         self.device_id = rsp['data'][0]
@@ -618,9 +618,10 @@ class SDR(object):
                 # be able to proceed
                 # However at the moment, we haven't done so
                 raise NotImplementedError
-            return  # We have Device SDR, without SDR Repository device, but
-                    # also without sensor device support, no idea how to
-                    # continue
+            return
+            # We have Device SDR, without SDR Repository device, but
+            # also without sensor device support, no idea how to
+            # continue
         self.get_sdr()
 
     def get_sdr_reservation(self):
@@ -636,14 +637,14 @@ class SDR(object):
             # we only understand SDR version 51h, the only version defined
             # at time of this writing
             raise NotImplementedError
-        #NOTE(jbjohnso): we actually don't need to care about 'numrecords'
+        # NOTE(jbjohnso): we actually don't need to care about 'numrecords'
         # since FFFF marks the end explicitly
-        #numrecords = (rsp['data'][2] << 8) + rsp['data'][1]
-        #NOTE(jbjohnso): don't care about 'free space' at the moment
-        #NOTE(jbjohnso): most recent timstamp data for add and erase could be
+        # numrecords = (rsp['data'][2] << 8) + rsp['data'][1]
+        # NOTE(jbjohnso): don't care about 'free space' at the moment
+        # NOTE(jbjohnso): most recent timstamp data for add and erase could be
         # handy to detect cache staleness, but for now will assume invariant
         # over life of session
-        #NOTE(jbjohnso): not looking to support the various options in op
+        # NOTE(jbjohnso): not looking to support the various options in op
         # support, ignore those for now, reservation if some BMCs can't read
         # full SDR in one slurp
         recid = 0

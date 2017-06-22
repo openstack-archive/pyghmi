@@ -14,12 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__author__ = 'jjohnson2@lenovo.com'
-
 import pyghmi.ipmi.command as ipmicommand
 import pyghmi.ipmi.private.serversession as serversession
 import pyghmi.ipmi.private.session as ipmisession
 import traceback
+
+__author__ = 'jjohnson2@lenovo.com'
 
 
 class Bmc(serversession.IpmiServer):
