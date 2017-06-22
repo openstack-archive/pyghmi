@@ -23,6 +23,7 @@ import pyghmi.exceptions as exc
 import pyghmi.ipmi.events as sel
 import pyghmi.ipmi.fru as fru
 from pyghmi.ipmi.oem.lookup import get_oem_handler
+
 try:
     from pyghmi.ipmi.private import session
 except ImportError:
@@ -41,7 +42,6 @@ try:
     buffer
 except NameError:
     buffer = memoryview
-
 
 boot_devices = {
     'net': 4,
@@ -90,7 +90,7 @@ def _mask_to_cidr(mask):
 
 
 def _cidr_to_mask(prefix):
-    return struct.pack('>I', 2**prefix-1 << (32-prefix))
+    return struct.pack('>I', 2 ** prefix - 1 << (32 - prefix))
 
 
 class Command(object):
@@ -435,7 +435,7 @@ class Command(object):
         response = self.raw_command(netfn=0, command=1)
         if 'error' in response:
             raise exc.IpmiException(response['error'])
-        assert(response['command'] == 1 and response['netfn'] == 1)
+        assert (response['command'] == 1 and response['netfn'] == 1)
         powerstate = 'on' if (response['data'][0] & 1) else 'off'
         return {'powerstate': powerstate}
 
@@ -763,7 +763,7 @@ class Command(object):
             1: 'Static',
             2: 'DHCP',
             3: 'BIOS',
-            4:  'Other',
+            4: 'Other',
         }
         retdata['ipv4_configuration'] = v4cfgmethods[self._fetch_lancfg_param(
             channel, 4)]
@@ -825,7 +825,7 @@ class Command(object):
         that
         """
         if self._netchannel is None:
-            for channel in chain((0xe, ), range(1, 0xc)):
+            for channel in chain((0xe,), range(1, 0xc)):
                 try:
                     rsp = self.xraw_command(
                         netfn=6, command=0x42, data=(channel,))
@@ -1041,7 +1041,7 @@ class Command(object):
             if destdata:
                 self.xraw_command(netfn=0xc, command=1, data=destdata)
         if (acknowledge_required is not None or retries is not None or
-                acknowledge_timeout is not None):
+           acknowledge_timeout is not None):
             currtype = self.xraw_command(netfn=0xc, command=2, data=(
                 channel, 18, destination, 0))
             if currtype['data'][0] != b'\x11':
@@ -1105,7 +1105,7 @@ class Command(object):
         return retstr
 
     def _chunkwise_dcmi_set(self, command, data):
-        chunks = [data[i:i+15] for i in range(0, len(data), 15)]
+        chunks = [data[i:i + 15] for i in range(0, len(data), 15)]
         offset = 0
         for chunk in chunks:
             chunk = bytearray(chunk, 'utf-8')
@@ -1184,7 +1184,7 @@ class Command(object):
             'dont_change': 0,
             'non_volatile': 1,
             'volatile': 2,
-            #'reserved': 3
+            # 'reserved': 3
         }
         b = 0
         b |= (access_update_modes[access_update_mode] << 6) & 0b11000000
@@ -1207,7 +1207,7 @@ class Command(object):
             'dont_change': 0,
             'non_volatile': 1,
             'volatile': 2,
-            #'reserved': 3
+            # 'reserved': 3
         }
         b |= (privilege_update_modes[privilege_update_mode] << 6) & 0b11000000
         privilege_levels = {
@@ -1292,7 +1292,7 @@ class Command(object):
             3: 'operator',
             4: 'administrator',
             5: 'proprietary',
-            #0x0F: 'no_access'
+            # 0x0F: 'no_access'
         }
         r['privilege_level'] = privilege_levels[data[1] & 0b00001111]
         return r
@@ -1337,8 +1337,8 @@ class Command(object):
             0x0a: 'reserved for USB 1.x',
             0x0b: 'reserved for USB 2.x',
             0x0c: 'System Interface (KCS, SMIC, or BT)',
-            ## 60h-7Fh: OEM
-            ## all other  reserved
+            # 60h-7Fh: OEM
+            # all other  reserved
         }
         t = data[1] & 0b01111111
         if t in channel_medium_types:
@@ -1450,7 +1450,7 @@ class Command(object):
             privilege_level: [reserved, callback, user,
                               operatorm administrator, proprietary, no_access]
         """
-        ## user access available during call-in or callback direct connection
+        # user access available during call-in or callback direct connection
         if channel is None:
             channel = self.get_network_channel()
         data = [channel, uid]
@@ -1636,7 +1636,7 @@ class Command(object):
             channel = self.get_network_channel()
         names = {}
         max_ids = self.get_channel_max_user_count(channel)
-        for uid in range(1, max_ids+1):
+        for uid in range(1, max_ids + 1):
             name = self.get_user_name(uid=uid)
             if name is not None:
                 names[uid] = self.get_user(uid=uid, channel=channel)
