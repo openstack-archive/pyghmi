@@ -1,0 +1,9 @@
+Code-Review+2: Jarrod Johnson <jjohnson2@lenovo.com>
+Workflow+1: Jarrod Johnson <jjohnson2@lenovo.com>
+Code-Review+1: kongxiangyun <kongxyxian2010@163.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Fri, 23 Jun 2017 12:56:05 +0000
+Reviewed-on: https://review.openstack.org/476444
+Project: openstack/pyghmi
+Branch: refs/heads/master
