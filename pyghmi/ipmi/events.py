@@ -200,6 +200,7 @@ def decode_eventdata(sensor_type, offset, eventdata, sdr):
     :param sensor_type: The sensor type number from the event
     :param offset:  Sensor specific offset
     :param eventdata: The three bytes from the log or alert
+    :param sdr: The sdr locator entry to help clarify how to parse data
     """
     if sensor_type == 5 and offset == 4:  # link loss, indicates which port
         return 'Port {0}'.format(eventdata[1])
@@ -398,6 +399,7 @@ class EventHandler(object):
     manageable data.
 
     :param sdr: An SDR object (per pyghmi.ipmi.sdr) matching the target BMC SDR
+    :param ipmicmd: An ipmi command object to fetch data live
     """
     def __init__(self, sdr, ipmicmd):
         self._sdr = sdr

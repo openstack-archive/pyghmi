@@ -35,6 +35,7 @@ class Console(object):
     :param iohandler: Either a function to call with bytes, a filehandle to
                       use for input and output, or a tuple of (input, output)
                       handles
+    :param force: Set to True to force on or False to force off
     :param kg: optional parameter for BMCs configured to require it
     """
 
