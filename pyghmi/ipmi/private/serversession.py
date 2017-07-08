@@ -76,6 +76,7 @@ class ServerSession(ipmisession.Session):
         self.kg = kg
         self.socket = netsocket
         self.sockaddr = clientaddr
+        self.pendingpayloads = collections.deque([])
         self.pktqueue = collections.deque([])
         ipmisession.Session.bmc_handlers[clientaddr] = self
         response = self.create_open_session_response(bytearray(request))

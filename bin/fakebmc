@@ -68,6 +68,15 @@ class FakeBmc(bmc.Bmc):
         print 'politely shut down the system'
         self.powerstate = 'off'
 
+    def is_active(self):
+        return self.powerstate == 'on'
+
+    def iohandler(self, data):
+        print(data)
+        if self.sol:
+            self.sol.send_data(data)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='fakebmc',

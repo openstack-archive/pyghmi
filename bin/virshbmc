@@ -21,6 +21,30 @@ import argparse
 import libvirt
 import pyghmi.ipmi.bmc as bmc
 import sys
+import threading
+
+
+def lifecycle_callback(connection, domain, event, detail, console):
+    console.state = console.domain.state(0)
+
+
+def error_handler(unused, error):
+    if (error[0] == libvirt.VIR_ERR_RPC and
+            error[1] == libvirt.VIR_FROM_STREAMS):
+        return
+
+
+def stream_callback(stream, events, self):
+    try:
+        data = self.stream.recv(1024)
+    except:
+        return
+    if self.sol:
+        self.sol.send_data(data)
+
+
+libvirt.virEventRegisterDefaultImpl()
+libvirt.registerErrorHandler(error_handler, None)
 
 
 class LibvirtBmc(bmc.Bmc):
@@ -30,7 +54,12 @@ class LibvirtBmc(bmc.Bmc):
         super(LibvirtBmc, self).__init__(authdata, port)
         # Rely on libvirt to throw on bad data
         self.conn = libvirt.open(hypervisor)
+        self.name = domain
         self.domain = self.conn.lookupByName(domain)
+        self.state = self.domain.state(0)
+        self.stream = None
+        self.run_console = True
+        self.conn.domainEventRegister(lifecycle_callback, self)
 
     def cold_reset(self):
         # Reset of the BMC, not managed system, here we will exit the demo
@@ -63,6 +92,32 @@ class LibvirtBmc(bmc.Bmc):
             return 0xd5  # Not valid in this state
         self.domain.shutdown()
 
+    def is_active(self):
+        return self.domain.isActive()
+
+    def activate_payload(self, request, session):
+        super(LibvirtBmc, self).activate_payload(request, session)
+        if self.stream is None:
+            self.stream = self.conn.newStream(libvirt.VIR_STREAM_NONBLOCK)
+            self.domain.openConsole(None, self.stream,
+                                    libvirt.VIR_DOMAIN_CONSOLE_FORCE)
+            self.stream.eventAddCallback(libvirt.VIR_STREAM_EVENT_READABLE,
+                                         stream_callback, self)
+
+    def deactivate_payload(self, request, session):
+        super(LibvirtBmc, self).deactivate_payload(request, session)
+        self.stream.eventRemoveCallback()
+        self.stream = None
+
+    def iohandler(self, data):
+        if self.stream:
+            self.stream.send(data)
+
+    def loop(self):
+        while True:
+            libvirt.virEventRunDefaultImpl()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='virshbmc',
@@ -87,4 +142,6 @@ if __name__ == '__main__':
                        hypervisor=args.hypervisor,
                        domain=args.domain,
                        port=args.port)
+    t = threading.Thread(target=mybmc.loop)
+    t.start()
     mybmc.listen()
