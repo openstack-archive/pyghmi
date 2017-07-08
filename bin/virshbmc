@@ -34,17 +34,13 @@ def error_handler(unused, error):
         return
 
 
-def stream_callback(stream, events, self):
+def stream_callback(stream, events, console):
     try:
-        data = self.stream.recv(1024)
+        data = console.stream.recv(1024)
     except Exception:
         return
-    if self.sol:
-        self.sol.send_data(data)
-
-
-libvirt.virEventRegisterDefaultImpl()
-libvirt.registerErrorHandler(error_handler, None)
+    if console.sol:
+        console.sol.send_data(data)
 
 
 class LibvirtBmc(bmc.Bmc):
@@ -58,8 +54,9 @@ class LibvirtBmc(bmc.Bmc):
         self.domain = self.conn.lookupByName(domain)
         self.state = self.domain.state(0)
         self.stream = None
-        self.run_console = True
+        self.run_console = False
         self.conn.domainEventRegister(lifecycle_callback, self)
+        self.sol_thread = None
 
     def cold_reset(self):
         # Reset of the BMC, not managed system, here we will exit the demo
@@ -95,26 +92,38 @@ class LibvirtBmc(bmc.Bmc):
     def is_active(self):
         return self.domain.isActive()
 
+    def check_console(self):
+        if (self.state[0] == libvirt.VIR_DOMAIN_RUNNING or
+                self.state[0] == libvirt.VIR_DOMAIN_PAUSED):
+            if self.stream is None:
+                self.stream = self.conn.newStream(libvirt.VIR_STREAM_NONBLOCK)
+                self.domain.openConsole(None, self.stream, 0)
+                self.stream.eventAddCallback(libvirt.VIR_STREAM_EVENT_READABLE,
+                                             stream_callback, self)
+        else:
+            if self.stream:
+                self.stream.eventRemoveCallback()
+                self.stream = None
+
+        return self.run_console
+
     def activate_payload(self, request, session):
         super(LibvirtBmc, self).activate_payload(request, session)
-        if self.stream is None:
-            self.stream = self.conn.newStream(libvirt.VIR_STREAM_NONBLOCK)
-            self.domain.openConsole(None, self.stream,
-                                    libvirt.VIR_DOMAIN_CONSOLE_FORCE)
-            self.stream.eventAddCallback(libvirt.VIR_STREAM_EVENT_READABLE,
-                                         stream_callback, self)
+        self.run_console = True
+        self.sol_thread = threading.Thread(target=self.loop)
+        self.sol_thread.start()
 
     def deactivate_payload(self, request, session):
+        self.run_console = False
+        self.sol_thread.join()
         super(LibvirtBmc, self).deactivate_payload(request, session)
-        self.stream.eventRemoveCallback()
-        self.stream = None
 
     def iohandler(self, data):
         if self.stream:
             self.stream.send(data)
 
     def loop(self):
-        while True:
+        while self.check_console():
             libvirt.virEventRunDefaultImpl()
 
 
@@ -138,10 +147,12 @@ if __name__ == '__main__':
                         required=True,
                         help='The name of the domain to manage')
     args = parser.parse_args()
+
+    libvirt.virEventRegisterDefaultImpl()
+    libvirt.registerErrorHandler(error_handler, None)
+
     mybmc = LibvirtBmc({'admin': 'password'},
                        hypervisor=args.hypervisor,
                        domain=args.domain,
                        port=args.port)
-    t = threading.Thread(target=mybmc.loop)
-    t.start()
     mybmc.listen()
