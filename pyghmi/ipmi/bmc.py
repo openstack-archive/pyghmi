@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import pyghmi.ipmi.command as ipmicommand
+import pyghmi.ipmi.console as console
 import pyghmi.ipmi.private.serversession as serversession
 import pyghmi.ipmi.private.session as ipmisession
 import traceback
@@ -23,6 +24,11 @@ __author__ = 'jjohnson2@lenovo.com'
 
 
 class Bmc(serversession.IpmiServer):
+
+    activated = False
+    sol = None
+    iohandler = None
+
     def cold_reset(self):
         raise NotImplementedError
 
@@ -46,6 +52,33 @@ class Bmc(serversession.IpmiServer):
 
     def get_power_state(self):
         raise NotImplementedError
+
+    def is_active(self):
+        raise NotImplementedError
+
+    def activate_payload(self, request, session):
+        if self.iohandler is None:
+            session.send_ipmi_response(code=0x81)
+        elif not self.is_active():
+            session.send_ipmi_response(code=0x81)
+        elif self.activated:
+            session.send_ipmi_response(code=0x80)
+        else:
+            self.activated = True
+            session.send_ipmi_response(
+                data=[0, 0, 0, 0, 1, 0, 1, 0, 2, 0x6f, 0xff, 0xff])
+            self.sol = console.ServerConsole(session, self.iohandler)
+
+    def deactivate_payload(self, request, session):
+        if self.iohandler is None:
+            session.send_ipmi_response(code=0x81)
+        elif not self.activated:
+            session.send_ipmi_response(code=0x80)
+        else:
+            session.send_ipmi_response()
+            self.sol.close()
+            self.activated = False
+            self.sol = None
 
     @staticmethod
     def handle_missing_command(session):
@@ -131,6 +164,10 @@ class Bmc(serversession.IpmiServer):
                     return self.send_device_id(session)
                 elif request['command'] == 2:  # cold reset
                     return session.send_ipmi_response(code=self.cold_reset())
+                elif request['command'] == 0x48:  # activate payload
+                    return self.activate_payload(request, session)
+                elif request['command'] == 0x49:  # deactivate payload
+                    return self.deactivate_payload(request, session)
             elif request['netfn'] == 0:
                 if request['command'] == 1:  # get chassis status
                     return self.get_chassis_status(session)

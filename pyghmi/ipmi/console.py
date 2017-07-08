@@ -386,3 +386,123 @@ class Console(object):
         # own session
         while (1):
             session.Session.wait_for_rsp(timeout=600)
+
+
+class ServerConsole(Console):
+    """IPMI SOL class.
+
+    This object represents an SOL channel, multiplexing SOL data with
+    commands issued by ipmi.command.
+
+    :param session: IPMI session
+    :param iohandler: I/O handler
+    """
+
+    def __init__(self, _session, iohandler, force=False):
+        self.keepaliveid = None
+        self.connected = True
+        self.broken = False
+        self.out_handler = iohandler
+        self.remseq = 0
+        self.myseq = 0
+        self.lastsize = 0
+        self.retriedpayload = 0
+        self.pendingoutput = []
+        self.awaitingack = False
+        self.activated = True
+        self.force_session = force
+        self.ipmi_session = _session
+        self.ipmi_session.sol_handler = self._got_sol_payload
+        self.maxoutcount = 256
+        self.poweredon = True
+
+        session.Session.wait_for_rsp(0)
+
+    def _got_sol_payload(self, payload):
+        """SOL payload callback
+        """
+        # TODO(jbjohnso) test cases to throw some likely scenarios at functions
+        # for example, retry with new data, retry with no new data
+        # retry with unexpected sequence number
+        if type(payload) == dict:  # we received an error condition
+            self.activated = False
+            self._print_error(payload)
+            return
+        newseq = payload[0] & 0b1111
+        ackseq = payload[1] & 0b1111
+        ackcount = payload[2]
+        nacked = payload[3] & 0b1000000
+        breakdetected = payload[3] & 0b10000
+        # for now, ignore overrun.  I assume partial NACK for this reason or
+        # for no reason would be treated the same, new payload with partial
+        # data.
+        remdata = ""
+        remdatalen = 0
+        flag = 0
+        if not self.poweredon:
+            flag |= 0b1100000
+        if not self.activated:
+            flag |= 0b1010000
+        if newseq != 0:  # this packet at least has some data to send to us..
+            if len(payload) > 4:
+                remdatalen = len(payload[4:])  # store remote len before dupe
+                # retry logic, we must ack *this* many even if it is
+                # a retry packet with new partial data
+                remdata = struct.pack("%dB" % remdatalen, *payload[4:])
+            if newseq == self.remseq:  # it is a retry, but could have new data
+                if remdatalen > self.lastsize:
+                    remdata = remdata[4 + self.lastsize:]
+                else:  # no new data...
+                    remdata = ""
+            else:  # TODO(jbjohnso) what if remote sequence number is wrong??
+                self.remseq = newseq
+            self.lastsize = remdatalen
+            ackpayload = (0, self.remseq, remdatalen, flag)
+            # Why not put pending data into the ack? because it's rare
+            # and might be hard to decide what to do in the context of
+            # retry situation
+            try:
+                self.send_payload(ackpayload, retry=False)
+            except exc.IpmiException:
+                # if the session is broken, then close the SOL session
+                self.close()
+            if remdata:  # Do not subject callers to empty data
+                self._print_data(remdata)
+        if self.myseq != 0 and ackseq == self.myseq:  # the bmc has something
+            # to say about last xmit
+            self.awaitingack = False
+            if nacked and not breakdetected:  # the BMC was in some way unhappy
+                newtext = self.lastpayload[4 + ackcount:]
+                newtext = struct.pack("B"*len(newtext), *newtext)
+                if (self.pendingoutput and
+                        not isinstance(self.pendingoutput[0], dict)):
+                    self.pendingoutput[0] = newtext + self.pendingoutput[0]
+                else:
+                    self.pendingoutput = [newtext] + self.pendingoutput
+                self._sendpendingoutput()
+            if len(self.pendingoutput) > 0:
+                self._sendpendingoutput()
+        elif ackseq != 0 and self.awaitingack:
+            # if an ack packet came in, but did not match what we
+            # expected, retry our payload now.
+            # the situation that was triggered was a senseless retry
+            # when data came in while we xmitted.  In theory, a BMC
+            # should handle a retry correctly, but some do not, so
+            # try to mitigate by avoiding overeager retries
+            # occasional retry of a packet
+            # sooner than timeout suggests is evidently a big deal
+            self.send_payload(payload=self.lastpayload)
+
+    def send_payload(self, payload, payload_type=1, retry=True,
+                     needskeepalive=False):
+        while not (self.connected or self.broken):
+            session.Session.wait_for_rsp(timeout=10)
+        self.ipmi_session.send_payload(payload,
+                                       payload_type=payload_type,
+                                       retry=retry,
+                                       needskeepalive=needskeepalive)
+
+    def close(self):
+        """Shut down an SOL session,
+        """
+        self.activated = False
