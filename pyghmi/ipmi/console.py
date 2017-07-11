@@ -163,14 +163,14 @@ class Console(object):
         # correlates at all to an ipmi channel to check mux
 
     def _addpendingdata(self, data):
-        if isinstance(data, dict):
-            self.pendingoutput.append(data)
-        else:  # it is a text situation
-            if (len(self.pendingoutput) == 0 or
-                    isinstance(self.pendingoutput[-1], dict)):
-                self.pendingoutput.append(data)
-            else:
+        try:
+            if (isinstance(data, str) and
+                    isinstance(self.pendingoutput[-1], str)):
                 self.pendingoutput[-1] += data
+            return
+        except IndexError:
+            pass
+        self.pendingoutput.append(data)
 
     def _got_cons_input(self, handle):
         """Callback for handle events detected by ipmi session
@@ -220,20 +220,24 @@ class Console(object):
         return session.Session.wait_for_rsp(timeout=timeout)
 
     def _sendpendingoutput(self):
-        if isinstance(self.pendingoutput[0], dict):
-            if 'break' in self.pendingoutput[0]:
-                self._sendoutput("", sendbreak=True)
+        try:
+            if isinstance(self.pendingoutput[0], dict):
+                if 'break' in self.pendingoutput[0]:
+                    self._sendoutput("", sendbreak=True)
+                else:
+                    raise ValueError
+                del self.pendingoutput[0]
+                return
+            if len(self.pendingoutput[0]) > self.maxoutcount:
+                chunk = self.pendingoutput[0][:self.maxoutcount]
+                self.pendingoutput[0] = \
+                    self.pendingoutput[0][self.maxoutcount:]
             else:
-                raise ValueError
-            del self.pendingoutput[0]
-            return
-        if len(self.pendingoutput[0]) > self.maxoutcount:
-            chunk = self.pendingoutput[0][:self.maxoutcount]
-            self.pendingoutput[0] = self.pendingoutput[0][self.maxoutcount:]
-        else:
-            chunk = self.pendingoutput[0]
-            del self.pendingoutput[0]
-        self._sendoutput(chunk)
+                chunk = self.pendingoutput[0]
+                del self.pendingoutput[0]
+            self._sendoutput(chunk)
+        except IndexError:
+            pass
 
     def _sendoutput(self, output, sendbreak=False):
         self.myseq += 1

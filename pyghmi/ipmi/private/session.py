@@ -1653,13 +1653,14 @@ class Session(object):
                 raise exc.IpmiException(
                     "Unable to transmit to specified address")
         if retry:
-            Session.waiting_sessions[self] = {}
-            Session.waiting_sessions[self]['ipmisession'] = self
             if timeout is not None:
                 self.expiration = timeout + _monotonic_time()
             else:
                 self.expiration = self.timeout + _monotonic_time()
-            Session.waiting_sessions[self]['timeout'] = self.expiration
+            Session.waiting_sessions[self] = {
+                'ipmisession': self,
+                'timeout': self.expiration,
+            }
 
     def logout(self):
         if not self.logged:
