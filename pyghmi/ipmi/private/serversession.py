@@ -78,7 +78,10 @@ class ServerSession(ipmisession.Session):
         self.sockaddr = clientaddr
         self.pendingpayloads = collections.deque([])
         self.pktqueue = collections.deque([])
-        ipmisession.Session.bmc_handlers[clientaddr] = self
+        if clientaddr not in ipmisession.Session.bmc_handlers:
+            ipmisession.Session.bmc_handlers[clientaddr] = {bmc.port: self}
+        else:
+            ipmisession.Session.bmc_handlers[clientaddr][bmc.port] = self
         response = self.create_open_session_response(bytearray(request))
         self.send_payload(response,
                           constants.payload_types['rmcpplusopenresponse'],
@@ -267,10 +270,11 @@ class IpmiServer(object):
                                    authstatus, chancap, *oemdata)
         self.kg = None
         self.timeout = 60
+        self.port = port
         addrinfo = socket.getaddrinfo(address, port, 0,
                                       socket.SOCK_DGRAM)[0]
         self.serversocket = ipmisession.Session._assignsocket(addrinfo)
-        ipmisession.Session.bmc_handlers[self.serversocket] = self
+        ipmisession.Session.bmc_handlers[self.serversocket] = {0: self}
 
     def send_auth_cap(self, myaddr, mylun, clientaddr, clientlun, clientseq,
                       sockaddr):
