@@ -190,12 +190,14 @@ def _io_graball(mysockets, iowaiters):
             # into the select
             if len(rdata[0]) < 4:
                 continue
+            myport = mysocket.getsockname()[1]
             rdata = rdata + (mysocket,)
             relsession = None
-            if rdata[1] in Session.bmc_handlers:
+            if (rdata[1] in Session.bmc_handlers and
+                    myport in Session.bmc_handlers[rdata[1]]):
                 # session data
                 rdata = rdata + (True,)
-                relsession = Session.bmc_handlers[rdata[1]]
+                relsession = Session.bmc_handlers[rdata[1]][myport]
             elif rdata[2] in Session.bmc_handlers:
                 # pyghmi is the bmc, and we have sessionless data
                 rdata = rdata + (False,)
@@ -301,7 +303,7 @@ class Session(object):
             session.logout()
 
     @classmethod
-    def _assignsocket(cls, server=None):
+    def _assignsocket(cls, server=None, forbiddensockets=()):
         global iothread
         global iothreadready
         global iosockets
@@ -315,9 +317,13 @@ class Session(object):
         if server is None:
             sorted_candidates = sorted(dictitems(cls.socketpool),
                                        key=operator.itemgetter(1))
-        if sorted_candidates and sorted_candidates[0][1] < MAX_BMCS_PER_SOCKET:
-            cls.socketpool[sorted_candidates[0][0]] += 1
-            return sorted_candidates[0][0]
+        for candidate in sorted_candidates:
+            if candidate[1] >= MAX_BMCS_PER_SOCKET:
+                break
+            if candidate[0] in forbiddensockets:
+                continue
+            cls.socketpool[candidate[0]] += 1
+            return candidate[0]
         # we need a new socket
         if server:
             # Regardless of whether ipv6 is supported or not, we
@@ -396,6 +402,7 @@ class Session(object):
                 kg=None,
                 onlogon=None):
         trueself = None
+        forbidsock = []
         for res in socket.getaddrinfo(bmc, port, 0, socket.SOCK_DGRAM):
             sockaddr = res[4]
             if ipv6support and res[0] == socket.AF_INET:
@@ -403,17 +410,20 @@ class Session(object):
                 newhost = '::ffff:' + sockaddr[0]
                 sockaddr = (newhost, sockaddr[1], 0, 0)
             if sockaddr in cls.bmc_handlers:
-                self = cls.bmc_handlers[sockaddr]
-                if (self.bmc == bmc and self.userid == userid and
-                        self.password == password and self.kgo == kg and
-                        (self.logged or self.logging) and
-                        cls._is_session_valid(self)):
-                    trueself = self
-                else:
-                    del cls.bmc_handlers[sockaddr]
+                for self in dictitems(cls.bmc_handlers[sockaddr]):
+                    self = self[1]
+                    if (self.bmc == bmc and self.userid == userid and
+                            self.password == password and self.kgo == kg and
+                            (self.logged or self.logging) and
+                            cls._is_session_valid(self)):
+                        trueself = self
+                        break
+                    forbidsock.append(self.socket)
             if trueself:
                 return trueself
-            return object.__new__(cls)
+            self = object.__new__(cls)
+            self.forbidsock = forbidsock
+            return self
 
     def __init__(self,
                  bmc,
@@ -479,7 +489,7 @@ class Session(object):
         if self.__class__.socketchecking is None:
             self.__class__.socketchecking = threading.Lock()
         with self.socketchecking:
-            self.socket = self._assignsocket()
+            self.socket = self._assignsocket(forbiddensockets=self.forbidsock)
         self.login()
         if not self.async:
             while self.logging:
@@ -513,9 +523,13 @@ class Session(object):
                 # since this session is broken, remove it from the handler list
                 # This allows constructor to create a new, functional object to
                 # replace this one
+                myport = self.socket.getsockname()[1]
                 for sockaddr in self.allsockaddrs:
-                    if sockaddr in Session.bmc_handlers:
-                        del Session.bmc_handlers[sockaddr]
+                    if (sockaddr in Session.bmc_handlers and
+                            myport in Session.bmc_hansdlers[sockaddr]):
+                        del Session.bmc_handlers[sockaddr][myport]
+                        if Session.bmc_handlers[sockaddr] == {}:
+                            del Session.bmc_handlers[sockaddr]
         elif not self.broken:
             self.broken = True
             self.socketpool[self.socket] -= 1
@@ -1182,22 +1196,13 @@ class Session(object):
             pkt[0] = bytearray(pkt[0])
             if not (pkt[0][0] == 6 and pkt[0][2:4] == b'\xff\x07'):
                 continue
+            # this should be in specific context, no need to check port
+            # since recvfrom result was already routed to this object
+            # specifically
             if pkt[1] in self.bmc_handlers:
                 self._handle_ipmi_packet(pkt[0], sockaddr=pkt[1], qent=pkt)
             elif pkt[2] in self.bmc_handlers:
                 self.sessionless_data(pkt[0], pkt[1])
-
-    @classmethod
-    def _route_ipmiresponse(cls, sockaddr, data, mysocket):
-        if not (data[0] == '\x06' and data[2:4] == '\xff\x07'):  # not ipmi
-            return
-        try:
-            cls.bmc_handlers[sockaddr]._handle_ipmi_packet(data,
-                                                           sockaddr=sockaddr)
-        except KeyError:
-            # check if we have a server attached to the target socket
-            if mysocket in cls.bmc_handlers:
-                cls.bmc_handlers[mysocket].sessionless_data(data, sockaddr)
 
     def _handle_ipmi_packet(self, data, sockaddr=None, qent=None):
         if self.sockaddr is None and sockaddr is not None:
@@ -1636,6 +1641,7 @@ class Session(object):
             # he have not yet picked a working sockaddr for this connection,
             # try all the candidates that getaddrinfo provides
             self.allsockaddrs = []
+            myport = self.socket.getsockname()[1]
             try:
                 for res in socket.getaddrinfo(self.bmc,
                                               self.port,
@@ -1647,7 +1653,9 @@ class Session(object):
                         newhost = '::ffff:' + sockaddr[0]
                         sockaddr = (newhost, sockaddr[1], 0, 0)
                     self.allsockaddrs.append(sockaddr)
-                    Session.bmc_handlers[sockaddr] = self
+                    if sockaddr not in Session.bmc_handlers:
+                        Session.bmc_handlers[sockaddr] = {}
+                    Session.bmc_handlers[sockaddr][myport] = self
                     _io_sendto(self.socket, self.netpacket, sockaddr)
             except socket.gaierror:
                 raise exc.IpmiException(
