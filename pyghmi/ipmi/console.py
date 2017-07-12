@@ -18,9 +18,14 @@
 
 import pyghmi.exceptions as exc
 import struct
+import threading
 
 from pyghmi.ipmi.private import constants
 from pyghmi.ipmi.private import session
+from pyghmi.ipmi.private import util
+
+
+PENDINGOUTPUT = threading.RLock()
 
 
 class Console(object):
@@ -140,8 +145,8 @@ class Console(object):
             callback=self._got_payload_instance_info)
         self.ipmi_session.sol_handler = self._got_sol_payload
         self.connected = True
-        if len(self.pendingoutput) > 0:
-            self._sendpendingoutput()
+        # self._sendpendingoutput() checks len(self._sendpendingoutput)
+        self._sendpendingoutput()
 
     def _got_payload_instance_info(self, response):
         if 'error' in response:
@@ -162,6 +167,7 @@ class Console(object):
         # discern which channel or even *if* the serial port in question
         # correlates at all to an ipmi channel to check mux
 
+    @util.protect(PENDINGOUTPUT)
     def _addpendingdata(self, data):
         if isinstance(data, dict):
             self.pendingoutput.append(data)
@@ -219,7 +225,10 @@ class Console(object):
         """
         return session.Session.wait_for_rsp(timeout=timeout)
 
+    @util.protect(PENDINGOUTPUT)
     def _sendpendingoutput(self):
+        if len(self.pendingoutput) == 0:
+            return
         if isinstance(self.pendingoutput[0], dict):
             if 'break' in self.pendingoutput[0]:
                 self._sendoutput("", sendbreak=True)
@@ -353,14 +362,15 @@ class Console(object):
                     # also add pending output for efficiency and ease
                     newtext = self.lastpayload[4 + ackcount:]
                     newtext = struct.pack("B"*len(newtext), *newtext)
-                    if (self.pendingoutput and
-                            not isinstance(self.pendingoutput[0], dict)):
-                        self.pendingoutput[0] = newtext + self.pendingoutput[0]
-                    else:
-                        self.pendingoutput = [newtext] + self.pendingoutput
-                    self._sendpendingoutput()
-            if len(self.pendingoutput) > 0:
-                self._sendpendingoutput()
+                    with util.protect(PENDINGOUTPUT):
+                        if (self.pendingoutput and
+                                not isinstance(self.pendingoutput[0], dict)):
+                            self.pendingoutput[0] = \
+                                newtext + self.pendingoutput[0]
+                        else:
+                            self.pendingoutput = [newtext] + self.pendingoutput
+            # self._sendpendingoutput() checks len(self._sendpendingoutput)
+            self._sendpendingoutput()
         elif ackseq != 0 and self.awaitingack:
             # if an ack packet came in, but did not match what we
             # expected, retry our payload now.
@@ -474,14 +484,14 @@ class ServerConsole(Console):
             if nacked and not breakdetected:  # the BMC was in some way unhappy
                 newtext = self.lastpayload[4 + ackcount:]
                 newtext = struct.pack("B"*len(newtext), *newtext)
-                if (self.pendingoutput and
-                        not isinstance(self.pendingoutput[0], dict)):
-                    self.pendingoutput[0] = newtext + self.pendingoutput[0]
-                else:
-                    self.pendingoutput = [newtext] + self.pendingoutput
-                self._sendpendingoutput()
-            if len(self.pendingoutput) > 0:
-                self._sendpendingoutput()
+                with util.protect(PENDINGOUTPUT):
+                    if (self.pendingoutput and
+                            not isinstance(self.pendingoutput[0], dict)):
+                        self.pendingoutput[0] = newtext + self.pendingoutput[0]
+                    else:
+                        self.pendingoutput = [newtext] + self.pendingoutput
+            # self._sendpendingoutput() checks len(self._sendpendingoutput)
+            self._sendpendingoutput()
         elif ackseq != 0 and self.awaitingack:
             # if an ack packet came in, but did not match what we
             # expected, retry our payload now.
