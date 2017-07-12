@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import ctypes
+import functools
 import os
 import socket
 import struct
@@ -107,3 +108,25 @@ def _monotonic_time():
     if wintime:
         return wintime() / 1000.0
     return os.times()[4]
+
+
+class protect(object):
+
+    def __init__(self, lock):
+        self.lock = lock
+
+    def __call__(self, func):
+        @functools.wraps(func)
+        def _wrapper(*args, **kwargs):
+            self.lock.acquire()
+            try:
+                return func(*args, **kwargs)
+            finally:
+                self.lock.release()
+        return _wrapper
+
+    def __enter__(self):
+        self.lock.acquire()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.lock.release()
