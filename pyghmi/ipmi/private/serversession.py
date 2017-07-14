@@ -317,7 +317,9 @@ class IpmiServer(object):
                               self.serversocket, data[16:], self.uuid,
                               bmc=self)
                 return
-            data = data[13:]  # ditch 13 bytes so the payload works out
+            # ditch two byte, because ipmi2 header is two
+            # bytes longer than ipmi1 (payload type added, payload length 2).
+            data = data[2:]
         myaddr, netfnlun = struct.unpack('2B', bytes(data[14:16]))
         netfn = (netfnlun & 0b11111100) >> 2
         mylun = netfnlun & 0b11
