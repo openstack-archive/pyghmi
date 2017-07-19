@@ -547,7 +547,7 @@ class Session(object):
                 myport = self.socket.getsockname()[1]
                 for sockaddr in self.allsockaddrs:
                     if (sockaddr in Session.bmc_handlers and
-                            myport in Session.bmc_hansdlers[sockaddr]):
+                            myport in Session.bmc_handlers[sockaddr]):
                         del Session.bmc_handlers[sockaddr][myport]
                         if Session.bmc_handlers[sockaddr] == {}:
                             del Session.bmc_handlers[sockaddr]
