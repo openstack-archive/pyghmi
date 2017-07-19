@@ -828,6 +828,11 @@ class OEMHandler(generic.OEMHandler):
                 else:
                     raise
 
+    def update_firmware(self, filename):
+        if self.has_xcc:
+            return self.immhandler.update_firmware(filename)
+        super(OEMHandler, self).update_firmware(filename)
+
     def detach_remote_media(self):
         if self.has_imm:
             self.immhandler.detach_remote_media()

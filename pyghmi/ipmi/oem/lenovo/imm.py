@@ -16,8 +16,10 @@
 
 from datetime import datetime
 import json
+import pyghmi.ipmi.private.session as ipmisession
 import pyghmi.ipmi.private.util as util
 import pyghmi.util.webclient as webclient
+import random
 import urllib
 import weakref
 
@@ -480,3 +482,41 @@ class XCCClient(IMMClient):
                     json.dumps({'Slot': slot}))
                 if 'return' not in rt or rt['return'] != 0:
                     raise Exception("Unrecognized return: " + repr(rt))
+
+    def update_firmware(self, filename, data=None):
+        rsv = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
+            {'UPD_WebReserve': 1}))
+        if rsv['return'] != 0:
+            raise Exception('Unexpected return to reservation: ' + repr(rsv))
+        xid = random.randint(0,1000000000)
+        rsp = self.wc.upload(
+            '/upload?X-Progress-ID={0}'.format(xid), filename, data)
+        rsp = json.loads(rsp)
+        if rsp['items'][0]['name'] != filename:
+            raise Exception('Unexpected response: ' + repr(rsp))
+        rsp = self.wc.grab_json_response(
+            '/upload/progress?X-Progress-ID={0}'.format(xid))
+        if rsp['state'] != 'done':
+            raise Exception('Unexpected progress: ' + repr(rsp))
+        rsp = self.wc.grab_json_response('/api/dataset/imm_firmware_success')
+        if len(rsp['items']) != 1:
+            raise Exception('Unexpected result: ' + repr(rsp))
+        rsp = self.wc.grab_json_response('/api/dataset/imm_firmware_update')
+        if rsp['items'][0]['upgrades'][0]['id'] != 1:
+            raise Exception('Unexpected answer: ' + repr(rsp))
+        rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
+            {'UPD_WebStartDefaultAction': 1}))
+        if rsp['return'] != 0:
+            raise Exception('Unexpected result starting update: ' +
+                            rsp['return'])
+        complete = False
+        while not complete:
+            ipmisession.pause(3)
+            rsp = self.wc.grab_json_response('/imm_firmware_progress')
+            if rsp['items'][0]['action_state'] == 'Complete OK':
+                complete = True
+                break
+            if rsp['items'][0]['action_state'] != 'In Progress':
+                raise Exception(
+                    'Unknown condition waiting for '
+                    'firmware update: ' + repr(rsp))

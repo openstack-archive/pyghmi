@@ -198,6 +198,10 @@ class OEMHandler(object):
         """
         return ()
 
+    def update_firmware(self, filename, data=None):
+        raise exc.UnsupportedFunctionality(
+            'Firmware update not supported on this platform')
+
     def get_graphical_console(self):
         """Get graphical console launcher"""
         return ()

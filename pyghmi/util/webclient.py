@@ -31,6 +31,26 @@ except ImportError:
 __author__ = 'jjohnson2'
 
 
+# Used as the separator for form data
+BND = 'TbqbLUSn0QFjx9gxiQLtgBK4Zu6ehLqtLs4JOBS50EgxXJ2yoRMhTrmRXxO1lkoAQdZx16'
+
+# We will frequently be dealing with the same data across many instances,
+# consolidate forms to single memory location to get benefits..
+uploadforms = {}
+
+
+def get_upload_form(filename, data):
+    try:
+        return uploadforms[filename]
+    except KeyError:
+        form = '--' + BND + '\r\nContent-Disposition: form-data; ' \
+                            'name="{0}"; filename="{0}"\r\n'.format(filename)
+        form += 'Content-Type: application/octet-stream\r\n\r\n' + data
+        form += '\r\n--' + BND + '--\r\n'
+        uploadforms[filename] = form
+        return form
+
+
 class SecureHTTPConnection(httplib.HTTPConnection, object):
     default_port = httplib.HTTPS_PORT
 
@@ -75,6 +95,35 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
             return json.loads(rsp.read())
         rsp.read()
         return {}
+
+    def upload(self, url, filename, data=None):
+        """
+        Upload a file to the url
+        
+        
+        :param url:
+        :param filename: The name of the file
+        :param data: A file object or data to use rather than reading from
+                     the file.
+        :return: 
+        """
+        if data is None:
+            data = open(filename, 'rb')
+        if isinstance(data, file):
+            data = data.read()
+        form = get_upload_form(filename, data)
+        ulheaders = self.stdheaders.copy()
+        ulheaders['Content-Type'] = 'multipart/form-data; boundary=' + BND
+        self.request('POST', url, form, ulheaders)
+        rsp = self.getresponse()
+        # peer updates in progress should already have pointers,
+        # subsequent transactions will cause memory to needlessly double,
+        # but easiest way to keep memory relatively low
+        del uploadforms[filename]
+        if rsp.status != 200:
+            raise Exception('Unexpected response in file upload: ' +
+                            rsp.read())
+        return rsp.read()
 
     def request(self, method, url, body=None, headers=None):
         if headers is None:
