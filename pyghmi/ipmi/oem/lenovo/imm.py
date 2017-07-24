@@ -16,10 +16,26 @@
 
 from datetime import datetime
 import json
+import pyghmi.ipmi.private.session as ipmisession
 import pyghmi.ipmi.private.util as util
 import pyghmi.util.webclient as webclient
+import random
+import threading
 import urllib
 import weakref
+
+
+class FileUploader(threading.Thread):
+
+    def __init__(self, webclient, url, filename, data):
+        self.wc = webclient
+        self.url = url
+        self.filename = filename
+        self.data = data
+        super(FileUploader, self).__init__()
+
+    def run(self):
+        self.rsp = self.wc.upload(self.url, self.filename, self.data)
 
 
 class IMMClient(object):
@@ -480,3 +496,95 @@ class XCCClient(IMMClient):
                     json.dumps({'Slot': slot}))
                 if 'return' not in rt or rt['return'] != 0:
                     raise Exception("Unrecognized return: " + repr(rt))
+
+    def update_firmware(self, filename, data=None, progress=None):
+        try:
+            self.update_firmware_backend(filename, data, progress)
+        except Exception:
+            self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
+                {'UPD_WebCancel': 1}))
+            raise
+
+    def update_firmware_backend(self, filename, data=None, progress=None):
+        rsv = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
+            {'UPD_WebReserve': 1}))
+        if rsv['return'] != 0:
+            raise Exception('Unexpected return to reservation: ' + repr(rsv))
+        xid = random.randint(0, 1000000000)
+        uploadthread = FileUploader(self.wc.dupe(),
+                                    '/upload?X-Progress-ID={0}'.format(xid),
+                                    filename, data)
+        uploadthread.start()
+        uploadstate = None
+        while uploadthread.isAlive():
+            uploadthread.join(3)
+            rsp = self.wc.grab_json_response(
+                '/upload/progress?X-Progress-ID={0}'.format(xid))
+            if rsp['state'] == 'uploading':
+                progress({'phase': 'upload',
+                          'progress': 100.0 * rsp['received'] / rsp['size']})
+            elif rsp['state'] != 'done':
+                raise Exception('Unexpected result:' + repr(rsp))
+            uploadstate = rsp['state']
+            self.wc.grab_json_response('/api/providers/identity')
+        while uploadstate != 'done':
+            rsp = self.wc.grab_json_response(
+                '/upload/progress?X-Progress-ID={0}'.format(xid))
+            uploadstate = rsp['state']
+            self.wc.grab_json_response('/api/providers/identity')
+        rsp = json.loads(uploadthread.rsp)
+        if rsp['items'][0]['name'] != filename:
+            raise Exception('Unexpected response: ' + repr(rsp))
+        progress({'phase': 'upload',
+                  'progress': 100.0})
+        self.wc.grab_json_response('/api/providers/identity')
+        if '_csrf_token' in self.wc.cookies:
+            self.wc.set_header('X-XSRF-TOKEN', self.wc.cookies['_csrf_token'])
+        rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
+            {'UPD_WebSetFileName': rsp['items'][0]['path']}))
+        if rsp['return'] != 0:
+            raise Exception('Unexpected return to set filename: ' + repr(rsp))
+        rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
+            {'UPD_WebVerifyUploadFile': 1}))
+        if rsp['return'] != 0:
+            raise Exception('Unexpected return to verify: ' + repr(rsp))
+        self.wc.grab_json_response('/api/providers/identity')
+        rsp = self.wc.grab_json_response(
+            '/upload/progress?X-Progress-ID={0}'.format(xid))
+        if rsp['state'] != 'done':
+            raise Exception('Unexpected progress: ' + repr(rsp))
+        rsp = self.wc.grab_json_response('/api/dataset/imm_firmware_success')
+        if len(rsp['items']) != 1:
+            raise Exception('Unexpected result: ' + repr(rsp))
+        rsp = self.wc.grab_json_response('/api/dataset/imm_firmware_update')
+        if rsp['items'][0]['upgrades'][0]['id'] != 1:
+            raise Exception('Unexpected answer: ' + repr(rsp))
+        if '_csrf_token' in self.wc.cookies:
+            self.wc.set_header('X-XSRF-TOKEN', self.wc.cookies['_csrf_token'])
+        rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
+            {'UPD_WebStartDefaultAction': 1}))
+        if rsp['return'] != 0:
+            raise Exception('Unexpected result starting update: ' +
+                            rsp['return'])
+        complete = False
+        while not complete:
+            ipmisession.Session.pause(3)
+            rsp = self.wc.grab_json_response(
+                '/api/dataset/imm_firmware_progress')
+            progress({'phase': 'apply',
+                      'progress': rsp['items'][0]['action_percent_complete']})
+            if rsp['items'][0]['action_state'] == 'Idle':
+                complete = True
+                break
+            if rsp['items'][0]['action_state'] == 'Complete OK':
+                complete = True
+                if rsp['items'][0]['action_status'] != 0:
+                    raise Exception('Unexpected failure: ' + repr(rsp))
+                break
+            if (rsp['items'][0]['action_state'] == 'In Progress' and
+                    rsp['items'][0]['action_status'] == 2):
+                raise Exception('Unexpected failure: ' + repr(rsp))
+            if rsp['items'][0]['action_state'] != 'In Progress':
+                raise Exception(
+                    'Unknown condition waiting for '
+                    'firmware update: ' + repr(rsp))
