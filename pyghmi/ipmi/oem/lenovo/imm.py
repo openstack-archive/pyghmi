@@ -16,6 +16,7 @@
 
 from datetime import datetime
 import json
+import os.path
 import pyghmi.ipmi.private.session as ipmisession
 import pyghmi.ipmi.private.util as util
 import pyghmi.util.webclient as webclient
@@ -549,7 +550,7 @@ class XCCClient(IMMClient):
             uploadstate = rsp['state']
             self.wc.grab_json_response('/api/providers/identity')
         rsp = json.loads(uploadthread.rsp)
-        if rsp['items'][0]['name'] != filename:
+        if rsp['items'][0]['name'] != os.path.basename(filename):
             raise Exception('Unexpected response: ' + repr(rsp))
         progress({'phase': 'upload',
                   'progress': 100.0})
