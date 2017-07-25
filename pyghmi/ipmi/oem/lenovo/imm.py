@@ -41,6 +41,15 @@ class FileUploader(threading.Thread):
 class IMMClient(object):
     logouturl = '/data/logout'
     bmcname = 'IMM'
+    ADP_URL = '/designs/imm/dataproviders/imm_adapters.php'
+    ADP_NAME = 'adapter.adapterName'
+    ADP_FUN = 'adapter.functions'
+    ADP_LABEL = 'adapter.connectorLabel'
+    ADP_SLOTNO = 'adapter.slotNo'
+    ADP_OOB = 'adapter.oobSupported'
+    BUSNO = 'generic.busNo'
+    PORTS = 'network.pPorts'
+    DEVNO = 'generic.devNo'
 
     def __init__(self, ipmicmd):
         self.ipmicmd = weakref.proxy(ipmicmd)
@@ -193,16 +202,15 @@ class IMMClient(object):
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
         if not adapterdata:
             if self.wc:
-                adapterdata = self.wc.grab_json_response(
-                    '/designs/imm/dataproviders/imm_adapters.php')
+                adapterdata = self.wc.grab_json_response(self.ADP_URL)
                 if adapterdata:
                     self.datacache['lenovo_cached_adapters'] = (
                         adapterdata, util._monotonic_time())
         if adapterdata and 'items' in adapterdata:
             for adata in adapterdata['items']:
-                aname = adata['adapter.adapterName']
+                aname = adata[self.ADP_NAME]
                 donenames = set([])
-                for fundata in adata['adapter.functions']:
+                for fundata in adata[self.ADP_FUN]:
                     fdata = fundata.get('firmwares', ())
                     for firm in fdata:
                         fname = firm['firmwareName'].rstrip()
@@ -281,30 +289,29 @@ class IMMClient(object):
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
         if not adapterdata:
             if self.wc:
-                adapterdata = self.wc.grab_json_response(
-                    '/designs/imm/dataproviders/imm_adapters.php')
+                adapterdata = self.wc.grab_json_response(self.ADP_URL)
                 if adapterdata:
                     self.datacache['lenovo_cached_adapters'] = (
                         adapterdata, util._monotonic_time())
         if adapterdata and 'items' in adapterdata:
             for adata in adapterdata['items']:
                 skipadapter = False
-                if not adata['adapter.oobSupported']:
+                if not adata[self.ADP_OOB]:
                     continue
-                aname = adata['adapter.adapterName']
-                clabel = adata['adapter.connectorLabel']
+                aname = adata[self.ADP_NAME]
+                clabel = adata[self.ADP_LABEL]
                 if clabel == 'Unknown':
                     continue
                 if clabel != 'Onboard':
-                    aslot = adata['adapter.slotNo']
+                    aslot = adata[self.ADP_SLOTNO]
                     if clabel == 'ML2':
                         clabel = 'ML2 (Slot {0})'.format(aslot)
                     else:
                         clabel = 'Slot {0}'.format(aslot)
                 bdata = {'location': clabel}
-                for fundata in adata['adapter.functions']:
+                for fundata in adata[self.ADP_FUN]:
                     bdata['pcislot'] = '{0:02x}:{1:02x}'.format(
-                        fundata['generic.busNo'], fundata['generic.devNo'])
+                        fundata[self.BUSNO], fundata[self.DEVNO])
                     serialdata = fundata.get('vpd.serialNo', None)
                     if (serialdata and serialdata != 'N/A' and
                             '---' not in serialdata):
@@ -312,8 +319,8 @@ class IMMClient(object):
                     partnum = fundata.get('vpd.partNo', None)
                     if partnum and partnum != 'N/A':
                         bdata['partnumber'] = partnum
-                    if 'network.pPorts' in fundata:
-                        for portinfo in fundata['network.pPorts']:
+                    if self.PORTS in fundata:
+                        for portinfo in fundata[self.PORTS]:
                             for lp in portinfo['logicalPorts']:
                                 ma = lp['networkAddr']
                                 ma = ':'.join(
@@ -379,6 +386,15 @@ class IMMClient(object):
 class XCCClient(IMMClient):
     logouturl = '/api/providers/logout'
     bmcname = 'XCC'
+    ADP_URL = '/api/dataset/imm_adapters?params=pci_GetAdapters'
+    ADP_NAME = 'adapterName'
+    ADP_FUN = 'functions'
+    ADP_LABEL = 'connectorLabel'
+    ADP_SLOTNO = 'slotNo'
+    ADP_OOB = 'oobSupported'
+    BUSNO = 'generic_busNo'
+    PORTS = 'network_pPorts'
+    DEVNO = 'generic_devNo'
 
     def get_webclient(self):
         cv = self.ipmicmd.certverify
