@@ -518,11 +518,20 @@ class XCCClient(IMMClient):
         try:
             self.update_firmware_backend(filename, data, progress)
         except Exception:
+            self._refresh_token()
             self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
                 {'UPD_WebCancel': 1}))
+            self.weblogout()
             raise
+        self.weblogout()
+
+    def _refresh_token(self):
+        self.wc.grab_json_response('/api/providers/identity')
+        if '_csrf_token' in self.wc.cookies:
+            self.wc.set_header('X-XSRF-TOKEN', self.wc.cookies['_csrf_token'])
 
     def update_firmware_backend(self, filename, data=None, progress=None):
+        self._refresh_token()
         rsv = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebReserve': 1}))
         if rsv['return'] != 0:
@@ -543,20 +552,18 @@ class XCCClient(IMMClient):
             elif rsp['state'] != 'done':
                 raise Exception('Unexpected result:' + repr(rsp))
             uploadstate = rsp['state']
-            self.wc.grab_json_response('/api/providers/identity')
+            self._refresh_token()
         while uploadstate != 'done':
             rsp = self.wc.grab_json_response(
                 '/upload/progress?X-Progress-ID={0}'.format(xid))
             uploadstate = rsp['state']
-            self.wc.grab_json_response('/api/providers/identity')
+            self._refresh_token()
         rsp = json.loads(uploadthread.rsp)
         if rsp['items'][0]['name'] != os.path.basename(filename):
             raise Exception('Unexpected response: ' + repr(rsp))
         progress({'phase': 'upload',
                   'progress': 100.0})
-        self.wc.grab_json_response('/api/providers/identity')
-        if '_csrf_token' in self.wc.cookies:
-            self.wc.set_header('X-XSRF-TOKEN', self.wc.cookies['_csrf_token'])
+        self._refresh_token()
         rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebSetFileName': rsp['items'][0]['path']}))
         if rsp['return'] != 0:
@@ -565,19 +572,14 @@ class XCCClient(IMMClient):
             {'UPD_WebVerifyUploadFile': 1}))
         if rsp['return'] != 0:
             raise Exception('Unexpected return to verify: ' + repr(rsp))
-        self.wc.grab_json_response('/api/providers/identity')
-        rsp = self.wc.grab_json_response(
-            '/upload/progress?X-Progress-ID={0}'.format(xid))
-        if rsp['state'] != 'done':
-            raise Exception('Unexpected progress: ' + repr(rsp))
+        self._refresh_token()
         rsp = self.wc.grab_json_response('/api/dataset/imm_firmware_success')
         if len(rsp['items']) != 1:
             raise Exception('Unexpected result: ' + repr(rsp))
         rsp = self.wc.grab_json_response('/api/dataset/imm_firmware_update')
         if rsp['items'][0]['upgrades'][0]['id'] != 1:
             raise Exception('Unexpected answer: ' + repr(rsp))
-        if '_csrf_token' in self.wc.cookies:
-            self.wc.set_header('X-XSRF-TOKEN', self.wc.cookies['_csrf_token'])
+        self._refresh_token()
         rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebStartDefaultAction': 1}))
         if rsp['return'] != 0:
