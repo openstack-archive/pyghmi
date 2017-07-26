@@ -563,7 +563,7 @@ class XCCClient(IMMClient):
             raise Exception('Unexpected response: ' + repr(rsp))
         progress({'phase': 'upload',
                   'progress': 100.0})
-        ipmisession.Session.pause(2)
+        ipmisession.Session.pause(3)
         # aggressive timing can cause the next call to occasionally
         # return 25 and fail
         self._refresh_token()

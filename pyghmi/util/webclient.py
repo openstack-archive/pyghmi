@@ -128,7 +128,10 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         # peer updates in progress should already have pointers,
         # subsequent transactions will cause memory to needlessly double,
         # but easiest way to keep memory relatively low
-        del uploadforms[filename]
+        try:
+            del uploadforms[filename]
+        except KeyError:  # something could have already deleted it
+            pass
         if rsp.status != 200:
             raise Exception('Unexpected response in file upload: ' +
                             rsp.read())
