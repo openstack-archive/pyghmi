@@ -279,7 +279,10 @@ class IMMClient(object):
 
     def weblogout(self):
         if self._wc:
-            self._wc.grab_json_response(self.logouturl)
+            try:
+                self._wc.grab_json_response(self.logouturl)
+            except Exception:
+                pass
             self._wc = None
 
     def hardware_inventory_map(self):
@@ -531,6 +534,7 @@ class XCCClient(IMMClient):
             self.wc.set_header('X-XSRF-TOKEN', self.wc.cookies['_csrf_token'])
 
     def update_firmware_backend(self, filename, data=None, progress=None):
+        self.weblogout()
         self._refresh_token()
         rsv = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebReserve': 1}))

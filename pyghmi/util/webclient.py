@@ -43,6 +43,8 @@ def get_upload_form(filename, data):
     try:
         return uploadforms[filename]
     except KeyError:
+        if isinstance(data, file):
+            data = data.read()
         form = '--' + BND + '\r\nContent-Disposition: form-data; ' \
                             'name="{0}"; filename="{0}"\r\n'.format(filename)
         form += 'Content-Type: application/octet-stream\r\n\r\n' + data
@@ -118,8 +120,6 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         """
         if data is None:
             data = open(filename, 'rb')
-        if isinstance(data, file):
-            data = data.read()
         form = get_upload_form(filename, data)
         ulheaders = self.stdheaders.copy()
         ulheaders['Content-Type'] = 'multipart/form-data; boundary=' + BND
