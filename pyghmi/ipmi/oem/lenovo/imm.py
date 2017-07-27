@@ -538,6 +538,8 @@ class XCCClient(IMMClient):
         self._refresh_token()
         rsv = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebReserve': 1}))
+        if rsv['return'] == 103:
+            raise Exception('Update already in progress')
         if rsv['return'] != 0:
             raise Exception('Unexpected return to reservation: ' + repr(rsv))
         xid = random.randint(0, 1000000000)
@@ -565,20 +567,28 @@ class XCCClient(IMMClient):
         rsp = json.loads(uploadthread.rsp)
         if rsp['items'][0]['name'] != os.path.basename(filename):
             raise Exception('Unexpected response: ' + repr(rsp))
-        progress({'phase': 'upload',
-                  'progress': 100.0})
+        progress({'phase': 'validating',
+                  'progress': 0.0})
         ipmisession.Session.pause(3)
         # aggressive timing can cause the next call to occasionally
         # return 25 and fail
         self._refresh_token()
         rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebSetFileName': rsp['items'][0]['path']}))
+        if rsp['return'] == 25:
+            raise Exception('Temporory error validating update, try again')
         if rsp['return'] != 0:
             raise Exception('Unexpected return to set filename: ' + repr(rsp))
+        progress({'phase': 'validating',
+                  'progress': 25.0})
         rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebVerifyUploadFile': 1}))
+        if rsp['return'] == 115:
+            raise Exception('Update image not intended for this system')
         if rsp['return'] != 0:
             raise Exception('Unexpected return to verify: ' + repr(rsp))
+        progress({'phase': 'validating',
+                  'progress': 99.0})
         self._refresh_token()
         rsp = self.wc.grab_json_response('/api/dataset/imm_firmware_success')
         if len(rsp['items']) != 1:
@@ -587,6 +597,8 @@ class XCCClient(IMMClient):
         if rsp['items'][0]['upgrades'][0]['id'] != 1:
             raise Exception('Unexpected answer: ' + repr(rsp))
         self._refresh_token()
+        progress({'phase': 'apply',
+                  'progress': 0.0})
         rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebStartDefaultAction': 1}))
         if rsp['return'] != 0:
