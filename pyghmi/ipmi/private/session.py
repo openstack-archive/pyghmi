@@ -35,8 +35,8 @@ from pyghmi.ipmi.private import util
 from pyghmi.ipmi.private.util import get_ipmi_error, _monotonic_time
 
 
-KEEPALIVE_SESSIONS = threading.RLock()
-WAITING_SESSIONS = threading.RLock()
+KEEPALIVE_SESSIONS = None
+WAITING_SESSIONS = None
 
 
 try:
@@ -82,6 +82,11 @@ MAX_IDLE = 29
 
 
 def define_worker():
+    global KEEPALIVE_SESSIONS
+    global WAITING_SESSIONS
+    if KEEPALIVE_SESSIONS is None:
+        KEEPALIVE_SESSIONS = threading.RLock()
+    WAITING_SESSIONS = threading.RLock()
     class _IOWorker(threading.Thread):
         def join(self):
             Session._cleanup()
@@ -396,6 +401,9 @@ class Session(object):
 
     @classmethod
     def _is_session_valid(cls, session):
+        global KEEPALIVE_SESSIONS
+        if KEEPALIVE_SESSIONS is None:
+            KEEPALIVE_SESSIONS = threading.RLock()
         with util.protect(KEEPALIVE_SESSIONS):
             sess = cls.keepalive_sessions.get(session, None)
             if sess is not None and 'timeout' in sess:
