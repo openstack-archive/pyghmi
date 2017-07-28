@@ -22,10 +22,6 @@ import threading
 
 from pyghmi.ipmi.private import constants
 from pyghmi.ipmi.private import session
-from pyghmi.ipmi.private import util
-
-
-PENDINGOUTPUT = threading.RLock()
 
 
 class Console(object):
@@ -47,6 +43,7 @@ class Console(object):
     def __init__(self, bmc, userid, password,
                  iohandler, port=623,
                  force=False, kg=None):
+        self.outputlock = threading.RLock()
         self.keepaliveid = None
         self.connected = False
         self.broken = False
@@ -167,16 +164,16 @@ class Console(object):
         # discern which channel or even *if* the serial port in question
         # correlates at all to an ipmi channel to check mux
 
-    @util.protect(PENDINGOUTPUT)
     def _addpendingdata(self, data):
-        if isinstance(data, dict):
-            self.pendingoutput.append(data)
-        else:  # it is a text situation
-            if (len(self.pendingoutput) == 0 or
-                    isinstance(self.pendingoutput[-1], dict)):
+        with self.outputlock:
+            if isinstance(data, dict):
                 self.pendingoutput.append(data)
-            else:
-                self.pendingoutput[-1] += data
+            else:  # it is a text situation
+                if (len(self.pendingoutput) == 0 or
+                        isinstance(self.pendingoutput[-1], dict)):
+                    self.pendingoutput.append(data)
+                else:
+                    self.pendingoutput[-1] += data
 
     def _got_cons_input(self, handle):
         """Callback for handle events detected by ipmi session
@@ -225,24 +222,25 @@ class Console(object):
         """
         return session.Session.wait_for_rsp(timeout=timeout)
 
-    @util.protect(PENDINGOUTPUT)
     def _sendpendingoutput(self):
-        if len(self.pendingoutput) == 0:
-            return
-        if isinstance(self.pendingoutput[0], dict):
-            if 'break' in self.pendingoutput[0]:
-                self._sendoutput("", sendbreak=True)
+        with self.outputlock:
+            if len(self.pendingoutput) == 0:
+                return
+            if isinstance(self.pendingoutput[0], dict):
+                if 'break' in self.pendingoutput[0]:
+                    self._sendoutput("", sendbreak=True)
+                else:
+                    raise ValueError
+                del self.pendingoutput[0]
+                return
+            if len(self.pendingoutput[0]) > self.maxoutcount:
+                chunk = self.pendingoutput[0][:self.maxoutcount]
+                self.pendingoutput[0] = self.pendingoutput[0][
+                    self.maxoutcount:]
             else:
-                raise ValueError
-            del self.pendingoutput[0]
-            return
-        if len(self.pendingoutput[0]) > self.maxoutcount:
-            chunk = self.pendingoutput[0][:self.maxoutcount]
-            self.pendingoutput[0] = self.pendingoutput[0][self.maxoutcount:]
-        else:
-            chunk = self.pendingoutput[0]
-            del self.pendingoutput[0]
-        self._sendoutput(chunk)
+                chunk = self.pendingoutput[0]
+                del self.pendingoutput[0]
+            self._sendoutput(chunk)
 
     def _sendoutput(self, output, sendbreak=False):
         self.myseq += 1
@@ -362,7 +360,7 @@ class Console(object):
                     # also add pending output for efficiency and ease
                     newtext = self.lastpayload[4 + ackcount:]
                     newtext = struct.pack("B"*len(newtext), *newtext)
-                    with util.protect(PENDINGOUTPUT):
+                    with self.outputlock:
                         if (self.pendingoutput and
                                 not isinstance(self.pendingoutput[0], dict)):
                             self.pendingoutput[0] = \
@@ -409,6 +407,7 @@ class ServerConsole(Console):
     """
 
     def __init__(self, _session, iohandler, force=False):
+        self.outputlock = threading.RLock()
         self.keepaliveid = None
         self.connected = True
         self.broken = False
@@ -484,7 +483,7 @@ class ServerConsole(Console):
             if nacked and not breakdetected:  # the BMC was in some way unhappy
                 newtext = self.lastpayload[4 + ackcount:]
                 newtext = struct.pack("B"*len(newtext), *newtext)
-                with util.protect(PENDINGOUTPUT):
+                with self.outputlock:
                     if (self.pendingoutput and
                             not isinstance(self.pendingoutput[0], dict)):
                         self.pendingoutput[0] = newtext + self.pendingoutput[0]
