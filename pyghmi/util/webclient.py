@@ -81,7 +81,13 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         self.stdheaders[key] = value
 
     def connect(self):
-        plainsock = socket.create_connection((self.host, self.port), 60)
+        addrinfo = socket.getaddrinfo(self.host, self.port)[0]
+        # workaround problems of too large mtu, moderately frequent occurance
+        # in this space
+        plainsock = socket.socket(addrinfo[0])
+        plainsock.settimeout(60)
+        plainsock.setsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG, 1456)
+        plainsock.connect(addrinfo[4])
         self.sock = ssl.wrap_socket(plainsock, cert_reqs=self.cert_reqs)
         # txtcert = self.sock.getpeercert()  # currently not possible
         bincert = self.sock.getpeercert(binary_form=True)
