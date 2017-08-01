@@ -254,6 +254,7 @@ class SDREntry(object):
     def __init__(self, entrybytes, ipmicmd, reportunsupported=False):
         # ignore record id for now, we only care about the sensor number for
         # moment
+        self.readable = True
         self.reportunsupported = reportunsupported
         self.ipmicmd = ipmicmd
         if entrybytes[2] != 0x51:
@@ -267,6 +268,8 @@ class SDREntry(object):
             self.full_decode(entrybytes[5:])
         elif self.rectype == 2:  # full sdr
             self.compact_decode(entrybytes[5:])
+        elif self.rectype == 3:  # event only
+            self.eventonly_decode(entrybytes[5:])
         elif self.rectype == 8:  # entity association
             self.association_decode(entrybytes[5:])
         elif self.rectype == 0x11:  # FRU locator
@@ -315,6 +318,12 @@ class SDREntry(object):
         # TODO(jbjohnso): actually represent this data
         self.sdrtype = TYPE_UNKNOWN
 
+    def eventonly_decode(self, entry):
+        # table 43-3 event_only sensor record
+        self._common_decode(entry)
+        self.sensor_name = self.tlv_decode(entry[11], entry[12:])
+        self.readable = False
+
     def compact_decode(self, entry):
         # table 43-2 compact sensor record
         self._common_decode(entry)
@@ -325,18 +334,25 @@ class SDREntry(object):
         return trapval + offset
 
     def _common_decode(self, entry):
-        # compact and full are very similar
+        # event only, compact and full are very similar
         # this function handles the common aspects of compact and full
         # offsets from spec, minus 6
         self.sensor_number = entry[2]
         self.entity = ipmiconst.entity_ids.get(
             entry[3], 'Unknown entity {0}'.format(entry[3]))
-        self.sensor_type_number = entry[7]
+        if self.rectype == 3:
+            self.sensor_type_number = entry[5]
+            self.reading_type = entry[6]  # table 42-1
+        else:
+            self.sensor_type_number = entry[7]
+            self.reading_type = entry[8]  # table 42-1
         try:
-            self.sensor_type = ipmiconst.sensor_type_codes[entry[7]]
+            self.sensor_type = ipmiconst.sensor_type_codes[
+                self.sensor_type_number]
         except KeyError:
-            self.sensor_type = "UNKNOWN type " + str(entry[7])
-        self.reading_type = entry[8]  # table 42-1
+            self.sensor_type = "UNKNOWN type " + str(self.sensor_type_number)
+        if self.rectype == 3:
+            return
         # 0: unspecified
         # 1: generic threshold based
         # 0x6f: discrete sensor-specific from table 42-3, sensor offsets
@@ -710,7 +726,9 @@ class SDR(object):
                 pass
 
     def get_sensor_numbers(self):
-        return self.sensors.iterkeys()
+        for number in self.sensors:
+            if self.sensors[number].readable:
+                yield number
 
     def add_sdr(self, sdrbytes):
         newent = SDREntry(sdrbytes, self.ipmicmd)
