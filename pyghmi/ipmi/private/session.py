@@ -707,20 +707,14 @@ class Session(object):
             incrementtime += 1
         return cumulativetime + 1
 
-    def _cmdwait(self, waitall=False):
+    def _cmdwait(self):
         while self._isincommand():
-            if waitall:
-                Session.wait_for_rsp(self._isincommand())
-            else:
-                _io_wait(self._isincommand(), self.sockaddr, self.evq)
+            _io_wait(self._isincommand(), self.sockaddr, self.evq)
 
-    def awaitresponse(self, retry, waitall=False):
+    def awaitresponse(self, retry):
         while retry and self.lastresponse is None and self.logged:
             timeout = self.expiration - _monotonic_time()
-            if waitall:
-                Session.wait_for_rsp(timeout)
-            else:
-                _io_wait(timeout, self.sockaddr)
+            _io_wait(timeout, self.sockaddr)
             while self.iterwaiters:
                 waiter = self.iterwaiters.pop()
                 waiter({'success': True})
@@ -739,15 +733,18 @@ class Session(object):
                     retry=True,
                     delay_xmit=None,
                     timeout=None,
-                    waitall=False):
+                    callback=None):
         if not self.logged:
             raise exc.IpmiException('Session no longer connected')
-        self._cmdwait(waitall)
+        self._cmdwait()
         if not self.logged:
             raise exc.IpmiException('Session no longer connected')
         self.incommand = _monotonic_time() + self._getmaxtimeout()
         self.lastresponse = None
-        self.ipmicallback = self._generic_callback
+        if callback is None:
+            self.ipmicallback = self._generic_callback
+        else:
+            self.ipmicallback = callback
         self._send_ipmi_net_payload(netfn, command, data,
                                     bridge_request=bridge_request,
                                     retry=retry, delay_xmit=delay_xmit,
@@ -757,13 +754,16 @@ class Session(object):
             timeout = None
         else:  # if not retry, give it a second before surrending
             timeout = 1
+        if callback:
+            # caller *must* clean up self.incommand and self.evq
+            return
         # The event loop is shared amongst pyghmi session instances
         # within a process.  In this way, synchronous usage of the interface
         # plays well with asynchronous use.  In fact, this produces the
         # behavior of only the constructor needing a callback.  From then on,
         # synchronous usage of the class acts in a greenthread style governed
         # by order of data on the network
-        self.awaitresponse(retry, waitall)
+        self.awaitresponse(retry)
         lastresponse = self.lastresponse
         self.incommand = False
         while self.evq:
@@ -1194,6 +1194,20 @@ class Session(object):
         except KeyError:
             pass
 
+    def _keepalive_wrapper(self, callback):
+        # generates a wrapped keepalive to cleanup session state
+        # and call callback if appropriate
+        def _keptalive(response):
+            self._generic_callback(response)
+            response = self.lastresponse
+            self.incommand = False
+            while self.evq:
+                self.evq.popleft().set()
+            if callback:
+                callback(response)
+
+        return _keptalive
+
     def _keepalive(self):
         """Performs a keepalive to avoid idle disconnect
         """
@@ -1202,7 +1216,8 @@ class Session(object):
                 if self.incommand:
                     # if currently in command, no cause to keepalive
                     return
-                self.raw_command(netfn=6, command=1, waitall=True)
+                self.raw_command(netfn=6, command=1,
+                                 callback=self._keepalive_wrapper(None))
             else:
                 kaids = list(self._customkeepalives.keys())
                 for keepalive in kaids:
@@ -1215,8 +1230,8 @@ class Session(object):
                         # raw command ultimately caused a keepalive to
                         # deregister
                         continue
-                    cmd['waitall'] = True
-                    callback(self.raw_command(**cmd))
+                    cmd['callback'] = self._keepalive_wrapper(callback)
+                    self.raw_command(**cmd)
         except exc.IpmiException:
             self._mark_broken()
 
