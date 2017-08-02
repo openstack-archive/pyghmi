@@ -685,7 +685,7 @@ class Command(object):
             if prefixlen:
                 return _mask_to_cidr(fetchdata[1:])
             else:
-                ip = socket.inet_ntop(socket.AF_INET, fetchdata[1:])
+                ip = socket.inet_ntoa(fetchdata[1:])
                 if ip == '0.0.0.0':
                     return None
                 return ip
@@ -901,8 +901,7 @@ class Command(object):
         rsp = self.xraw_command(netfn=0xc, command=2, data=rqdata)
         if ord(rsp['data'][2]) & 0b11110000 == 0:
             destinfo['address_format'] = 'ipv4'
-            destinfo['address'] = socket.inet_ntop(socket.AF_INET,
-                                                   rsp['data'][4:8])
+            destinfo['address'] = socket.inet_ntoa(rsp['data'][4:8])
         elif ord(rsp['data'][2]) & 0b11110000 == 0b10000:
             destinfo['address_format'] = 'ipv6'
             destinfo['address'] = socket.inet_ntop(socket.AF_INET6,
@@ -1024,7 +1023,7 @@ class Command(object):
         if ip is not None:
             destdata = bytearray((channel, 19, destination))
             try:
-                parsedip = socket.inet_pton(socket.AF_INET, ip)
+                parsedip = socket.inet_aton(ip)
                 destdata.extend((0, 0))
                 destdata.extend(parsedip)
                 destdata.extend(b'\x00\x00\x00\x00\x00\x00')
