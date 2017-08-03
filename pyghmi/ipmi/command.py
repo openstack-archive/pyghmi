@@ -28,7 +28,10 @@ try:
     from pyghmi.ipmi.private import session
 except ImportError:
     session = None
-from pyghmi.ipmi.private import localsession
+try:
+    from pyghmi.ipmi.private import localsession
+except ImportError:
+    localsession = None
 import pyghmi.ipmi.private.util as pygutil
 import pyghmi.ipmi.sdr as sdr
 import socket
