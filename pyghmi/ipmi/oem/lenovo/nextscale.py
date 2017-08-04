@@ -16,8 +16,14 @@
 
 import pyghmi.constants as pygconst
 import pyghmi.exceptions as pygexc
+import pyghmi.ipmi.private.session as ipmisession
 import pyghmi.ipmi.sdr as sdr
+import pyghmi.util.webclient as webclient
 import struct
+import urllib
+import weakref
+from xml.etree.ElementTree import fromstring
+import zipfile
 
 try:
     range = xrange
@@ -224,3 +230,90 @@ def get_sensor_reading(name, ipmicmd, sz):
                                   'type': sensor['type']},
                                  sensor['units'])
     raise Exception('Sensor not found: ' + name)
+
+
+class SMMClient(object):
+    def __init__(self, ipmicmd):
+        self.ipmicmd = weakref.proxy(ipmicmd)
+        self.smm = ipmicmd.bmc
+        self.username = ipmicmd.ipmi_session.userid
+        self.password = ipmicmd.ipmi_session.password
+        self._wc = None
+
+    def get_webclient(self):
+        cv = self.ipmicmd.certverify
+        wc = webclient.SecureHTTPConnection(self.smm, 443, verifycallback=cv)
+        wc.connect()
+        loginform = urllib.urlencode({'user': self.username,
+                                      'password': self.password})
+        wc.request('POST', '/data/login', loginform)
+        rsp = wc.getresponse()
+        if rsp.status != 200:
+            raise Exception(rsp.read())
+        authdata = rsp.read()
+        authdata = fromstring(authdata)
+        for data in authdata.findall('authResult'):
+            if int(data.text) != 0:
+                raise Exception("Firmware update already in progress")
+        self.st1 = None
+        self.st2 = None
+        for data in authdata.findall('st1'):
+            self.st1 = data.text
+        for data in authdata.findall('st2'):
+            self.st2 = data.text
+        wc.set_header('ST2', self.st2)
+        return wc
+
+    def update_firmware(self, filename, data=None, progress=None):
+        if progress is None:
+            progress = lambda x: True
+        if not data and zipfile.is_zipfile(filename):
+            z = zipfile.ZipFile(filename)
+            for tmpname in z.namelist():
+                if tmpname.endswith('.rom'):
+                    filename = tmpname
+                    data = z.open(filename)
+                    break
+        progress({'phase': 'upload', 'progress': 0.0})
+        url = self.wc
+        url = '/fwupload/fwupload.esp?ST1={0}'.format(self.st1)
+        self.wc.upload(url, filename, data, formname='fileUpload',
+                       otherfields={'preConfig': 'on'})
+        progress({'phase': 'validating', 'progress': 0.0})
+        url = '/data'
+        self.wc.request('POST', url, 'get=fwVersion,spfwInfo')
+        rsp = self.wc.getresponse()
+        rsp.read()
+        if rsp.status != 200:
+            raise Exception('Error validating firmware')
+        progress({'phase': 'apply', 'progress': 0.0})
+        self.wc.request('POST', '/data', 'set=fwUpdate:1')
+        rsp = self.wc.getresponse()
+        rsp.read()
+        complete = False
+        while not complete:
+            ipmisession.Session.pause(3)
+            self.wc.request('POST', '/data', 'get=fwProgress,fwUpdate')
+            rsp = self.wc.getresponse()
+            progdata = rsp.read()
+            if rsp.status != 200:
+                raise Exception('Error applying firmware')
+            progdata = fromstring(progdata)
+            percent = float(progdata.findall('fwProgress')[0].text)
+
+            progress({'phase': 'apply',
+                      'progress': percent})
+            complete = percent >= 100.0
+
+    def logout(self):
+        self.wc.request('POST', '/data/logout', None)
+        rsp = self.wc.getresponse()
+        rsp.read()
+        self._wc = None
+
+    @property
+    def wc(self):
+        if not self._wc:
+            self._wc = self.get_webclient()
+        return self._wc
+
