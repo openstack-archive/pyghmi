@@ -1,4 +1,4 @@
-# Copyright 2015 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,15 +39,23 @@ BND = 'TbqbLUSn0QFjx9gxiQLtgBK4Zu6ehLqtLs4JOBS50EgxXJ2yoRMhTrmRXxO1lkoAQdZx16'
 uploadforms = {}
 
 
-def get_upload_form(filename, data):
+def get_upload_form(filename, data, formname, otherfields):
+    if not formname:
+        formname = filename
     try:
         return uploadforms[filename]
     except KeyError:
-        if isinstance(data, file):
+        try:
             data = data.read()
+        except AttributeError:
+            pass
         form = '--' + BND + '\r\nContent-Disposition: form-data; ' \
-                            'name="{0}"; filename="{0}"\r\n'.format(filename)
+                            'name="{0}"; filename="{1}"\r\n'.format(formname,
+                                                                    filename)
         form += 'Content-Type: application/octet-stream\r\n\r\n' + data
+        for ofield in otherfields:
+            form += '\r\n--' + BND + '\r\nContent-Disposition: form-data; ' \
+                'name="{0}"\r\n\r\n{1}'.format(ofield, otherfields[ofield])
         form += '\r\n--' + BND + '--\r\n'
         uploadforms[filename] = form
         return form
@@ -115,7 +123,8 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         rsp.read()
         return {}
 
-    def upload(self, url, filename, data=None):
+    def upload(self, url, filename, data=None, formname=None,
+               otherfields=()):
         """Upload a file to the url
 
         :param url:
@@ -126,7 +135,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         """
         if data is None:
             data = open(filename, 'rb')
-        form = get_upload_form(filename, data)
+        form = get_upload_form(filename, data, formname, otherfields)
         ulheaders = self.stdheaders.copy()
         ulheaders['Content-Type'] = 'multipart/form-data; boundary=' + BND
         self.request('POST', url, form, ulheaders)
