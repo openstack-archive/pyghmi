@@ -154,6 +154,8 @@ class OEMHandler(generic.OEMHandler):
             self.immhandler = imm.XCCClient(ipmicmd)
         elif self.has_imm:
             self.immhandler = imm.IMMClient(ipmicmd)
+        elif self.is_fpc:
+            self.smmhandler = nextscale.SMMClient(ipmicmd)
 
     @property
     def _megarac_eth_index(self):
@@ -831,6 +833,9 @@ class OEMHandler(generic.OEMHandler):
     def update_firmware(self, filename, data=None, progress=None):
         if self.has_xcc:
             return self.immhandler.update_firmware(
+                filename, data=data, progress=progress)
+        if self.is_fpc:
+            return self.smmhandler.update_firmware(
                 filename, data=data, progress=progress)
         super(OEMHandler, self).update_firmware(filename, data=data,
                                                 progress=progress)
