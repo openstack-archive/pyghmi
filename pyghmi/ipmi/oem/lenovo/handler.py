@@ -496,6 +496,9 @@ class OEMHandler(generic.OEMHandler):
             except (AttributeError, KeyError, IndexError):
                 pass
             return fru
+        elif self.is_fpc == 2:  # SMM variant
+            fru['oem_parser'] = 'lenovo'
+            return self.smmhandler.process_fru(fru)
         else:
             fru['oem_parser'] = None
             return fru
