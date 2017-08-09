@@ -240,6 +240,16 @@ class SMMClient(object):
         self.password = ipmicmd.ipmi_session.password
         self._wc = None
 
+    def process_fru(self, fru):
+        # TODO(jjohnson2): can also get EIOM, SMM, and riser data if warranted
+        fru['Serial Number'] = self.ipmicmd.xraw_command(
+            netfn=0x32, command=0xb0, data=(5, 1))['data'][:].strip().replace(
+                '\xff', '')
+        fru['Model'] = self.ipmicmd.xraw_command(
+            netfn=0x32, command=0xb0, data=(5, 0))['data'][:].strip().replace(
+                '\xff', '')
+        return fru
+
     def get_webclient(self):
         cv = self.ipmicmd.certverify
         wc = webclient.SecureHTTPConnection(self.smm, 443, verifycallback=cv)
