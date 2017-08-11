@@ -55,6 +55,8 @@ class IMMClient(object):
     def __init__(self, ipmicmd):
         self.ipmicmd = weakref.proxy(ipmicmd)
         self.imm = ipmicmd.bmc
+        self.adp_referer = 'https://{0}/designs/imm/index-console.php'.format(
+            self.imm)
         self.username = ipmicmd.ipmi_session.userid
         self.password = ipmicmd.ipmi_session.password
         self._wc = None  # The webclient shall be initiated on demand
@@ -203,7 +205,8 @@ class IMMClient(object):
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
         if not adapterdata:
             if self.wc:
-                adapterdata = self.wc.grab_json_response(self.ADP_URL)
+                adapterdata = self.wc.grab_json_response(
+                    self.ADP_URL, referer=self.adp_referer)
                 if adapterdata:
                     self.datacache['lenovo_cached_adapters'] = (
                         adapterdata, util._monotonic_time())
@@ -293,7 +296,8 @@ class IMMClient(object):
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
         if not adapterdata:
             if self.wc:
-                adapterdata = self.wc.grab_json_response(self.ADP_URL)
+                adapterdata = self.wc.grab_json_response(
+                    self.ADP_URL, referer=self.adp_referer)
                 if adapterdata:
                     self.datacache['lenovo_cached_adapters'] = (
                         adapterdata, util._monotonic_time())

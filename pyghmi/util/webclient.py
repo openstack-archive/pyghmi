@@ -112,11 +112,11 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
                     self.cookies[k] = c[k].value
         return rsp
 
-    def grab_json_response(self, url, data=None):
+    def grab_json_response(self, url, data=None, referer=None):
         if data:
-            self.request('POST', url, data)
+            self.request('POST', url, data, referer=referer)
         else:
-            self.request('GET', url)
+            self.request('GET', url, referer=referer)
         rsp = self.getresponse()
         if rsp.status == 200:
             return json.loads(rsp.read())
@@ -152,7 +152,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
                             rsp.read())
         return rsp.read()
 
-    def request(self, method, url, body=None, headers=None):
+    def request(self, method, url, body=None, headers=None, referer=None):
         if headers is None:
             headers = self.stdheaders.copy()
         if method == 'GET' and 'Content-Type' in headers:
@@ -162,5 +162,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
             for ckey in self.cookies:
                 cookies.append('{0}={1}'.format(ckey, self.cookies[ckey]))
             headers['Cookie'] = '; '.join(cookies)
+        if referer:
+            headers['Referer'] = referer
         return super(SecureHTTPConnection, self).request(method, url, body,
                                                          headers)
