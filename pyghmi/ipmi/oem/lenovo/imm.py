@@ -630,3 +630,4 @@ class XCCClient(IMMClient):
                 raise Exception(
                     'Unknown condition waiting for '
                     'firmware update: ' + repr(rsp))
+        return 'pending'

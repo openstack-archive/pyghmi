@@ -314,6 +314,7 @@ class SMMClient(object):
             progress({'phase': 'apply',
                       'progress': percent})
             complete = percent >= 100.0
+        return 'complete'
 
     def logout(self):
         self.wc.request('POST', '/data/logout', None)
