@@ -522,8 +522,9 @@ class XCCClient(IMMClient):
                     raise Exception("Unrecognized return: " + repr(rt))
 
     def update_firmware(self, filename, data=None, progress=None):
+        result = None
         try:
-            self.update_firmware_backend(filename, data, progress)
+            result = self.update_firmware_backend(filename, data, progress)
         except Exception:
             self._refresh_token()
             self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
@@ -531,6 +532,7 @@ class XCCClient(IMMClient):
             self.weblogout()
             raise
         self.weblogout()
+        return result
 
     def _refresh_token(self):
         self.wc.grab_json_response('/api/providers/identity')
