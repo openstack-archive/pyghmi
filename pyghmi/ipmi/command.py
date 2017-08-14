@@ -1779,7 +1779,7 @@ class Command(object):
         self.oem_init()
         if progress is None:
             progress = lambda x: True
-        self._oem.update_firmware(file, data, progress)
+        return self._oem.update_firmware(file, data, progress)
 
     def attach_remote_media(self, url, username=None, password=None):
         """Attach remote media by url

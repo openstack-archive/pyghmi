@@ -840,8 +840,8 @@ class OEMHandler(generic.OEMHandler):
         if self.is_fpc:
             return self.smmhandler.update_firmware(
                 filename, data=data, progress=progress)
-        super(OEMHandler, self).update_firmware(filename, data=data,
-                                                progress=progress)
+        return super(OEMHandler, self).update_firmware(filename, data=data,
+                                                       progress=progress)
 
     def detach_remote_media(self):
         if self.has_imm:
