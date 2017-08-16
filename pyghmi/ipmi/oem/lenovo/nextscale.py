@@ -274,7 +274,7 @@ class SMMClient(object):
         wc.set_header('ST2', self.st2)
         return wc
 
-    def update_firmware(self, filename, data=None, progress=None):
+    def update_firmware(self, filename, data=None, progress=None, bank=None):
         if progress is None:
             progress = lambda x: True
         if not data and zipfile.is_zipfile(filename):

@@ -539,7 +539,8 @@ class XCCClient(IMMClient):
         if '_csrf_token' in self.wc.cookies:
             self.wc.set_header('X-XSRF-TOKEN', self.wc.cookies['_csrf_token'])
 
-    def update_firmware_backend(self, filename, data=None, progress=None):
+    def update_firmware_backend(self, filename, data=None, progress=None,
+                                bank='primary'):
         self.weblogout()
         self._refresh_token()
         rsv = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
@@ -605,8 +606,15 @@ class XCCClient(IMMClient):
         self._refresh_token()
         progress({'phase': 'apply',
                   'progress': 0.0})
-        rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
-            {'UPD_WebStartDefaultAction': 1}))
+        if bank in ('primary', None):
+            rsp = self.wc.grab_json_response(
+                '/api/providers/fwupdate', json.dumps(
+                    {'UPD_WebStartDefaultAction': 1}))
+        elif bank == 'backup':
+            rsp = self.wc.grab_json_response(
+                '/api/providers/fwupdate', json.dumps(
+                    {'UPD_WebStartOptionalAction': 2}))
+
         if rsp['return'] != 0:
             raise Exception('Unexpected result starting update: ' +
                             rsp['return'])
