@@ -198,7 +198,7 @@ class OEMHandler(object):
         """
         return ()
 
-    def update_firmware(self, filename, data=None, progress=None):
+    def update_firmware(self, filename, data=None, progress=None, bank=None):
         raise exc.UnsupportedFunctionality(
             'Firmware update not supported on this platform')
 

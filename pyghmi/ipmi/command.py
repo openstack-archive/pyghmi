@@ -1767,7 +1767,7 @@ class Command(object):
         self.oem_init()
         return self._oem.get_graphical_console()
 
-    def update_firmware(self, file, data=None, progress=None):
+    def update_firmware(self, file, data=None, progress=None, bank=None):
         """Send file to BMC to perform firmware update
 
          :param filename:  The filename to upload to the target BMC
@@ -1775,11 +1775,12 @@ class Command(object):
                        specified filename.
          :param progress:  A callback that will be given a dict describing
                            update process.  Provide if
+         :param bank: Indicate a target 'bank' of firmware if supported
         """
         self.oem_init()
         if progress is None:
             progress = lambda x: True
-        return self._oem.update_firmware(file, data, progress)
+        return self._oem.update_firmware(file, data, progress, bank)
 
     def attach_remote_media(self, url, username=None, password=None):
         """Attach remote media by url
