@@ -251,6 +251,8 @@ class OEMHandler(generic.OEMHandler):
         if self.has_tsm:
             ntpres = self.ipmicmd.xraw_command(netfn=0x32, command=0xa7)
             return ntpres['data'][0] == '\x01'
+        elif self.is_fpc:
+            return self.smmhandler.get_ntp_enabled(self._fpc_variant)
         return None
 
     def get_ntp_servers(self):
@@ -260,6 +262,8 @@ class OEMHandler(generic.OEMHandler):
             srvs.append(ntpres['data'][1:129].rstrip('\x00'))
             srvs.append(ntpres['data'][129:257].rstrip('\x00'))
             return srvs
+        if self.is_fpc:
+            return self.smmhandler.get_ntp_servers()
         return None
 
     def set_ntp_enabled(self, enabled):
@@ -271,6 +275,9 @@ class OEMHandler(generic.OEMHandler):
                 self.ipmicmd.xraw_command(
                     netfn=0x32, command=0xa8, data=(3, 0), timeout=15)
             return True
+        if self.is_fpc:
+            self.smmhandler.set_ntp_enabled(enabled)
+            return True
         return None
 
     def set_ntp_server(self, server, index=0):
@@ -280,6 +287,12 @@ class OEMHandler(generic.OEMHandler):
             cmddata = bytearray((1 + index, ))
             cmddata += server.ljust(128, '\x00')
             self.ipmicmd.xraw_command(netfn=0x32, command=0xa8, data=cmddata)
+            return True
+        elif self.is_fpc:
+            if not 0 <= index <= 2:
+                raise pygexc.InvalidParameterValue(
+                    'SMM supports indexes 0 through 2')
+            self.smmhandler.set_ntp_server(server, index)
             return True
         return None
 
