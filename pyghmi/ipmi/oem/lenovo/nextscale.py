@@ -274,6 +274,48 @@ class SMMClient(object):
         wc.set_header('ST2', self.st2)
         return wc
 
+    def get_ntp_enabled(self, variant):
+        self.wc.request('POST', '/data', 'get=ntpOpMode')
+        rsp = self.wc.getresponse()
+        info = fromstring(rsp.read())
+        self.logout()
+        for data in info.findall('ntpOpMode'):
+            return data.text == '1'
+
+    def set_ntp_enabled(self, enabled):
+        self.wc.request('POST', '/data', 'set=ntpOpMode:{0}'.format(
+            1 if enabled else 0))
+        rsp = self.wc.getresponse()
+        result = rsp.read()
+        self.logout()
+        if not '<status>ok</status>' in result:
+            raise Exception("Unrecognized result: " + result)
+
+    def set_ntp_server(self, server, index):
+        self.wc.request('POST', '/data', 'set=ntpServer{0}:{1}'.format(
+            index + 1, server))
+        rsp = self.wc.getresponse()
+        result = rsp.read()
+        if not '<status>ok</status>' in result:
+            raise Exception("Unrecognized result: " + result)
+        self.logout()
+        return True
+
+    def get_ntp_servers(self):
+        self.wc.request(
+            'POST', '/data', 'get=ntpServer1,ntpServer2,ntpServer3')
+        rsp = self.wc.getresponse()
+        result = fromstring(rsp.read())
+        srvs = []
+        for data in result.findall('ntpServer1'):
+            srvs.append(data.text)
+        for data in result.findall('ntpServer2'):
+            srvs.append(data.text)
+        for data in result.findall('ntpServer3'):
+            srvs.append(data.text)
+        self.logout()
+        return srvs
+
     def update_firmware(self, filename, data=None, progress=None, bank=None):
         if progress is None:
             progress = lambda x: True
@@ -285,7 +327,7 @@ class SMMClient(object):
                     data = z.open(filename)
                     break
         progress({'phase': 'upload', 'progress': 0.0})
-        url = self.wc
+        url = self.wc  # this is just to get self.st1 initted
         url = '/fwupload/fwupload.esp?ST1={0}'.format(self.st1)
         self.wc.upload(url, filename, data, formname='fileUpload',
                        otherfields={'preConfig': 'on'})
