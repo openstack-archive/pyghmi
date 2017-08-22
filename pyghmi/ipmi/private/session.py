@@ -1076,7 +1076,7 @@ class Session(object):
 
         This watches for any activity on IPMI handles and handles registered
         by register_handle_callback.  Callers are satisfied in the order that
-        packets return from nework, not in the order of calling.
+        packets return from network, not in the order of calling.
 
         :param timeout: Maximum time to wait for data to come across.  If
                         unspecified, will autodetect based on earliest timeout
