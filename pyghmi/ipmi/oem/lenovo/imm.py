@@ -502,6 +502,20 @@ class XCCClient(IMMClient):
             'date': '/v2/tdm/build_date'})
         if bdata:
             yield ('LXPM', bdata)
+        bdata = self.fetch_grouped_properties({
+            'build': '/v2/drvwn/build_id',
+            'version': '/v2/drvwn/build_version',
+            'date': '/v2/drvwn/build_date',
+        })
+        if bdata:
+            yield ('LXPM Windows Driver Bundle', bdata)
+        bdata = self.fetch_grouped_properties({
+            'build': '/v2/drvln/build_id',
+            'version': '/v2/drvln/build_version',
+            'date': '/v2/drvln/build_date',
+        })
+        if bdata:
+            yield ('LXPM Linux Driver Bundle', bdata)
         fpga = self.ipmicmd.xraw_command(netfn=0x3a, command=0x6b, data=(0,))
         fpga = '{0}.{1}.{2}'.format(*[ord(x) for x in fpga['data']])
         yield ('FPGA', {'version': fpga})
