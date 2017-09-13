@@ -21,9 +21,19 @@ import pyghmi.ipmi.private.session as ipmisession
 import pyghmi.ipmi.private.util as util
 import pyghmi.util.webclient as webclient
 import random
+import struct
 import threading
 import urllib
 import weakref
+
+
+def fixup_uuid(uuidprop):
+    baduuid = ''.join(uuidprop.split())
+    uuidprefix = (baduuid[:8], baduuid[8:12], baduuid[12:16])
+    a = struct.pack('<IHH', *[int(x, 16) for x in uuidprefix]).encode(
+        'hex')
+    uuid = (a[:8], a[8:12], a[12:16], baduuid[16:20], baduuid[20:])
+    return '-'.join(uuid).upper()
 
 
 class FileUploader(threading.Thread):
@@ -293,6 +303,9 @@ class IMMClient(object):
         if hwmap:
             return hwmap
         hwmap = {}
+        enclosureuuid = self.get_property('/v2/ibmc/smm/chassis/uuid')
+        if enclosureuuid:
+            hwmap['Enclosure'] = {'UUID': fixup_uuid(enclosureuuid)}
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
         if not adapterdata:
             if self.wc:
