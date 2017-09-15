@@ -17,6 +17,7 @@
 from datetime import datetime
 import json
 import os.path
+import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.private.session as ipmisession
 import pyghmi.ipmi.private.util as util
 import pyghmi.util.webclient as webclient
@@ -396,9 +397,13 @@ class IMMClient(object):
             'build': '/v2/bios/pending_build_id'})
         if bdata:
             yield ('UEFI Pending Update', bdata)
-        fpga = self.ipmicmd.xraw_command(netfn=0x3a, command=0x6b, data=(0,))
-        fpga = '{0}.{1}.{2}'.format(*[ord(x) for x in fpga['data']])
-        yield ('FPGA', {'version': fpga})
+        try:
+            fpga = self.ipmicmd.xraw_command(netfn=0x3a, command=0x6b, data=(0,))
+            fpga = '{0}.{1}.{2}'.format(*[ord(x) for x in fpga['data']])
+            yield ('FPGA', {'version': fpga})
+        except pygexc.IpmiException as ie:
+            if ie.ipmicode != 193:
+                raise
         for firm in self.fetch_agentless_firmware():
             yield firm
 
@@ -528,9 +533,13 @@ class XCCClient(IMMClient):
         })
         if bdata:
             yield ('LXPM Linux Driver Bundle', bdata)
-        fpga = self.ipmicmd.xraw_command(netfn=0x3a, command=0x6b, data=(0,))
-        fpga = '{0}.{1}.{2}'.format(*[ord(x) for x in fpga['data']])
-        yield ('FPGA', {'version': fpga})
+        try:
+            fpga = self.ipmicmd.xraw_command(netfn=0x3a, command=0x6b, data=(0,))
+            fpga = '{0}.{1}.{2}'.format(*[ord(x) for x in fpga['data']])
+            yield ('FPGA', {'version': fpga})
+        except pygexc.IpmiException as ie:
+            if ie.ipmicode != 193:
+                raise
         for firm in self.fetch_agentless_firmware():
             yield firm
 
