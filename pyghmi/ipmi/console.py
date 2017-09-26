@@ -33,9 +33,7 @@ class Console(object):
     :param bmc: hostname or ip address of BMC
     :param userid: username to use to connect
     :param password: password to connect to the BMC
-    :param iohandler: Either a function to call with bytes, a filehandle to
-                      use for input and output, or a tuple of (input, output)
-                      handles
+    :param iohandler: a function to call with bytes
     :param kg: optional parameter for BMCs configured to require it
     """
 
