@@ -737,7 +737,8 @@ class SPD(object):
         self.info['manufacture_date'] = decode_spd_date(spd[120], spd[121])
         self.info['serial'] = hex(struct.unpack(
             '>I', struct.pack('4B', *spd[122:126]))[0])[2:].rjust(8, '0')
-        self.info['model'] = struct.pack('18B', *spd[128:146])
+        self.info['model'] = struct.pack('18B', *spd[128:146]).strip(
+            '\x00\xff ')
 
     def _decode_ddr4(self):
         spd = self.rawdata
@@ -762,4 +763,5 @@ class SPD(object):
         self.info['manufacture_date'] = decode_spd_date(spd[323], spd[324])
         self.info['serial'] = hex(struct.unpack(
             '>I', struct.pack('4B', *spd[325:329]))[0])[2:].rjust(8, '0')
-        self.info['model'] = struct.pack('18B', *spd[329:347])
+        self.info['model'] = struct.pack('18B', *spd[329:347]).strip(
+            '\x00\xff ')
