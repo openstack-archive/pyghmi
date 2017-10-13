@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2015-2016 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -355,16 +355,25 @@ class OEMHandler(generic.OEMHandler):
             for name in nextscale.get_sensor_names(self._fpc_variant):
                 yield nextscale.get_sensor_reading(name, self.ipmicmd,
                                                    self._fpc_variant)
+        elif self.has_imm:
+            for name in self.immhandler.get_oem_sensor_names(self.ipmicmd):
+                yield self.immhandler.get_oem_sensor_reading(name,
+                                                             self.ipmicmd)
 
     def get_sensor_descriptions(self):
         if self.is_fpc:
             return nextscale.get_sensor_descriptions(self._fpc_variant)
+        elif self.has_imm:
+            return self.immhandler.get_oem_sensor_descriptions(self.ipmicmd)
         return ()
 
     def get_sensor_reading(self, sensorname):
         if self.is_fpc:
             return nextscale.get_sensor_reading(sensorname, self.ipmicmd,
                                                 self._fpc_variant)
+        elif self.has_imm:
+            return self.immhandler.get_oem_sensor_reading(sensorname,
+                                                          self.ipmicmd)
         return ()
 
     def get_inventory_of_component(self, component):
