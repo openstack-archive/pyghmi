@@ -17,9 +17,12 @@
 from datetime import datetime
 import json
 import os.path
+import pyghmi.constants as pygconst
 import pyghmi.exceptions as pygexc
+import pyghmi.ipmi.oem.lenovo.energy as energy
 import pyghmi.ipmi.private.session as ipmisession
 import pyghmi.ipmi.private.util as util
+import pyghmi.ipmi.sdr as sdr
 import pyghmi.util.webclient as webclient
 import random
 import struct
@@ -70,6 +73,7 @@ class IMMClient(object):
         self.username = ipmicmd.ipmi_session.userid
         self.password = ipmicmd.ipmi_session.password
         self._wc = None  # The webclient shall be initiated on demand
+        self._energymanager = None
         self.datacache = {}
 
     @staticmethod
@@ -289,6 +293,31 @@ class IMMClient(object):
             return hwmap[compname]
         except KeyError:
             return None
+
+    def get_oem_sensor_names(self, ipmicmd):
+        if self._energymanager is None:
+            self._energymanager = energy.EnergyManager(ipmicmd)
+        return self._energymanager.supportedmeters
+
+    def get_oem_sensor_descriptions(self, ipmicmd):
+        return [{'name': x, 'type': 'Power'
+                 } for x in self.get_oem_sensor_names(ipmicmd)]
+
+
+    def get_oem_sensor_reading(self, name, ipmicmd):
+        if self._energymanager is None:
+            self._energymanager = energy.EnergyManager(ipmicmd)
+        if name == 'AC Energy':
+            kwh = self._energymanager.get_ac_energy(ipmicmd)
+        elif name == 'DC Energy':
+            kwh = self._energymanager.get_dc_energy(ipmicmd)
+        else:
+            raise pygexc.UnsupportedFunctionality('No sunch sensor ' + name)
+        return sdr.SensorReading({'name': name, 'imprecision': None,
+                                  'value': kwh, 'states': [],
+                                  'state_ids': [],
+                                  'health': pygconst.Health.Ok,
+                                  'type': 'Power'}, 'kWh')
 
     def weblogout(self):
         if self._wc:
