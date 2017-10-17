@@ -300,7 +300,7 @@ class IMMClient(object):
         return self._energymanager.supportedmeters
 
     def get_oem_sensor_descriptions(self, ipmicmd):
-        return [{'name': x, 'type': 'Power'
+        return [{'name': x, 'type': 'Energy'
                  } for x in self.get_oem_sensor_names(ipmicmd)]
 
     def get_oem_sensor_reading(self, name, ipmicmd):
@@ -316,7 +316,7 @@ class IMMClient(object):
                                   'value': kwh, 'states': [],
                                   'state_ids': [],
                                   'health': pygconst.Health.Ok,
-                                  'type': 'Power'}, 'kWh')
+                                  'type': 'Energy'}, 'kWh')
 
     def weblogout(self):
         if self._wc:
