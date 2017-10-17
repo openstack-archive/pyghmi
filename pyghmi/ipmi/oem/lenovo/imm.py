@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from datetime import datetime
+import errno
 import json
 import os.path
 import pyghmi.constants as pygconst
@@ -25,6 +26,7 @@ import pyghmi.ipmi.private.util as util
 import pyghmi.ipmi.sdr as sdr
 import pyghmi.util.webclient as webclient
 import random
+import socket
 import struct
 import threading
 import urllib
@@ -137,8 +139,10 @@ class IMMClient(object):
         wc = webclient.SecureHTTPConnection(self.imm, 443, verifycallback=cv)
         try:
             wc.connect()
-        except Exception:
-            return None
+        except socket.error as se:
+            if se.errno != errno.ECONNREFUSED:
+                raise
+            return
         adata = urllib.urlencode({'user': self.username,
                                   'password': self.password,
                                   'SessionTimeout': 60
@@ -455,8 +459,10 @@ class XCCClient(IMMClient):
         wc = webclient.SecureHTTPConnection(self.imm, 443, verifycallback=cv)
         try:
             wc.connect()
-        except Exception:
-            return None
+        except socket.error as se:
+            if se.errno != errno.ECONNREFUSED:
+                raise
+            return
         adata = json.dumps({'username': self.username,
                             'password': self.password
                             })
