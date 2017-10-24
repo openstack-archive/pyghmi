@@ -672,9 +672,25 @@ class XCCClient(IMMClient):
         rsp = self.wc.grab_json_response('/api/dataset/imm_firmware_success')
         if len(rsp['items']) != 1:
             raise Exception('Unexpected result: ' + repr(rsp))
-        rsp = self.wc.grab_json_response('/api/dataset/imm_firmware_update')
-        if rsp['items'][0]['upgrades'][0]['id'] != 1:
-            raise Exception('Unexpected answer: ' + repr(rsp))
+        firmtype = rsp['items'][0]['firmware_type']
+        if firmtype not in ('UEFI', 'IMM'):  # adapter firmware
+            rsp = self.wc.grab_json_response(
+                '/api/function/adapter_update?params=pci_GetAdapterListAndFW')
+            if len(rsp['items']) != 1:
+                raise Exception(
+                    'Unsupported adapter update response: ' + repr(rsp))
+            selector = '{0}-{1}'.format(
+                rsp['items'][0]['location'], rsp['items'][0]['slotNo'])
+            rsp = self.wc.grab_json_response('/api/function', json.dumps(
+                {'pci_SetOOBFWSlots': selector}))
+            if rsp['return'] != 0:
+                raise Exception(
+                    'Unexpected result from PCI select: ' + repr(rsp))
+        else:
+            rsp = self.wc.grab_json_response(
+                '/api/dataset/imm_firmware_update')
+            if rsp['items'][0]['upgrades'][0]['id'] != 1:
+                raise Exception('Unexpected answer: ' + repr(rsp))
         self._refresh_token()
         progress({'phase': 'apply',
                   'progress': 0.0})
