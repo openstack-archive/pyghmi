@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2016 Lenovo
+# Copyright 2016-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -672,9 +672,32 @@ class XCCClient(IMMClient):
         rsp = self.wc.grab_json_response('/api/dataset/imm_firmware_success')
         if len(rsp['items']) != 1:
             raise Exception('Unexpected result: ' + repr(rsp))
-        rsp = self.wc.grab_json_response('/api/dataset/imm_firmware_update')
-        if rsp['items'][0]['upgrades'][0]['id'] != 1:
-            raise Exception('Unexpected answer: ' + repr(rsp))
+        firmtype = rsp['items'][0]['firmware_type']
+        if firmtype not in ('UEFI', 'IMM'):  # adapter firmware
+            webid = rsp['items'][0]['webfile_build_id']
+            locations = webid[webid.find('[')+1:webid.find(']')]
+            locations = locations.split(':')
+            if len(locations) > 1:
+                raise Exception("Multiple of the same adapter not supported")
+            validselector = locations[0].replace('#', '-')
+            rsp = self.wc.grab_json_response(
+                '/api/function/adapter_update?params=pci_GetAdapterListAndFW')
+            for adpitem in rsp['items']:
+                selector = '{0}-{1}'.format(adpitem['location'], adpitem['slotNo'])
+                if selector == validselector:
+                    break
+            else:
+                raise Exception('Could not find matching adapter for update')
+            rsp = self.wc.grab_json_response('/api/function', json.dumps(
+                {'pci_SetOOBFWSlots': selector}))
+            if rsp['return'] != 0:
+                raise Exception(
+                    'Unexpected result from PCI select: ' + repr(rsp))
+        else:
+            rsp = self.wc.grab_json_response(
+                '/api/dataset/imm_firmware_update')
+            if rsp['items'][0]['upgrades'][0]['id'] != 1:
+                raise Exception('Unexpected answer: ' + repr(rsp))
         self._refresh_token()
         progress({'phase': 'apply',
                   'progress': 0.0})
