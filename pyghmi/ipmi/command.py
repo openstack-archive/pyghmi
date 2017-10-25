@@ -250,6 +250,18 @@ class Command(object):
                         'persistent': persistent,
                         'uefimode': uefimode}
 
+    def reseat_bay(self, bay):
+        """Request the reseat of a bay
+
+        Request the enclosure manager to reseat the system in a particular
+        bay.
+
+        :param bay: The bay identifier to reseat
+        :return:
+        """
+        self.oem_init()
+        self._oem.reseat_bay(bay)
+
     def set_power(self, powerstate, wait=False):
         """Request power state change (helper)
 

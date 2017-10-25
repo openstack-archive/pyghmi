@@ -240,6 +240,10 @@ class SMMClient(object):
         self.password = ipmicmd.ipmi_session.password
         self._wc = None
 
+    def reseat_bay(self, bay):
+        self.ipmicmd.xraw_command(netfn=0x32, command=0xa4,
+                                  data=[int(bay), 2])
+
     def process_fru(self, fru):
         # TODO(jjohnson2): can also get EIOM, SMM, and riser data if warranted
         fru['Serial Number'] = self.ipmicmd.xraw_command(

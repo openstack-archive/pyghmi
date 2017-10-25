@@ -202,6 +202,10 @@ class OEMHandler(object):
         raise exc.UnsupportedFunctionality(
             'Firmware update not supported on this platform')
 
+    def reseat_bay(self, bay):
+        raise exc.UnsupportedFunctionality(
+            'Bay reseat not supported on this platform')
+
     def get_graphical_console(self):
         """Get graphical console launcher"""
         return ()

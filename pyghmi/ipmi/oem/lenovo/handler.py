@@ -247,6 +247,11 @@ class OEMHandler(generic.OEMHandler):
                 event['component_type_id'] == 13):
             event['component'] += ' {0}'.format(evdata[1] & 0b11111)
 
+    def reseat_bay(self, bay):
+        if self.is_fpc:
+            return self.smmhandler.reseat_bay(bay)
+        return super(OEMHandler, self).reseat_bay(bay)
+
     def get_ntp_enabled(self):
         if self.has_tsm:
             ntpres = self.ipmicmd.xraw_command(netfn=0x32, command=0xa7)
