@@ -673,7 +673,9 @@ class XCCClient(IMMClient):
         if len(rsp['items']) != 1:
             raise Exception('Unexpected result: ' + repr(rsp))
         firmtype = rsp['items'][0]['firmware_type']
-        if firmtype not in ('UEFI', 'IMM'):  # adapter firmware
+        if firmtype not in (
+                'TDM', 'WINDOWS DRIV', 'LINUX DRIVER', 'UEFI', 'IMM'):
+            # adapter firmware
             webid = rsp['items'][0]['webfile_build_id']
             locations = webid[webid.find('[')+1:webid.find(']')]
             locations = locations.split(':')
