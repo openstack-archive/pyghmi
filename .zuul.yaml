@@ -16,8 +16,8 @@
 - job:
     name: tempest-devstack-ironic-pxe_ipmitool-pyghmi-src
     parent: legacy-dsvm-base
-    run: playbooks/legacy/tempest-devstack-ironic-pxe_ipmitool-pyghmi-src/run
-    post-run: playbooks/legacy/tempest-devstack-ironic-pxe_ipmitool-pyghmi-src/post
+    run: playbooks/legacy/tempest-devstack-ironic-pxe_ipmitool-pyghmi-src/run.yaml
+    post-run: playbooks/legacy/tempest-devstack-ironic-pxe_ipmitool-pyghmi-src/post.yaml
     timeout: 10800
     required-projects:
       - openstack-infra/devstack-gate
