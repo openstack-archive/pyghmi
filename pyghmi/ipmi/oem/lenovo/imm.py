@@ -69,6 +69,7 @@ class IMMClient(object):
 
     def __init__(self, ipmicmd):
         self.ipmicmd = weakref.proxy(ipmicmd)
+        self.updating = False
         self.imm = ipmicmd.bmc
         self.adp_referer = 'https://{0}/designs/imm/index-console.php'.format(
             self.imm)
@@ -222,6 +223,9 @@ class IMMClient(object):
     def fetch_agentless_firmware(self):
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
         if not adapterdata:
+            if self.updating:
+                raise pygexc.TemporaryError(
+                    'Cannot read extended inventory during firmware update')
             if self.wc:
                 adapterdata = self.wc.grab_json_response(
                     self.ADP_URL, referer=self.adp_referer)
@@ -340,6 +344,9 @@ class IMMClient(object):
             hwmap['Enclosure'] = {'UUID': fixup_uuid(enclosureuuid)}
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
         if not adapterdata:
+            if self.updating:
+                raise pygexc.TemporaryError(
+                    'Cannot read extended inventory during firmware update')
             if self.wc:
                 adapterdata = self.wc.grab_json_response(
                     self.ADP_URL, referer=self.adp_referer)
@@ -594,15 +601,21 @@ class XCCClient(IMMClient):
 
     def update_firmware(self, filename, data=None, progress=None, bank=None):
         result = None
+        if self.updating:
+            raise pygexc.TemporaryError('Cannot run multiple updates to same '
+                                        'target concurrently')
+        self.updating = True
         try:
             result = self.update_firmware_backend(filename, data, progress,
                                                   bank)
         except Exception:
+            self.updating = False
             self._refresh_token()
             self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
                 {'UPD_WebCancel': 1}))
             self.weblogout()
             raise
+        self.updating = False
         self.weblogout()
         return result
 

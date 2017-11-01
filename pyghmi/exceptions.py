@@ -2,7 +2,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2013 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,6 +33,12 @@ class UnrecognizedCertificate(Exception):
     def __init__(self, text='', certdata=None):
         super(UnrecognizedCertificate, self).__init__(text)
         self.certdata = certdata
+
+
+class TemporaryError(Exception):
+    # A temporary condition that should clear, but warrants reporting to the
+    # caller
+    pass
 
 
 class InvalidParameterValue(PyghmiException):
