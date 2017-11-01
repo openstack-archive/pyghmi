@@ -622,7 +622,7 @@ class XCCClient(IMMClient):
         if rsv['return'] != 0:
             raise Exception('Unexpected return to reservation: ' + repr(rsv))
         xid = random.randint(0, 1000000000)
-        uploadthread = FileUploader(self.wc.dupe(),
+        uploadthread = FileUploader(self.wc,
                                     '/upload?X-Progress-ID={0}'.format(xid),
                                     filename, data)
         uploadthread.start()

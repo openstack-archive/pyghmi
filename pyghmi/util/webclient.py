@@ -75,8 +75,8 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         self.cert_reqs = ssl.CERT_NONE  # verification will be done ssh style..
         if clone:
             self._certverify = clone._certverify
-            self.cookies = clone.cookies.copy()
-            self.stdheaders = clone.stdheaders.copy()
+            self.cookies = clone.cookies
+            self.stdheaders = clone.stdheaders
         else:
             self._certverify = verifycallback
             self.cookies = {}
@@ -113,11 +113,12 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         return rsp
 
     def grab_json_response(self, url, data=None, referer=None):
+        webclient = self.dupe()
         if data:
-            self.request('POST', url, data, referer=referer)
+            webclient.request('POST', url, data, referer=referer)
         else:
-            self.request('GET', url, referer=referer)
-        rsp = self.getresponse()
+            webclient.request('GET', url, referer=referer)
+        rsp = webclient.getresponse()
         if rsp.status == 200:
             return json.loads(rsp.read())
         rsp.read()
@@ -138,8 +139,9 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         form = get_upload_form(filename, data, formname, otherfields)
         ulheaders = self.stdheaders.copy()
         ulheaders['Content-Type'] = 'multipart/form-data; boundary=' + BND
-        self.request('POST', url, form, ulheaders)
-        rsp = self.getresponse()
+        webclient = self.dupe()
+        webclient.request('POST', url, form, ulheaders)
+        rsp = webclient.getresponse()
         # peer updates in progress should already have pointers,
         # subsequent transactions will cause memory to needlessly double,
         # but easiest way to keep memory relatively low
