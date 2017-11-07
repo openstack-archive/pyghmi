@@ -544,6 +544,12 @@ class XCCClient(IMMClient):
         if bdata:
             yield ('{0} Trusted Image'.format(self.bmcname), bdata)
         bdata = self.fetch_grouped_properties({
+            'build': '/v2/ibmc/dm/fw/imm3/primary_pending_build_id',
+            'version': '/v2/ibmc/dm/fw/imm3/primary_pending_build_version',
+            'date': '/v2/ibmc/dm/fw/imm3/primary_pending_build_date'})
+        if bdata:
+            yield ('{0} Pending Update'.format(self.bmcname), bdata)
+        bdata = self.fetch_grouped_properties({
             'build': '/v2/bios/build_id',
             'version': '/v2/bios/build_version',
             'date': '/v2/bios/build_date'})
