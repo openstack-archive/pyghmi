@@ -485,6 +485,231 @@ class XCCClient(IMMClient):
                 wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
             return wc
 
+    @property
+    def _raid_number_map(self):
+        themap = {}
+        rsp = self.wc.grab_json_response(
+            '/api/function/raid_conf?params=raidlink_GetDisksToConf,1')
+        for lvl in rsp['items'][0]['supported_raidlvl']:
+            mapdata = (lvl['rdlvl'], lvl['maxSpan'])
+            raidname = lvl['rdlvlstr'].replace(' ', '').lower()
+            themap[raidname] = mapdata
+            raidname = raidname.replace('raid', 'r')
+            themap[raidname] = mapdata
+            raidname = raidname.replace('r', '')
+            themap[raidname] = mapdata
+        return themap
+
+    def check_storage_configuration(self, cfgspec=None):
+        rsp = self.wc.grab_json_response(
+            '/api/function/raid_conf?params=raidlink_GetStatus')
+        if rsp['items'][0]['status'] != 2:
+            raise pygexc.TemporaryError('Storage configuration unavilable in '
+                                        'current state (try boot to setup or '
+                                        'an OS)')
+        if cfgspec and 'raid' in cfgspec:
+            # making a new array
+            self._parse_storage_cfgspec(cfgspec)
+            return True
+        raise pygexc.InvalidParameterValue('raid is a required value for '
+                                           'validaton')
+
+    def _parse_storage_cfgspec(self, cfgspec):
+        if 'drives' not in cfgspec:
+            raise pygexc.InvalidParameterValue(
+                'drives is a required parameter')
+        controller = None
+        drives = []
+        raidmap = self._raid_number_map
+        if not raidmap:
+            raise pygexc.InvalidParameterValue(
+                'There are no available drives for a new array')
+        requestedlevel = str(cfgspec['raid']).lower()
+        if requestedlevel not in raidmap:
+            raise pygexc.InvalidParameterValue(
+                'Requested RAID {0} not available on this '
+                'system with currently available drives'.format(
+                    requestedlevel))
+        rdinfo = raidmap[str(cfgspec['raid']).lower()]
+        rdlvl = str(rdinfo[0])
+        defspan = 1 if rdinfo[1] == 1 else 2
+        controller = str(
+            self.extract_drivelist(cfgspec, controller, drives))
+        spancount = str(cfgspec.get('spans', defspan))
+        drivesperspan = str(len(drives) // int(spancount))
+        hotspares = []
+        if 'hotspares' in cfgspec:
+            self.extract_drivelist(cfgspec, controller, hotspares)
+        pth = '/api/function/raid_conf?params=raidlink_CheckConfisValid'
+        drvstr = '|'.join(drives)
+        if drvstr:
+            drvstr += '|'
+        hstr = '|'.join(hotspares)
+        if hstr:
+            hstr += '|'
+        url = ','.join(
+            [pth, controller, rdlvl, spancount, drivesperspan, drvstr,
+             hstr])
+        rsp = self.wc.grab_json_response(url)
+        if rsp['items'][0]['errcode'] == 16:
+            raise pygexc.InvalidParameterValue('Incorrect number of disks')
+        elif rsp['items'][0]['errcode'] != 0:
+            raise pygexc.InvalidParameterValue(
+                'Invalid configuration: {0}'.format(
+                    rsp['items'][0]['errcode']))
+        return {
+            'capacity': rsp['items'][0]['freeCapacity'],
+            'controller': controller,
+            'drives': drvstr,
+            'hotspares': hstr,
+            'raidlevel': rdlvl,
+            'spans': spancount,
+            'perspan': drivesperspan,
+        }
+
+    def apply_storage_configuration(self, cfgspec):
+        params = self._parse_storage_cfgspec(cfgspec)
+        url = '/api/function/raid_conf?params=raidlink_GetDefaultVolProp'
+        args = (url, params['controller'], 0, params['drives'])
+        props = self.wc.grab_json_response(','.join([str(x) for x in args]))
+        props = props['items'][0]
+        volumes = cfgspec.get('volumes', [cfgspec])
+        remainingcap = params['capacity']
+        nameappend = 1
+        vols = []
+        for jbod in cfgspec.get('jbods', []):
+            ctl, drive = self._extract_drive_desc(jbod)
+            rsp = self.grab_json_response(
+                '/api/function',
+                {'raidlink_DiskStateAction': '{0},{1}'.format(drive, 16)})
+            if rsp['return'] != 0:
+                raise Exception(
+                    'Unexpected return to set jbod: {0}'.format(
+                        rsp['return']))
+        for hs in cfgspec.get('hotspares', []):
+            ctl, drive = self._extract_drive_desc(hs)
+            rsp = self.grab_json_response(
+                '/api/function',
+                {'raidlink_DiskStateAction': '{0},{1}'.format(drive, 8)})
+            if rsp['return'] != 0:
+                raise Exception(
+                    'Unexpected return to set hotspare: {0}'.format(
+                        rsp['return']))
+        for vol in volumes:
+            if 'name' in vol:
+                name = vol['name']
+            else:
+                name = props['name'] + '_{0}'.format(nameappend)
+                nameappend += 1
+            stripesize = vol.get('stripesize', props['stripsize'])
+
+            strsize = str(vol.get('size', 'remainder')).lower()
+            if strsize in ('all', '100%'):
+                volsize = params['capacity']
+            elif strsize in ('remainder', 'rest'):
+                volsize = remainingcap
+            elif strsize.endswith('%'):
+                volsize = int(params['capacity'] *
+                              float(strsize.replace('%','')) / 100.0)
+            elif strsize.endswith('mb'):
+                volsize = int(strsize.replace('mb', ''))
+            elif strsize.endswitch('gb'):
+                volsize = int(strsize.replace('gb', '')) * 1000
+            elif strsize.endswitch('tb'):
+                volsize = int(strsize.replace('tb', '')) * 1000 * 1000
+            else:
+                raise pygexc.InvalidParameterValue(
+                    'Unrecognized size ' + strsize)
+            remainingcap -= volsize
+            if remainingcap < 0:
+                raise pygexc.InvalidParameterValue(
+                    'Requested sizes exceed available capacity')
+            vols.append('{0};{1};{2};{3};{4};{5};{6};{7};{8};|'.format(
+                name, volsize, stripesize, props['cpwb'], props['cpra'],
+                props['cpio'], props['ap'], props['dcp'], props['initstate']))
+        url = '/api/function'
+        arglist = '{0},{1},{2},{3},{4},{5},'.format(
+            params['controller'], params['raidlevel'], params['spans'],
+            params['perspan'], params['drives'], params['hotspares'])
+        arglist += ''.join(vols)
+        parms = {'raidlink_AddNewVolWithNaAsync': arglist}
+        rsp = self.wc.grab_json_response(url, parms)
+        if rsp['return'] != 0:
+            raise Exception(
+                'Unexpected response to add volume command: ' + repr(rsp))
+        rsp = {'items': [{'status': 0}]}
+        while rsp['items'][0]['status'] == 0:
+            ipmisession.Session.pause(1)
+            rsp = self.wc.grab_json_response(
+                '/api/function/raid_conf?params=raidlink_QueryAsyncStatus')
+
+    def extract_drivelist(self, cfgspec, controller, drives):
+        for drive in cfgspec['drives']:
+            ctl, drive = self._extract_drive_desc(drive)
+            if controller is None:
+                controller = ctl
+            if ctl != controller:
+                raise pygexc.UnsupportedFunctionality(
+                    'Cannot span arrays across controllers')
+            drives.append(drive)
+        return controller
+
+    def _extract_drive_desc(self, drive):
+        _, ctl, drive = drive.split('/')
+        ctl = int(ctl.replace('c', ''))
+        drive = drive.replace('d', '')
+        return ctl, drive
+
+    def get_storage_configuration(self):
+        rsp = self.wc.grab_json_response(
+            '/api/function/raid_alldevices?params=storage_GetAllDevices')
+        standalonedisks = []
+        pools = []
+        diskstates = {
+            'Global Hot Spare': 'hotspare',
+            'Unconfigured Good': 'available',
+        }
+        for item in rsp['items']:
+            for cinfo in item['controllerInfo']:
+                cid = cinfo['id']
+                for pool in cinfo['pools']:
+                    poolinfo = {
+                        'id': pool['id'],
+                        'layout': pool['rdlvlstr'],
+                        'volumes': [],
+                        'disks': [],
+                        'cfgpath': '/c{0}/p{0}'.format(cid, pool['id'])
+                    }
+                    pools.append(poolinfo)
+                    for volume in pool['volumes']:
+                        poolinfo['volumes'].append({
+                            'name': volume['name'],
+                            'size': volume['capacity'],
+                            'status': volume['statusStr'],
+                            'cfgpath': '/c{0}/v{0}'.format(cid, volume['id']),
+                        })
+                    for disk in pool['disks']:
+                        poolinfo['disks'].append({
+                            'name': disk['name'],
+                            'description': disk['type'],
+                            'cfgpath': '/c{0}/d{0}'.format(cid, disk['id']),
+                            'status': disk['RAIDState'],
+                            'fru': disk['fruPartNo'],
+                            'serial': disk['serialNo'],
+                        })
+                for disk in cinfo['unconfiguredDisks']:
+                    # can be unused, global hot spare, or JBOD
+                    standalonedisks.append({'name': disk['name'],
+                                            'description': disk['type'],
+                                            'fru': disk['fruPartNo'],
+                                            'serial': disk['serialNo'],
+                                            'cfgpath': '/c{0}/d{0}'.format(
+                                                cid, disk['id']),
+                                            'state': diskstates.get(
+                                                disk['RAIDState'],
+                                                disk['RAIDState'])})
+        return {'disks': standalonedisks, 'pools': pools}
+
     def attach_remote_media(self, url, user, password):
         proto, host, path = util.urlsplit(url)
         if proto == 'smb':
