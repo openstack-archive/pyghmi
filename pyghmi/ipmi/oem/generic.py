@@ -198,6 +198,18 @@ class OEMHandler(object):
         """
         return ()
 
+    def apply_storage_configuration(self, cfgspec):
+        raise exc.UnsupportedFunctionality(
+            'Remote storage configuration not supported on this platform')
+
+    def check_storage_configuration(self, cfgspec):
+        raise exc.UnsupportedFunctionality(
+            'Remote storage configuration not supported on this platform')
+
+    def get_storage_configuration(self):
+        raise exc.UnsupportedFunctionality(
+            'Remote storage configuration not supported on this platform')
+
     def update_firmware(self, filename, data=None, progress=None, bank=None):
         raise exc.UnsupportedFunctionality(
             'Firmware update not supported on this platform')
