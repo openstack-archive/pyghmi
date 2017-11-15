@@ -165,6 +165,12 @@ class OEMHandler(generic.OEMHandler):
             self._mrethidx = rsp['data'][0]
         return self._mrethidx
 
+    def get_storage_configuration(self):
+        if self.has_xcc:
+            return self.immhandler.get_storage_configuration()
+        return super(OEMHandler, self).get_storage_configuration()
+
+
     def get_video_launchdata(self):
         if self.has_tsm:
             return self.get_tsm_launchdata()

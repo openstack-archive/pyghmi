@@ -485,6 +485,56 @@ class XCCClient(IMMClient):
                 wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
             return wc
 
+    def get_storage_configuration(self):
+        rsp = self.wc.grab_json_response(
+            '/api/function/raid_alldevices?params=storage_GetAllDevices')
+        standalonedisks = []
+        pools = []
+        diskstates = {
+            'Global Hot Spare': 'hotspare',
+            'JBOD': 'direct',
+            'Unconfigured Good': 'free',
+        }
+        for item in rsp['items']:
+            for cinfo in item['controllerInfo']:
+                cid = cinfo['id']
+                for pool in cinfo['pools']:
+                    poolinfo = {
+                        'id': pool['id'],
+                        'layout': pool['rdlvlstr'],
+                        'volumes': [],
+                        'disks': [],
+                        'cfgpath': '/c{0}/p{0}'.format(cid, pool['id'])
+                    }
+                    pools.append(poolinfo)
+                    for volume in pool['volumes']:
+                        poolinfo['volumes'].append({
+                            'name': volume['name'],
+                            'size': volume['capacity'],
+                            'status': volume['statusStr'],
+                            'cfgpath': '/c{0}/v{0}'.format(cid, volume['id']),
+                        })
+                    for disk in pool['disks']:
+                        poolinfo['disks'].append({
+                            'name': disk['name'],
+                            'description': disk['type'],
+                            'cfgpath': '/c{0}/d{0}'.format(cid, disk['id']),
+                            'status': disk['RAIDState'],
+                            'fru': disk['fruPartNo'],
+                            'serial': disk['serialNo'],
+                        })
+                for disk in cinfo['unconfiguredDisks']:
+                    # can be unused, global hot spare, or JBOD
+                    standalonedisks.append({'name': disk['name'],
+                                'description': disk['type'],
+                                'fru': disk['fruPartNo'],
+                                'serial': disk['serialNo'],
+                                'cfgpath': '/c{0}/d{0}'.format(cid,
+                                                               disk['id']),
+                                'state': diskstates.get(disk['RAIDState'],
+                                                        disk['RAIDState'])})
+        return {'disks': standalonedisks, 'pools': pools}
+
     def attach_remote_media(self, url, user, password):
         proto, host, path = util.urlsplit(url)
         if proto == 'smb':
