@@ -755,6 +755,19 @@ class Command(object):
             cmddata = bytearray((channel, 12)) + socket.inet_aton(ipv4_gateway)
             self.xraw_command(netfn=0xc, command=1, data=cmddata)
 
+    def get_storage_configuration(self):
+        """"Get storage configuration data
+
+        Retrieves the storage configuration from the target.  Data is given
+        about disks, pools, and volumes.  When referencing something, use the
+        relevant 'cfgpath' attribute to describe it.  It is not guaranteed that
+        cfgpath will be consistent version to version, so a lookup is suggested
+        in end user applications.
+
+        """
+        self.oem_init()
+        return self._oem.get_storage_configuration()
+
     def get_net_configuration(self, channel=None, gateway_macs=True):
         """Get network configuration data
 
