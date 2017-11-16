@@ -475,7 +475,6 @@ class Session(object):
         # queue of events denoting line to run a cmd
         self.evq = collections.deque([])
         self.bmc = bmc
-        self.broken = False
         # a private queue for packets for which this session handler
         # is destined to receive
         self.pktqueue = collections.deque([])
