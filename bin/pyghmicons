@@ -31,7 +31,7 @@ import threading
 
 tcattr = termios.tcgetattr(sys.stdin)
 newtcattr = tcattr
-#TODO(jbjohnso): add our exit handler
+# TODO(jbjohnso): add our exit handler
 newtcattr[-1][termios.VINTR] = 0
 newtcattr[-1][termios.VSUSP] = 0
 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, newtcattr)

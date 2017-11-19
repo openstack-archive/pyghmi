@@ -322,7 +322,8 @@ class SMMClient(object):
 
     def update_firmware(self, filename, data=None, progress=None, bank=None):
         if progress is None:
-            progress = lambda x: True
+            def progress(x):
+                pass
         if not data and zipfile.is_zipfile(filename):
             z = zipfile.ZipFile(filename)
             for tmpname in z.namelist():
