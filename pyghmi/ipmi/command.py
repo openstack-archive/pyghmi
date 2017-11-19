@@ -755,6 +755,51 @@ class Command(object):
             cmddata = bytearray((channel, 12)) + socket.inet_aton(ipv4_gateway)
             self.xraw_command(netfn=0xc, command=1, data=cmddata)
 
+    def get_storage_configuration(self):
+        """"Get storage configuration data
+
+        Retrieves the storage configuration from the target.  Data is given
+        about disks, pools, and volumes.  When referencing something, use the
+        relevant 'cfgpath' attribute to describe it.  It is not guaranteed that
+        cfgpath will be consistent version to version, so a lookup is suggested
+        in end user applications.
+
+        :return: A pyghmi.storage.ConfigSpec object describing current config
+        """
+        self.oem_init()
+        return self._oem.get_storage_configuration()
+
+    def remove_storage_configuration(self, cfgspec):
+        """Remove specified storage configuration from controller.
+
+        :param cfgspec: A pyghmi.storage.ConfigSpec describing what to remove
+        :return:
+        """
+        self.oem_init()
+        return self._oem.remove_storage_configuration(cfgspec)
+
+    def apply_storage_configuration(self, cfgspec=None):
+        """Evaluate a configuration for validity
+
+        This will check if configuration is currently available and, if given,
+        whether the specified cfgspec can be applied.
+        :param cfgspec: A pyghmi.storage.ConfigSpec describing desired oonfig
+        :return:
+        """
+        self.oem_init()
+        return self._oem.apply_storage_configuration(cfgspec)
+
+    def check_storage_configuration(self, cfgspec=None):
+        """Evaluate a configuration for validity
+
+        This will check if configuration is currently available and, if given,
+        whether the specified cfgspec can be applied.
+        :param cfgspec: A pyghmi.storage.ConfigSpec describing desired oonfig
+        :return:
+        """
+        self.oem_init()
+        return self._oem.check_storage_configuration(cfgspec)
+
     def get_net_configuration(self, channel=None, gateway_macs=True):
         """Get network configuration data
 
