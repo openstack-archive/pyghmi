@@ -114,6 +114,8 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
 
     def grab_json_response(self, url, data=None, referer=None):
         webclient = self.dupe()
+        if isinstance(data, dict):
+            data = json.dumps(data)
         if data:
             webclient.request('POST', url, data, referer=referer)
         else:

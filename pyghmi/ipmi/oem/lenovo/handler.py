@@ -165,6 +165,31 @@ class OEMHandler(generic.OEMHandler):
             self._mrethidx = rsp['data'][0]
         return self._mrethidx
 
+    def remove_storage_configuration(self, cfgspec):
+        if self.has_xcc:
+            return self.immhandler.remove_storage_configuration(cfgspec)
+        return super(OEMHandler, self).remove_storage_configuration()
+
+    def clear_storage_arrays(self):
+        if self.has_xcc:
+            return self.immhandler.clear_storage_arrays()
+        return super(OEMHandler, self).clear_storage_ararys()
+
+    def apply_storage_configuration(self, cfgspec):
+        if self.has_xcc:
+            return self.immhandler.apply_storage_configuration(cfgspec)
+        return super(OEMHandler, self).apply_storage_configuration()
+
+    def check_storage_configuration(self, cfgspec):
+        if self.has_xcc:
+            return self.immhandler.check_storage_configuration(cfgspec)
+        return super(OEMHandler, self).get_storage_configuration()
+
+    def get_storage_configuration(self):
+        if self.has_xcc:
+            return self.immhandler.get_storage_configuration()
+        return super(OEMHandler, self).get_storage_configuration()
+
     def get_video_launchdata(self):
         if self.has_tsm:
             return self.get_tsm_launchdata()
