@@ -14,10 +14,10 @@
 # limitations under the License.
 __author__ = 'jjohnson2@lenovo.com'
 
-#this is a quick sample of how to write something that acts like a bmc
-#to play:
+# this is a quick sample of how to write something that acts like a bmc
+# to play:
 # run fakebmc
-## ipmitool -I lanplus -U admin -P password -H 127.0.0.1 power status
+# # ipmitool -I lanplus -U admin -P password -H 127.0.0.1 power status
 # Chassis Power is off
 # # ipmitool -I lanplus -U admin -P password -H 127.0.0.1 power on
 # Chassis Power Control: Up/On
