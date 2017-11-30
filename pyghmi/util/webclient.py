@@ -94,7 +94,10 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         # in this space
         plainsock = socket.socket(addrinfo[0])
         plainsock.settimeout(60)
-        plainsock.setsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG, 1456)
+        try:
+            plainsock.setsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG, 1456)
+        except socket.error:
+            pass
         plainsock.connect(addrinfo[4])
         self.sock = ssl.wrap_socket(plainsock, cert_reqs=self.cert_reqs)
         # txtcert = self.sock.getpeercert()  # currently not possible
