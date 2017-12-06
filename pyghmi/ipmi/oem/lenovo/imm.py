@@ -24,6 +24,7 @@ import pyghmi.ipmi.oem.lenovo.energy as energy
 import pyghmi.ipmi.private.session as ipmisession
 import pyghmi.ipmi.private.util as util
 import pyghmi.ipmi.sdr as sdr
+import pyghmi.media as media
 import pyghmi.storage as storage
 import pyghmi.util.webclient as webclient
 import random
@@ -890,6 +891,56 @@ class XCCClient(IMMClient):
                     json.dumps({'Slot': slot}))
                 if 'return' not in rt or rt['return'] != 0:
                     raise Exception("Unrecognized return: " + repr(rt))
+        rdocs = self.wc.grab_json_response('/api/providers/rp_rdoc_imagelist')
+        for rdoc in rdocs['items']:
+            filename = rdoc['filename']
+            rt = self.wc.grab_json_response('/api/providers/rp_rdoc_unmount',
+                                            {'ImageName': filename})
+            if rt.get('return', 1) != 0:
+                raise Exception("Unrecognized return: " + repr(rt))
+
+    def list_media(self):
+        rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_getdisk')
+        if 'items' in rt:
+            for mt in rt['items']:
+                yield media.Media(mt['filename'], mt['remotepath'])
+        rt = self.wc.grab_json_response('/api/providers/rp_rdoc_imagelist')
+        if 'items' in rt:
+            for mt in rt['items']:
+                yield media.Media(mt['filename'])
+
+    def upload_media(self, filename, progress=None):
+        xid = random.randint(0, 1000000000)
+        uploadthread = FileUploader(self.wc,
+                                    '/upload?X-Progress-ID={0}'.format(xid),
+                                    filename, None)
+        uploadthread.start()
+        while uploadthread.isAlive():
+            uploadthread.join(3)
+            rsp = self.wc.grab_json_response(
+                '/upload/progress?X-Progress-ID={0}'.format(xid))
+            if progress and rsp['state'] == 'uploading':
+                progress({'phase': 'upload',
+                          'progress': 100.0 * rsp['received'] / rsp['size']})
+            self._refresh_token()
+        rsp = json.loads(uploadthread.rsp)
+        if progress:
+            progress({'phase': 'complete'})
+        thepath = rsp['items'][0]['path']
+        thename = rsp['items'][0]['name']
+        writeable = 1 if filename.lower().endswith('.img') else 0
+        addfile = {"Url": thepath, "Protocol": 6, "Write": writeable,
+                   "Credential": ":", "Option": "", "Domain": "",
+                   "WebUploadName": thename}
+        rsp = self.wc.grab_json_response('/api/providers/rp_rdoc_addfile',
+                                         addfile)
+        if rsp['return'] != 0:
+            raise Exception('Unrecognized return: ' + repr(rsp))
+        rsp = self.wc.grab_json_response('/api/providers/rp_rdoc_mountall',
+                                         {})
+        if rsp['return'] != 0:
+            raise Exception('Unrecognized return: ' + repr(rsp))
+        self.weblogout()
 
     def update_firmware(self, filename, data=None, progress=None, bank=None):
         result = None
