@@ -1860,8 +1860,30 @@ class Command(object):
         :param password: Password for endpoint to use when accessing the URL.
         """
         self.oem_init()
-        self._oem.attach_remote_media(url, username, password)
+        return self._oem.attach_remote_media(url, username, password)
 
     def detach_remote_media(self):
         self.oem_init()
-        self._oem.detach_remote_media()
+        return self._oem.detach_remote_media()
+
+    def upload_media(self, filename, progress=None):
+        """Upload a file to be hosted on the target BMC
+
+        This will upload the specified data to
+        the BMC so that it will make it available to the system as an emulated
+        USB device.
+
+        :param filename: The filename to use, the basename of the parameter
+                         will be given to the bmc.
+        :param filename: Optional callback for progress updates
+        """
+        self.oem_init()
+        return self._oem.upload_media(filename, progress)
+
+    def list_media(self):
+        """List attached remote media
+
+        :returns: An iterable list of attached media
+        """
+        self.oem_init()
+        return self._oem.list_media()

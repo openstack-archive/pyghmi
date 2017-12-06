@@ -903,3 +903,13 @@ class OEMHandler(generic.OEMHandler):
             self.ipmicmd.xraw_command(
                 netfn=0x32, command=0x9f, data=(8, 10, 0, 0))
             self.ipmicmd.xraw_command(netfn=0x32, command=0x9f, data=(8, 11))
+
+    def upload_media(self, filename, progress):
+        if self.has_xcc:
+            return self.immhandler.upload_media(filename, progress)
+        return super(OEMHandler, self).upload_media(filename, progress)
+
+    def list_media(self):
+        if self.has_xcc:
+            return self.immhandler.list_media(filename)
+        return super(OEMHandler, self).list_media(filename)
