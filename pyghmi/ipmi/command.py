@@ -1865,3 +1865,16 @@ class Command(object):
     def detach_remote_media(self):
         self.oem_init()
         self._oem.detach_remote_media()
+
+    def upload_media(self, filename):
+        """Upload a file to be hosted on the target BMC
+
+        This will upload the specified data to
+        the BMC so that it will make it available to the system as an emulated
+        USB device.
+
+        :param filename: The filename to use, the basename of the parameter
+                         will be given to the bmc.
+        """
+        self.oem_init()
+        self._oem.upload_media(filename)
