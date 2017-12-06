@@ -245,6 +245,9 @@ class OEMHandler(object):
     def attach_remote_media(self, imagename, username, password):
         raise exc.UnsupportedFunctionality()
 
+    def upload_media(self, filename, progress):
+        raise exc.UnsupportedFunctionality()
+
     def set_identify(self, on, duration):
         """Provide an OEM override for set_identify
 
