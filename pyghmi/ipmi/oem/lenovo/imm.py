@@ -890,6 +890,31 @@ class XCCClient(IMMClient):
                     json.dumps({'Slot': slot}))
                 if 'return' not in rt or rt['return'] != 0:
                     raise Exception("Unrecognized return: " + repr(rt))
+        rt = self.wc.grab_json_response('/api/providers/rp_rdoc_mountall')
+
+    def upload_media(self, filename):
+        uploadthread = FileUploader(self.wc, '/upload', filename, None)
+        uploadthread.start()
+        uploadstate = None
+        while uploadthread.isAlive():
+            uploadthread.join(3)
+            self._refresh_token()
+        rsp = json.loads(uploadthread.rsp)
+        thepath = rsp['items'][0]['path']
+        thename = rsp['items'][0]['file']
+        writeable = 1 if filename.lower().endswith('.img') else 0
+        addfile = {"Url": thepath, "Protocol": 6, "Write": writeable,
+                   "Credential": ":", "Option": "", "Domain": "",
+                   "WebUploadName": thename}
+        rsp = self.wc.grab_json_response('/api/providers/rp_rdoc_addfile',
+                                         addfile)
+        if rsp['return'] != 0:
+            raise Exception('Unrecognized return: ' + repr(rsp))
+        rsp = self.wc.grab_json_response('/api/providers/rp_rdoc_mountall',
+                                         {})
+        if rsp['return'] != 0:
+            raise Exception('Unrecognized return: ' + repr(rsp))
+        self.weblogout()
 
     def update_firmware(self, filename, data=None, progress=None, bank=None):
         result = None
