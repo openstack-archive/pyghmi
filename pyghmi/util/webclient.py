@@ -168,7 +168,11 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
             cookies = []
             for ckey in self.cookies:
                 cookies.append('{0}={1}'.format(ckey, self.cookies[ckey]))
-            headers['Cookie'] = '; '.join(cookies)
+            cookies_header = '; '.join(cookies)
+            if headers['Cookie'] is None:
+                headers['Cookie'] = cookies_header
+            else:
+                headers['Cookie'] += '; ' + '; '.join(cookies)
         if referer:
             headers['Referer'] = referer
         return super(SecureHTTPConnection, self).request(method, url, body,
