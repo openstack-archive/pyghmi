@@ -56,6 +56,7 @@ class Console(object):
         self.awaitingack = False
         self.activated = False
         self.force_session = force
+        self.port = port
         self.ipmi_session = session.Session(bmc=bmc,
                                             userid=userid,
                                             password=password,
@@ -126,7 +127,10 @@ class Console(object):
         # BMC tells us this is the maximum allowed size
         # data[6:7] is the promise of how small packets are going to be, but we
         # don't have any reason to worry about it
-        if (data[8] + (data[9] << 8)) not in (623, 28418):
+        # some BMCs disagree on the endianness, so do both
+        valid_ports = (self.port, struct.unpack(
+            '<H', struct.pack('>H', self.port))[0])
+        if (data[8] + (data[9] << 8)) not in valid_ports:
             # TODO(jbjohnso): support atypical SOL port number
             raise NotImplementedError("Non-standard SOL Port Number")
         # ignore data[10:11] for now, the vlan detail, shouldn't matter to this
