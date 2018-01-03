@@ -18,6 +18,7 @@ import pyghmi.ipmi.command as ipmicommand
 import pyghmi.ipmi.console as console
 import pyghmi.ipmi.private.serversession as serversession
 import pyghmi.ipmi.private.session as ipmisession
+import struct
 import traceback
 
 __author__ = 'jjohnson2@lenovo.com'
@@ -65,8 +66,9 @@ class Bmc(serversession.IpmiServer):
             session.send_ipmi_response(code=0x80)
         else:
             self.activated = True
+            solport = list(struct.unpack('BB', struct.pack('!H', self.port)))
             session.send_ipmi_response(
-                data=[0, 0, 0, 0, 1, 0, 1, 0, 2, 0x6f, 0xff, 0xff])
+                data=[0, 0, 0, 0, 1, 0, 1, 0] + solport + [0xff, 0xff])
             self.sol = console.ServerConsole(session, self.iohandler)
 
     def deactivate_payload(self, request, session):
