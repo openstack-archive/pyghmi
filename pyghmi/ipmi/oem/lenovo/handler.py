@@ -330,11 +330,11 @@ class OEMHandler(generic.OEMHandler):
     def is_fpc(self):
         """True if the target is a Lenovo nextscale fan power controller
         """
-        fpc_id = (19046, 32, 1063)
+        fpc_ids = ((19046, 32, 1063), (20301, 32, 462))
         smm_id = (19046, 32, 1180)
         currid = (self.oemid['manufacturer_id'], self.oemid['device_id'],
                   self.oemid['product_id'])
-        if currid == fpc_id:
+        if currid in fpc_ids:
             self._fpc_variant = 6
         elif currid == smm_id:
             self._fpc_variant = 2
