@@ -169,7 +169,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
             for ckey in self.cookies:
                 cookies.append('{0}={1}'.format(ckey, self.cookies[ckey]))
             cookies_header = '; '.join(cookies)
-            if headers['Cookie'] is None:
+            if headers.get('Cookie', None) is None:
                 headers['Cookie'] = cookies_header
             else:
                 headers['Cookie'] += '; ' + '; '.join(cookies)
