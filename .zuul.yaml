@@ -12,19 +12,3 @@
             irrelevant-files:
               - ^(test-|)requirements.txt$
               - ^setup.cfg$
-
-- job:
-    name: tempest-devstack-ironic-pxe_ipmitool-pyghmi-src
-    parent: legacy-dsvm-base
-    run: playbooks/legacy/tempest-devstack-ironic-pxe_ipmitool-pyghmi-src/run.yaml
-    post-run: playbooks/legacy/tempest-devstack-ironic-pxe_ipmitool-pyghmi-src/post.yaml
-    timeout: 10800
-    required-projects:
-      - openstack-infra/devstack-gate
-      - openstack/ironic
-      - openstack/ironic-lib
-      - openstack/ironic-python-agent
-      - openstack/pyghmi
-      - openstack/python-ironicclient
-      - openstack/tempest
-      - openstack/virtualbmc
