@@ -1211,13 +1211,8 @@ class Session(object):
         """Performs a keepalive to avoid idle disconnect
         """
         try:
-            if not self._customkeepalives:
-                if self.incommand:
-                    # if currently in command, no cause to keepalive
-                    return
-                self.raw_command(netfn=6, command=1,
-                                 callback=self._keepalive_wrapper(None))
-            else:
+            keptalive = False
+            if self._customkeepalives:
                 kaids = list(self._customkeepalives.keys())
                 for keepalive in kaids:
                     try:
@@ -1229,8 +1224,18 @@ class Session(object):
                         # raw command ultimately caused a keepalive to
                         # deregister
                         continue
+                    if callable(cmd):
+                        cmd()
+                        continue
+                    keptalive = True
                     cmd['callback'] = self._keepalive_wrapper(callback)
                     self.raw_command(**cmd)
+            if not keptalive:
+                if self.incommand:
+                    # if currently in command, no cause to keepalive
+                    return
+                self.raw_command(netfn=6, command=1,
+                                 callback=self._keepalive_wrapper(None))
         except exc.IpmiException:
             self._mark_broken()
 
