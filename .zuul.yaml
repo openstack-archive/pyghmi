@@ -1,20 +1,19 @@
 - project:
-    name: openstack/pyghmi
     check:
       jobs:
-        - tempest-devstack-ironic-pxe_ipmitool-pyghmi-src:
+        - pyghmi-tempest-devstack-ironic-pxe_ipmitool-src:
             irrelevant-files:
               - ^(test-|)requirements.txt$
               - ^setup.cfg$
     gate:
       jobs:
-        - tempest-devstack-ironic-pxe_ipmitool-pyghmi-src:
+        - pyghmi-tempest-devstack-ironic-pxe_ipmitool-src:
             irrelevant-files:
               - ^(test-|)requirements.txt$
               - ^setup.cfg$
 
 - job:
-    name: tempest-devstack-ironic-pxe_ipmitool-pyghmi-src
+    name: pyghmi-tempest-devstack-ironic-pxe_ipmitool-src
     parent: legacy-dsvm-base
     run: playbooks/legacy/tempest-devstack-ironic-pxe_ipmitool-pyghmi-src/run.yaml
     post-run: playbooks/legacy/tempest-devstack-ironic-pxe_ipmitool-pyghmi-src/post.yaml
