@@ -1,0 +1,10 @@
+Code-Review+1: Dmitry Tantsur <divius.inside@gmail.com>
+Code-Review+1: Jim Rollenhagen <jim@jimrollenhagen.com>
+Code-Review+2: Jarrod Johnson <jjohnson2@lenovo.com>
+Workflow+1: Jarrod Johnson <jjohnson2@lenovo.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Mon, 22 Jan 2018 19:43:02 +0000
+Reviewed-on: https://review.openstack.org/536401
+Project: openstack/pyghmi
+Branch: refs/heads/master
