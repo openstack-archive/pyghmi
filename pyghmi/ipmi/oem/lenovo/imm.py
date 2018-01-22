@@ -80,6 +80,8 @@ class IMMClient(object):
         self._wc = None  # The webclient shall be initiated on demand
         self._energymanager = None
         self.datacache = {}
+        self.webkeepalive = None
+        self._keepalivesession = None
 
     @staticmethod
     def _parse_builddate(strval):
@@ -798,7 +800,14 @@ class XCCClient(IMMClient):
                                         '{}')
         if 'return' not in rt or rt['return'] != 0:
             raise Exception('Unhandled return: ' + repr(rt))
-        self.weblogout()
+        if not self.webkeepalive:
+            self._keepalivesession = self._wc
+            self.webkeepalive = self.ipmicmd.ipmi_session.register_keepalive(
+                self.keepalive, None)
+        self._wc = None
+
+    def keepalive(self):
+        self._refresh_token_wc(self._keepalivesession)
 
     def get_firmware_inventory(self, bmcver):
         # First we fetch the system firmware found in imm properties
@@ -881,6 +890,9 @@ class XCCClient(IMMClient):
             yield firm
 
     def detach_remote_media(self):
+        if self.webkeepalive:
+            self.ipmicmd.ipmi_session.unregister_keepalive(self.webkeepalive)
+            self._keepalivesession = None
         rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_getdisk')
         if 'items' in rt:
             slots = []
@@ -966,9 +978,12 @@ class XCCClient(IMMClient):
         return result
 
     def _refresh_token(self):
-        self.wc.grab_json_response('/api/providers/identity')
-        if '_csrf_token' in self.wc.cookies:
-            self.wc.set_header('X-XSRF-TOKEN', self.wc.cookies['_csrf_token'])
+        self._refresh_token(self.wc)
+
+    def _refresh_token_wc(self, wc):
+        wc.grab_json_response('/api/providers/identity')
+        if '_csrf_token' in wc.cookies:
+            wc.set_header('X-XSRF-TOKEN', self.wc.cookies['_csrf_token'])
 
     def update_firmware_backend(self, filename, data=None, progress=None,
                                 bank=None):
