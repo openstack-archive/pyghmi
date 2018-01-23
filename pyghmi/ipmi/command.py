@@ -555,7 +555,7 @@ class Command(object):
         yield "System"
         if self._sdr is None:
             self._sdr = sdr.SDR(self)
-        for fruid in self._sdr.fru:
+        for fruid in sorted(self._sdr.fru):
             yield self._sdr.fru[fruid].fru_name
         self.oem_init()
         for compname in self._oem.get_oem_inventory_descriptions():
@@ -616,7 +616,7 @@ class Command(object):
         yield ("System", self._get_zero_fru())
         if self._sdr is None:
             self._sdr = sdr.SDR(self)
-        for fruid in self._sdr.fru:
+        for fruid in sorted(self._sdr.fru):
             fruinf = fru.FRU(
                 ipmicmd=self, fruid=fruid, sdr=self._sdr.fru[fruid]).info
             if fruinf is not None:
