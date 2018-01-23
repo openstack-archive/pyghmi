@@ -978,7 +978,7 @@ class XCCClient(IMMClient):
         return result
 
     def _refresh_token(self):
-        self._refresh_token(self.wc)
+        self._refresh_token_wc(self.wc)
 
     def _refresh_token_wc(self, wc):
         wc.grab_json_response('/api/providers/identity')
