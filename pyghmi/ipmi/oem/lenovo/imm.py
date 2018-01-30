@@ -795,10 +795,16 @@ class XCCClient(IMMClient):
         rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_connect',
                                         json.dumps(rq))
         if 'return' not in rt or rt['return'] != 0:
+            if rt['return'] in (657, 659, 656):
+                raise pygexc.InvalidParameterValue(
+                    'Given location was unreachable by the XCC')
             raise Exception('Unhandled return: ' + repr(rt))
         rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_mountall',
                                         '{}')
         if 'return' not in rt or rt['return'] != 0:
+            if rt['return'] in (657, 659, 656):
+                raise pygexc.InvalidParameterValue(
+                    'Given location was unreachable by the XCC')
             raise Exception('Unhandled return: ' + repr(rt))
         if not self.webkeepalive:
             self._keepalivesession = self._wc
