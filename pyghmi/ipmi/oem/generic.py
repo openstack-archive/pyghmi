@@ -273,3 +273,18 @@ class OEMHandler(object):
         :returns True if standard parameter set should be suppressed
         """
         return False
+
+    def get_system_configuration(self):
+        """Retrieve system configuration
+
+        This returns a dictionary of settings names to dictionaries including
+        'current', 'default' and 'possible' values as well as 'help'
+        """
+        return {}
+
+    def set_system_configuration(self, changeset):
+        """Apply a changeset to system configuration
+
+        Takes a key value pair and applies it against the system configuration
+        """
+        raise exc.UnsupportedFunctionality()
