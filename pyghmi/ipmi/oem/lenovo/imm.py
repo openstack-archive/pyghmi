@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from datetime import datetime
+import config
 import errno
 import json
 import os.path
@@ -82,6 +83,9 @@ class IMMClient(object):
         self.datacache = {}
         self.webkeepalive = None
         self._keepalivesession = None
+        self.fwc = None
+        self.fwo = None
+        self.fwovintage = None
 
     @staticmethod
     def _parse_builddate(strval):
@@ -123,6 +127,53 @@ class IMMClient(object):
         if propstr is None:
             return None
         return cls._parse_builddate(propstr)
+
+    def get_system_configuration(self):
+        if not self.fwc:
+            self.fwc = config.LenovoFirmwareConfig(self.ipmicmd)
+        self.fwo = self.fwc.get_fw_options()
+        self.fwovintage = util._monotonic_time()
+        retcfg = {}
+        for opt in self.fwo:
+            if self.fwo[opt]['lenovo_protect']:
+                # Do not enumerate hidden settings
+                continue
+            retcfg[opt] = {}
+            retcfg[opt]['current'] = self.fwo[opt]['current']
+            retcfg[opt]['default'] = self.fwo[opt]['default']
+            retcfg[opt]['help'] = self.fwo[opt]['help']
+            retcfg[opt]['possible'] = self.fwo[opt]['possible']
+        return retcfg
+
+    def set_system_configuration(self, changeset):
+        if not self.fwc:
+            self.fwc = config.LenovoFirmwareConfig(self.ipmicmd)
+        if not self.fwo or util._monotonic_time() - self.fwovintage > 30:
+            self.fwo = self.fwc.get_fw_options()
+        for key in list(changeset):
+            if key not in self.fwo:
+                for rkey in self.fwo:
+                    if rkey.lower() == key:
+                        changeset[rkey] = changeset[key]
+                        del changeset[key]
+                        break
+                else:
+                    raise pygexc.InvalidParameterValue(
+                        '{0} not a known setting'.format(key))
+        for key in changeset:
+            if (isinstance(changeset[key], str) or
+                    isinstance(changeset[key], unicode)):
+                changeset[key] = {'value': changeset[key]}
+            newvalue = changeset[key]['value']
+            if (self.fwo[key]['possible'] and
+                    newvalue not in self.fwo[key]['possible']):
+                for candidate in self.fwo[key]['possible']:
+                    if newvalue.lower().startswith(candidate.lower()):
+                        newvalue = candidate
+                        break
+            self.fwo[key]['new_value'] = newvalue
+        if changeset:
+            self.fwc.set_fw_options(self.fwo)
 
     def get_property(self, propname):
         propname = propname.encode('utf-8')

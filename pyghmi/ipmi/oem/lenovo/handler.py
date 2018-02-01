@@ -896,6 +896,16 @@ class OEMHandler(generic.OEMHandler):
                                                        progress=progress,
                                                        bank=bank)
 
+    def get_system_configuration(self):
+        if self.has_imm or self.has_xcc:
+            return self.immhandler.get_system_configuration()
+        return super(OEMHandler, self).get_system_configuration()
+
+    def set_system_configuration(self, changeset):
+        if self.has_imm or self.has_xcc:
+            return self.immhandler.set_system_configuration(changeset)
+        return super(OEMHandler, self).set_system_configuration(changeset)
+
     def detach_remote_media(self):
         if self.has_imm:
             self.immhandler.detach_remote_media()
