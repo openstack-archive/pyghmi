@@ -715,6 +715,14 @@ class Command(object):
         else:
             raise Exception("Unrecognized data format " + repr(fetchdata))
 
+    def get_system_configuration(self):
+        self.oem_init()
+        return self._oem.get_system_configuration()
+
+    def set_system_configuration(self, changeset):
+        self.oem_init()
+        return self._oem.set_system_configuration(changeset)
+
     def set_net_configuration(self, ipv4_address=None, ipv4_configuration=None,
                               ipv4_gateway=None, channel=None):
         """Set network configuration data.
