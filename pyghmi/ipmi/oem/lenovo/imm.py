@@ -139,7 +139,7 @@ class IMMClient(object):
                 # Do not enumerate hidden settings
                 continue
             retcfg[opt] = {}
-            retcfg[opt]['current'] = self.fwo[opt]['current']
+            retcfg[opt]['value'] = self.fwo[opt]['current']
             retcfg[opt]['default'] = self.fwo[opt]['default']
             retcfg[opt]['help'] = self.fwo[opt]['help']
             retcfg[opt]['possible'] = self.fwo[opt]['possible']
@@ -150,6 +150,7 @@ class IMMClient(object):
             self.fwc = config.LenovoFirmwareConfig(self.ipmicmd)
         if not self.fwo or util._monotonic_time() - self.fwovintage > 30:
             self.fwo = self.fwc.get_fw_options()
+            self.fwovintage = util._monotonic_time()
         for key in list(changeset):
             if key not in self.fwo:
                 for rkey in self.fwo:

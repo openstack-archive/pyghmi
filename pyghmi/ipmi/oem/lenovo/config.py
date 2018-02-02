@@ -55,10 +55,10 @@ class LenovoFirmwareConfig(object):
         for i in range(len(filename)):
             data += [ord(filename[i])]
 
-        response = self.connection.raw_command(netfn=IMM_NETFN,
-                                               command=IMM_COMMAND, data=data)
+        response = self.connection.xraw_command(netfn=IMM_NETFN,
+                                                command=IMM_COMMAND, data=data)
 
-        size = ''.join(chr(c) for c in response['data'][3:7])
+        size = response['data'][3:7]
 
         size = struct.unpack("i", size)
         return size[0]
@@ -84,9 +84,9 @@ class LenovoFirmwareConfig(object):
 
         while retries:
             retries = retries-1
-            response = self.connection.raw_command(netfn=IMM_NETFN,
-                                                   command=IMM_COMMAND,
-                                                   data=data)
+            response = self.connection.xraw_command(netfn=IMM_NETFN,
+                                                    command=IMM_COMMAND,
+                                                    data=data)
             try:
                 if response['code'] == 0 or retries == 0:
                     break
@@ -94,7 +94,7 @@ class LenovoFirmwareConfig(object):
                 pass
 
             self.connection.ipmi_session.pause(5)
-        filehandle = ''.join(chr(byte) for byte in response['data'][3:7])
+        filehandle = response['data'][3:7]
         filehandle = struct.unpack("<I", filehandle)[0]
         return filehandle
 
@@ -108,8 +108,8 @@ class LenovoFirmwareConfig(object):
         for byte in hex_filehandle[:4]:
             data += [ord(byte)]
 
-        self.connection.raw_command(netfn=IMM_NETFN,
-                                    command=IMM_COMMAND, data=data)
+        self.connection.xraw_command(netfn=IMM_NETFN,
+                                     command=IMM_COMMAND, data=data)
 
     def imm_write(self, filehandle, size, inputdata):
         blocksize = 0xc8
@@ -135,13 +135,13 @@ class LenovoFirmwareConfig(object):
                 data += [ord(byte)]
             remaining -= blocksize
             offset += blocksize
-            self.connection.raw_command(netfn=IMM_NETFN, command=IMM_COMMAND,
-                                        data=data)
+            self.connection.xraw_command(netfn=IMM_NETFN, command=IMM_COMMAND,
+                                         data=data)
 
     def imm_read(self, filehandle, size):
         blocksize = 0xc8
         offset = 0
-        output = []
+        output = ''
         remaining = size
 
         hex_filehandle = struct.pack("<I", filehandle)
@@ -163,13 +163,12 @@ class LenovoFirmwareConfig(object):
             remaining -= blocksize
             offset += blocksize
 
-            response = self.connection.raw_command(netfn=IMM_NETFN,
-                                                   command=IMM_COMMAND,
-                                                   data=data)
-
+            response = self.connection.xraw_command(netfn=IMM_NETFN,
+                                                    command=IMM_COMMAND,
+                                                    data=data)
             output += response['data'][5:]
 
-        return ''.join(chr(c) for c in output)
+        return output
 
     def factory_reset(self):
         options = self.get_fw_options()
