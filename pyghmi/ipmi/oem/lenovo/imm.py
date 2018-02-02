@@ -139,7 +139,7 @@ class IMMClient(object):
                 # Do not enumerate hidden settings
                 continue
             retcfg[opt] = {}
-            retcfg[opt]['current'] = self.fwo[opt]['current']
+            retcfg[opt]['value'] = self.fwo[opt]['current']
             retcfg[opt]['default'] = self.fwo[opt]['default']
             retcfg[opt]['help'] = self.fwo[opt]['help']
             retcfg[opt]['possible'] = self.fwo[opt]['possible']
