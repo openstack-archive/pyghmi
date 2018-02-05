@@ -19,9 +19,11 @@
 # This contains functions to manage the firmware configuration of Lenovo
 # servers
 
+import ast
 import EfiDecompressor
 import struct
 import random
+import pyghmi.exceptions as pygexc
 try:
     from lxml import etree
     import EfiCompressor
@@ -39,6 +41,69 @@ READ_COMMAND = [0x02]
 WRITE_COMMAND = [0x03]
 CLOSE_COMMAND = [0x05]
 SIZE_COMMAND = [0x06]
+
+
+def _convert_syntax(raw):
+    return raw.replace('!', 'not').replace('||', 'or').replace('&&', 'and')
+
+
+class _ExpEngine(object):
+    def __init__(self, cfg, setting):
+        self.cfg = cfg
+        self.setting = setting
+        self.relatedsettings = set([])
+
+    def lookup(self, category, setting):
+        for optkey in self.cfg:
+            opt = self.cfg[optkey]
+            if (opt['lenovo_id'] == category and
+                    opt['lenovo_setting'] == setting):
+                self.relatedsettings.add(optkey)
+                return opt['lenovo_value']
+        raise Exception('Cannot find {0}.{1}'.format(category, setting))
+
+    def process(self, parsed):
+        if isinstance(parsed, ast.UnaryOp) and isinstance(parsed.op, ast.Not):
+            return not self.process(parsed.operand)
+        if isinstance(parsed, ast.Compare):
+            if isinstance(parsed.ops[0], ast.NotEq):
+                return self.process(parsed.left) != self.process(
+                    parsed.comparators[0])
+            elif isinstance(parsed.ops[0], ast.Eq):
+                return self.process(parsed.left) == self.process(
+                    parsed.comparators[0])
+        if isinstance(parsed, ast.Num):
+            return parsed.n
+        if isinstance(parsed, ast.Attribute):
+            category = parsed.value.id
+            setting = parsed.attr
+            return self.lookup(category, setting)
+        if isinstance(parsed, ast.Name):
+            if parsed.id == 'true':
+                return True
+            elif parsed.id == 'false':
+                return False
+            else:
+                category = self.setting['lenovo_id']
+                setting = parsed.id
+                return self.lookup(category, setting)
+        if isinstance(parsed, ast.BoolOp):
+            if isinstance(parsed.op, ast.Or):
+                return self.process(parsed.values[0]) or self.process(
+                    parsed.values[1])
+            elif isinstance(parsed.op, ast.And):
+                return self.process(parsed.values[0]) and self.process(
+                    parsed.values[1])
+
+
+def _eval_conditional(expression, cfg, setting):
+    if not expression:
+        return False, ()
+    parsed = ast.parse(expression)
+    parsed = parsed.body[0].value
+    evaluator = _ExpEngine(cfg, setting)
+    result = evaluator.process(parsed)
+    return result, evaluator.relatedsettings
 
 
 class LenovoFirmwareConfig(object):
@@ -193,7 +258,6 @@ class LenovoFirmwareConfig(object):
             self.connection.ipmi_session.pause(2)
 
         xml = etree.fromstring(data)
-
         for config in xml.iter("config"):
             lenovo_id = config.get("ID")
             for group in config.iter("group"):
@@ -203,6 +267,12 @@ class LenovoFirmwareConfig(object):
                     lenovo_setting = setting.get("ID")
                     protect = True if setting.get("protected") == 'true' \
                         else False
+                    hide = setting.get('suppress-if')
+                    if hide:
+                        hide = _convert_syntax(hide)
+                    readonly = setting.get('gray-if')
+                    if readonly:
+                        readonly = _convert_syntax(readonly)
                     possible = []
                     current = None
                     default = None
@@ -213,7 +283,7 @@ class LenovoFirmwareConfig(object):
                     if setting.find("list_data") is not None:
                         is_list = True
                         current = []
-
+                    lenovo_value = None
                     for choice in setting.iter("choice"):
                         label = choice.find("label").text
                         possible.append(label)
@@ -223,6 +293,11 @@ class LenovoFirmwareConfig(object):
                                 current.append(label)
                             else:
                                 current = label
+                                try:
+                                    lenovo_value = int(
+                                        choice.find('value').text)
+                                except ValueError:
+                                    lenovo_value = choice.find('value').text
                         if choice.get("default") == "true":
                             default = label
                         if choice.get("reset-required") == "true":
@@ -235,12 +310,21 @@ class LenovoFirmwareConfig(object):
                                                new_value=None,
                                                help=help,
                                                is_list=is_list,
+                                               lenovo_value=lenovo_value,
                                                lenovo_id=lenovo_id,
                                                lenovo_group=lenovo_group,
                                                lenovo_setting=lenovo_setting,
                                                lenovo_reboot=reset,
                                                lenovo_protect=protect,
+                                               readonly_expression=readonly,
+                                               hide_expression=hide,
                                                lenovo_instance="")
+        for opt in options:
+            opt = options[opt]
+            opt['hidden'], opt['hidden_why'] = _eval_conditional(
+                opt['hide_expression'], options, opt)
+            opt['readonly'], opt['readonly_why'] = _eval_conditional(
+                opt['readonly_expression'], options, opt)
 
         return options
 
@@ -261,6 +345,13 @@ class LenovoFirmwareConfig(object):
                 continue
             if options[option]['pending'] == options[option]['new_value']:
                 continue
+            if options[option]['readonly']:
+                errstr = '{0} is read only'.format(option)
+                if options[option]['readonly_why']:
+                    ea = ' due to one of the following settings: {0}'.format(
+                        ','.join(sorted(options[option]['readonly_why'])))
+                    errstr += ea
+                raise pygexc.InvalidParameterValue(errstr)
             if (isinstance(options[option]['new_value'], str) or
                     isinstance(options[option]['new_value'], unicode)):
                 # Coerce a simple string parameter to the expected list format
