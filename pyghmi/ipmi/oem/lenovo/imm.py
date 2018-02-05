@@ -135,7 +135,7 @@ class IMMClient(object):
         self.fwovintage = util._monotonic_time()
         retcfg = {}
         for opt in self.fwo:
-            if self.fwo[opt]['lenovo_protect']:
+            if self.fwo[opt]['lenovo_protect'] or self.fwo[opt]['hidden']:
                 # Do not enumerate hidden settings
                 continue
             retcfg[opt] = {}
@@ -154,7 +154,7 @@ class IMMClient(object):
         for key in list(changeset):
             if key not in self.fwo:
                 for rkey in self.fwo:
-                    if rkey.lower() == key:
+                    if rkey.lower() == key.lower():
                         changeset[rkey] = changeset[key]
                         del changeset[key]
                         break
@@ -168,10 +168,21 @@ class IMMClient(object):
             newvalue = changeset[key]['value']
             if (self.fwo[key]['possible'] and
                     newvalue not in self.fwo[key]['possible']):
+                candlist = []
                 for candidate in self.fwo[key]['possible']:
                     if newvalue.lower().startswith(candidate.lower()):
                         newvalue = candidate
                         break
+                    if candidate.lower().startswith(newvalue.lower()):
+                        candlist.append(candidate)
+                else:
+                    if len(candlist) == 1:
+                        newvalue = candlist[0]
+                    else:
+                        raise pygexc.InvalidParameterValue(
+                            '{0} is not a valid value for {1} ({2})'.format(
+                                newvalue, key,
+                                ','.join(self.fwo[key]['possible'])))
             self.fwo[key]['new_value'] = newvalue
         if changeset:
             self.fwc.set_fw_options(self.fwo)
