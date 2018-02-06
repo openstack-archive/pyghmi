@@ -44,7 +44,8 @@ SIZE_COMMAND = [0x06]
 
 
 def _convert_syntax(raw):
-    return raw.replace('!', 'not').replace('||', 'or').replace('&&', 'and')
+    return raw.replace('!', 'not').replace('||', 'or').replace(
+        '&&', 'and').replace('-', '_')
 
 
 class _ExpEngine(object):
@@ -56,11 +57,12 @@ class _ExpEngine(object):
     def lookup(self, category, setting):
         for optkey in self.cfg:
             opt = self.cfg[optkey]
-            if (opt['lenovo_id'] == category and
+            lid = opt['lenovo_id'].replace('-', '_')
+            if (lid == category and
                     opt['lenovo_setting'] == setting):
                 self.relatedsettings.add(optkey)
                 return opt['lenovo_value']
-        raise Exception('Cannot find {0}.{1}'.format(category, setting))
+        return None
 
     def process(self, parsed):
         if isinstance(parsed, ast.UnaryOp) and isinstance(parsed.op, ast.Not):
