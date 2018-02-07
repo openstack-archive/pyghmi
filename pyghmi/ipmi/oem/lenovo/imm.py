@@ -143,6 +143,7 @@ class IMMClient(object):
             retcfg[opt]['default'] = self.fwo[opt]['default']
             retcfg[opt]['help'] = self.fwo[opt]['help']
             retcfg[opt]['possible'] = self.fwo[opt]['possible']
+            retcfg[opt]['sortid'] = self.fwo[opt]['sortid']
         return retcfg
 
     def set_system_configuration(self, changeset):

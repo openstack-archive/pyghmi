@@ -260,6 +260,7 @@ class LenovoFirmwareConfig(object):
             self.connection.ipmi_session.pause(2)
 
         xml = etree.fromstring(data)
+        sortid = 0
         for config in xml.iter("config"):
             lenovo_id = config.get("ID")
             for group in config.iter("group"):
@@ -320,7 +321,9 @@ class LenovoFirmwareConfig(object):
                                                lenovo_protect=protect,
                                                readonly_expression=readonly,
                                                hide_expression=hide,
+                                               sortid=sortid,
                                                lenovo_instance="")
+                    sortid = sortid + 1
         for opt in options:
             opt = options[opt]
             opt['hidden'], opt['hidden_why'] = _eval_conditional(
