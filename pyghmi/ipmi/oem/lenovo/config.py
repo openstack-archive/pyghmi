@@ -24,6 +24,9 @@ import EfiDecompressor
 import struct
 import random
 import pyghmi.exceptions as pygexc
+
+from pyghmi.ipmi.oem.lenovo import EfiDecompressor
+
 try:
     from lxml import etree
     import EfiCompressor

@@ -15,12 +15,12 @@
 # limitations under the License.
 
 from datetime import datetime
-import config
 import errno
 import json
 import os.path
 import pyghmi.constants as pygconst
 import pyghmi.exceptions as pygexc
+import pyghmi.ipmi.oem.lenovo.config as config
 import pyghmi.ipmi.oem.lenovo.energy as energy
 import pyghmi.ipmi.private.session as ipmisession
 import pyghmi.ipmi.private.util as util
