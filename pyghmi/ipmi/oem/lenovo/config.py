@@ -20,7 +20,6 @@
 # servers
 
 import ast
-import EfiDecompressor
 import struct
 import random
 import pyghmi.exceptions as pygexc
