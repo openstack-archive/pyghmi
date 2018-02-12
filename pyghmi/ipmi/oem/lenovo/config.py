@@ -251,7 +251,7 @@ class LenovoFirmwareConfig(object):
     def get_fw_options(self):
         options = {}
         data = None
-        for i in range(0, 15):
+        for i in range(0, 30):
             filehandle = self.imm_open("config.efi")
             size = self.imm_size("config.efi")
             data = self.imm_read(filehandle, size)
