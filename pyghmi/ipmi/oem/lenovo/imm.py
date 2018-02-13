@@ -1014,7 +1014,8 @@ class XCCClient(IMMClient):
             self._refresh_token()
         rsp = json.loads(uploadthread.rsp)
         if progress:
-            progress({'phase': 'complete'})
+            progress({'phase': 'upload',
+                      'progress': 100.0})
         thepath = rsp['items'][0]['path']
         thename = rsp['items'][0]['name']
         writeable = 1 if filename.lower().endswith('.img') else 0
@@ -1029,6 +1030,8 @@ class XCCClient(IMMClient):
                                          {})
         if rsp['return'] != 0:
             raise Exception('Unrecognized return: ' + repr(rsp))
+        if progress:
+            progress({'phase': 'complete'})
         self.weblogout()
 
     def update_firmware(self, filename, data=None, progress=None, bank=None):
