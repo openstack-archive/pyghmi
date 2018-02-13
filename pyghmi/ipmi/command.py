@@ -1790,14 +1790,14 @@ class Command(object):
         self.set_user_password(uid, mode)
         return True
 
-    def get_firmware(self):
+    def get_firmware(self, components=()):
         """Retrieve OEM Firmware information
         """
         self.oem_init()
         mcinfo = self.xraw_command(netfn=6, command=1)
         bmcver = '{0}.{1}'.format(
             ord(mcinfo['data'][2]), hex(ord(mcinfo['data'][3]))[2:])
-        return self._oem.get_oem_firmware(bmcver)
+        return self._oem.get_oem_firmware(bmcver, components)
 
     def get_capping_enabled(self):
         """Get PSU based power capping status

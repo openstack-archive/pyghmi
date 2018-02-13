@@ -595,13 +595,13 @@ class OEMHandler(generic.OEMHandler):
         self._hasimm = (rdata[1] & 1 == 1) or (rdata[1] & 16 == 16)
         return self._hasimm
 
-    def get_oem_firmware(self, bmcver):
+    def get_oem_firmware(self, bmcver, components):
         if self.has_tsm:
             command = firmware.get_categories()["firmware"]
             rsp = self.ipmicmd.xraw_command(**command["command"])
             return command["parser"](rsp["data"])
         elif self.has_imm:
-            return self.immhandler.get_firmware_inventory(bmcver)
+            return self.immhandler.get_firmware_inventory(bmcver, components)
         elif self.is_fpc:
             return nextscale.get_fpc_firmware(bmcver, self.ipmicmd,
                                               self._fpc_variant)

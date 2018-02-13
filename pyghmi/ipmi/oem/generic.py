@@ -159,12 +159,18 @@ class OEMHandler(object):
         fru['oem_parser'] = None
         return fru
 
-    def get_oem_firmware(self, bmcver):
+    def get_oem_firmware(self, bmcver, components):
         """Get Firmware information.
         """
         # Here the bmc version is passed into the OEM handler, to allow
         # the handler to enrich the data. For the generic case, just
         # provide the generic BMC version, which is all that is possible
+        # Additionally, components may be provided for an advisory guide
+        # on interesting firmware.  The OEM library is permitted to return
+        # more than requested, and it is the responsibility of the calling
+        # code to know whether it cares or not.  The main purpose of the
+        # components argument is to indicate when certain performance
+        # optimizations can be performed.
         yield ('BMC Version', {'version': bmcver})
 
     def get_oem_capping_enabled(self):
