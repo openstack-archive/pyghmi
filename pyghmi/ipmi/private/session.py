@@ -291,6 +291,7 @@ class Session(object):
     """
     bmc_handlers = {}
     waiting_sessions = {}
+    initting_sessions = {}
     keepalive_sessions = {}
     peeraddr_to_nodes = {}
     iterwaiters = []
@@ -440,8 +441,15 @@ class Session(object):
                     forbidsock.append(self.socket)
             if trueself:
                 return trueself
+            i = cls.initting_sessions.get(
+                (bmc, userid, password, port, kg), False)
+            if i:
+                i.initialized = True
+                i.logging = True
+                return i
             self = object.__new__(cls)
             self.forbidsock = forbidsock
+            cls.initting_sessions[(bmc, userid, password, port, kg)] = self
             return self
 
     def __init__(self,
@@ -1709,6 +1717,11 @@ class Session(object):
                         Session.bmc_handlers[sockaddr] = {}
                     Session.bmc_handlers[sockaddr][myport] = self
                     _io_sendto(self.socket, self.netpacket, sockaddr)
+                try:
+                    del Session.initting_sessions[(self.bmc, self.userid,
+                                                   self.password, self.kgo)]
+                except KeyError:
+                    pass
             except socket.gaierror:
                 raise exc.IpmiException(
                     "Unable to transmit to specified address")
