@@ -1,1 +1,1 @@
-pycrypto>=2.6
+cryptography>=1.9,!=2.0  # BSD/Apache-2.0
