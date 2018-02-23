@@ -867,7 +867,9 @@ class XCCClient(IMMClient):
             rq['Protocol'] = 7
             rq['Url'] = url
         else:
-            raise Exception('TODO')
+            raise pygexc.UnsupportedFunctionality(
+                '{0} scheme is not supported on this system or '
+                'invalid url format')
         rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_connect',
                                         json.dumps(rq))
         if 'return' not in rt or rt['return'] != 0:
