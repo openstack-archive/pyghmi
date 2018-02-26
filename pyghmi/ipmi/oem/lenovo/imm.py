@@ -413,7 +413,11 @@ class IMMClient(object):
         hwmap = {}
         enclosureuuid = self.get_property('/v2/ibmc/smm/chassis/uuid')
         if enclosureuuid:
-            hwmap['Enclosure'] = {'UUID': fixup_uuid(enclosureuuid)}
+            bay = self.get_property('/v2/cmm/sp/7')
+            hwmap['Enclosure'] = {
+                'UUID': fixup_uuid(enclosureuuid),
+                'bay': bay,
+            }
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
         if not adapterdata:
             if self.updating:
