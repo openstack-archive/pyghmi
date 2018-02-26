@@ -1046,6 +1046,10 @@ class XCCClient(IMMClient):
                                          addfile)
         if rsp['return'] != 0:
             raise Exception('Unrecognized return: ' + repr(rsp))
+        rsp = self.wc.grab_json_response('/api/providers/rp_rdoc_getfiles')
+        if 'items' not in rsp or len(rsp['items']) == 0:
+            raise Exception(
+                'Image upload was not accepted, it may be too large')
         rsp = self.wc.grab_json_response('/api/providers/rp_rdoc_mountall',
                                          {})
         if rsp['return'] != 0:
