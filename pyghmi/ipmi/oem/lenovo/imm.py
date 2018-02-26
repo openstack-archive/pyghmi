@@ -1011,7 +1011,14 @@ class XCCClient(IMMClient):
         rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_getdisk')
         if 'items' in rt:
             for mt in rt['items']:
-                yield media.Media(mt['filename'], mt['remotepath'])
+                url = mt['remotepath']
+                if url.startswith('//'):
+                    url = 'smb:' + url
+                elif (not url.startswith('http://') and
+                      not url.startswith('https://')):
+                    url = url.replace(':', '')
+                    url = 'nfs://' + url
+                yield media.Media(mt['filename'], url)
         rt = self.wc.grab_json_response('/api/providers/rp_rdoc_imagelist')
         if 'items' in rt:
             for mt in rt['items']:
