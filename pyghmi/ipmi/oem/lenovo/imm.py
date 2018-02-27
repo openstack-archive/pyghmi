@@ -872,8 +872,8 @@ class XCCClient(IMMClient):
             rq['Url'] = url
         else:
             raise pygexc.UnsupportedFunctionality(
-                '{0} scheme is not supported on this system or '
-                'invalid url format')
+                '"{0}" scheme is not supported on this system or '
+                'invalid url format'.format(proto))
         rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_connect',
                                         json.dumps(rq))
         if 'return' not in rt or rt['return'] != 0:
