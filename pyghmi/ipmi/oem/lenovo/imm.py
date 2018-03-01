@@ -545,6 +545,10 @@ class XCCClient(IMMClient):
     PORTS = 'network_pPorts'
     DEVNO = 'generic_devNo'
 
+    def __init__(self, ipmicmd):
+        super(XCCClient, self).__init__(ipmicmd)
+        self.adp_referer = None
+
     def get_webclient(self):
         cv = self.ipmicmd.certverify
         wc = webclient.SecureHTTPConnection(self.imm, 443, verifycallback=cv)
