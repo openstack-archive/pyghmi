@@ -167,24 +167,35 @@ class IMMClient(object):
                     isinstance(changeset[key], unicode)):
                 changeset[key] = {'value': changeset[key]}
             newvalue = changeset[key]['value']
-            if (self.fwo[key]['possible'] and
-                    newvalue not in self.fwo[key]['possible']):
-                candlist = []
-                for candidate in self.fwo[key]['possible']:
-                    if newvalue.lower().startswith(candidate.lower()):
-                        newvalue = candidate
-                        break
-                    if candidate.lower().startswith(newvalue.lower()):
-                        candlist.append(candidate)
-                else:
-                    if len(candlist) == 1:
-                        newvalue = candlist[0]
+            if self.fwo[key]['is_list'] and not isinstance(newvalue, list):
+                newvalues = newvalue.split(',')
+            else:
+                newvalues = [newvalue]
+            newnewvalues = []
+            for newvalue in newvalues:
+                if (self.fwo[key]['possible'] and
+                        newvalue not in self.fwo[key]['possible']):
+                    candlist = []
+                    for candidate in self.fwo[key]['possible']:
+                        if newvalue.lower().startswith(candidate.lower()):
+                            newvalue = candidate
+                            break
+                        if candidate.lower().startswith(newvalue.lower()):
+                            candlist.append(candidate)
                     else:
-                        raise pygexc.InvalidParameterValue(
-                            '{0} is not a valid value for {1} ({2})'.format(
-                                newvalue, key,
-                                ','.join(self.fwo[key]['possible'])))
-            self.fwo[key]['new_value'] = newvalue
+                        if len(candlist) == 1:
+                            newvalue = candlist[0]
+                        else:
+                            raise pygexc.InvalidParameterValue(
+                                '{0} is not a valid value for {1} '
+                                '({2})'.format(
+                                    newvalue, key,
+                                    ','.join(self.fwo[key]['possible'])))
+                newnewvalues.append(newvalue)
+            if len(newnewvalues) == 1:
+                self.fwo[key]['new_value'] = newnewvalues[0]
+            else:
+                self.fwo[key]['new_value'] = newnewvalues
         if changeset:
             try:
                 self.fwc.set_fw_options(self.fwo)
