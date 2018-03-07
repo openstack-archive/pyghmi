@@ -50,6 +50,7 @@ boot_devices = {
     'net': 4,
     'network': 4,
     'pxe': 4,
+    'disk': 8,
     'hd': 8,
     'safe': 0xc,
     'cd': 0x14,
