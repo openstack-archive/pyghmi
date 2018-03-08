@@ -285,6 +285,16 @@ class LenovoFirmwareConfig(object):
                     name = setting.find("mriName").text
                     help = setting.find("desc").text
 
+                    textdata = setting.find('text_data')
+                    if textdata is not None:
+                        if textdata.get('maxinstance') is not None:
+                            protect = True # Not yet supported
+                        else:
+                            instance = textdata.find('instance')
+                            if instance is None:
+                                protect = True  # not supported yet
+                            else:
+                                current = instance.text
                     if setting.find("list_data") is not None:
                         is_list = True
                         current = []
