@@ -284,10 +284,13 @@ class LenovoFirmwareConfig(object):
                     reset = False
                     name = setting.find("mriName").text
                     help = setting.find("desc").text
-
-                    if setting.find("list_data") is not None:
+                    ldata = setting.find("list_data")
+                    extraorder = False
+                    currentdict = {}
+                    if ldata is not None:
                         is_list = True
                         current = []
+                        extraorder = ldata.get('ordered') == 'true'
                     lenovo_value = None
                     for choice in setting.iter("choice"):
                         label = choice.find("label").text
@@ -295,7 +298,11 @@ class LenovoFirmwareConfig(object):
                         instance = choice.find("instance")
                         if instance is not None:
                             if is_list:
-                                current.append(label)
+                                if not extraorder:
+                                    current.append(label)
+                                else:
+                                    currentdict[
+                                        int(instance.get("order"))] = label
                             else:
                                 current = label
                                 try:
@@ -307,6 +314,9 @@ class LenovoFirmwareConfig(object):
                             default = label
                         if choice.get("reset-required") == "true":
                             reset = True
+                    if len(currentdict) > 0:
+                        for order in sorted(currentdict):
+                            current.append(currentdict[order])
                     optionname = "%s.%s" % (lenovo_id, name)
                     options[optionname] = dict(current=current,
                                                default=default,
