@@ -265,6 +265,9 @@ class LenovoFirmwareConfig(object):
         sortid = 0
         for config in xml.iter("config"):
             lenovo_id = config.get("ID")
+            if lenovo_id == 'iSCSI':
+                # Do not support iSCSI at this time
+                continue
             for group in config.iter("group"):
                 lenovo_group = group.get("ID")
                 for setting in group.iter("setting"):
