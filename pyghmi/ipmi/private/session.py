@@ -1570,6 +1570,15 @@ class Session(object):
         # For now, skip the checksums since we are in LAN only,
         # TODO(jbjohnso): if implementing other channels, add checksum checks
         # here
+        if len(payload) < 7:
+            # This cannot possibly be a valid IPMI packet.  Note this is after
+            # the integrity checks, so this must be a buggy BMC packet
+            # One example was a BMC that if receiving an SOL deactivate
+            # from another party would emit what looks to be an attempt
+            # at SOL deactivation payload, but with the wrong payload type
+            # since we can't do anything remotely sane with such a packet,
+            # drop it and carry about our business.
+            return
         if self.servermode:
             self.seqlun = payload[4]
             self.clientaddr = payload[3]
