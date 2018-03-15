@@ -43,6 +43,9 @@ def fixup_uuid(uuidprop):
     uuid = (a[:8], a[8:12], a[12:16], baduuid[16:20], baduuid[20:])
     return '-'.join(uuid).upper()
 
+def fixup_str(propstr):
+    return ''.join([chr(int(c, 16)) for c in propstr.split()])
+
 
 class FileUploader(threading.Thread):
 
@@ -425,9 +428,13 @@ class IMMClient(object):
         enclosureuuid = self.get_property('/v2/ibmc/smm/chassis/uuid')
         if enclosureuuid:
             bay = self.get_property('/v2/cmm/sp/7')
+            serial = self.get_property('/v2/ibmc/smm/chassis/sn')
+            model = self.get_property('/v2/ibmc/smm/chassis/mtm')
             hwmap['Enclosure'] = {
                 'UUID': fixup_uuid(enclosureuuid),
                 'Bay': bay,
+                'Model': fixup_str(model),
+                'Serial': fixup_str(serial),
             }
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
         if not adapterdata:
