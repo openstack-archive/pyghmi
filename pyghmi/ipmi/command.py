@@ -1142,13 +1142,21 @@ class Command(object):
 
         :returns: The identifier as a string
         """
-        return self._chunkwise_dcmi_fetch(9)
+        self.oem_init()
+        try:
+            return self._oem.get_hostname()
+        except exc.UnsupportedFunctionality:
+            return self._chunkwise_dcmi_fetch(9)
 
     def set_mci(self, mci):
         """Set the management controller identifier, per DCMI specification
 
         """
-        return self._chunkwise_dcmi_set(0xa, mci + b'\x00')
+        self.oem_init()
+        try:
+            return self._oem.set_hostname(mci)
+        except exc.UnsupportedFunctionality:
+            return self._chunkwise_dcmi_set(0xa, mci + b'\x00')
 
     def get_asset_tag(self):
         """Get the system asset tag, per DCMI specification
