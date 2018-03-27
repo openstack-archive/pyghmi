@@ -1137,12 +1137,43 @@ class Command(object):
         if not ip == '0.0.0.0':
             self._assure_alert_policy(channel, destination)
 
+    def get_hostname(self):
+        """Get the hostname used by the BMC in various contexts
+
+        This can vary somewhat in interpretation, but generally speaking
+        this should be the name that shows up on UIs and in DHCP requests and
+        DNS registration requests, as applicable.
+
+        :return: 
+        """
+        self.oem_init()
+        try:
+            return self._oem.get_hostname()
+        except exc.UnsupportedFunctionality:
+            # Use the DCMI MCI field as a fallback, since it's the closest
+            # thing in the IPMI Spec for this
+            return self.get_mci()
+
     def get_mci(self):
         """Get the Management Controller Identifier, per DCMI specification
 
         :returns: The identifier as a string
         """
         return self._chunkwise_dcmi_fetch(9)
+
+    def set_hostname(self, hostname):
+        """Set the hostname to be used by the BMC in various contexts.
+
+        See get_hostname for details
+
+        :param hostname: The hostname 
+        :return: 
+        """
+        self.oem_init()
+        try:
+            return self._oem.set_hostname(mci)
+        except exc.UnsupportedFunctionality:
+            return self.set_mci(hostname)
 
     def set_mci(self, mci):
         """Set the management controller identifier, per DCMI specification
