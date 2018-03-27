@@ -278,6 +278,18 @@ class OEMHandler(object):
         """
         return
 
+    def set_hostname(self, hostname):
+        """OEM specific hook to specify name information
+
+        """
+        raise exc.UnsupportedFunctionality()
+
+    def get_hostname(self):
+        """OEM specific hook to specify name information
+
+        """
+        raise exc.UnsupportedFunctionality()
+
     def set_alert_ipv6_destination(self, ip, destination, channel):
         """Set an IPv6 alert destination
 

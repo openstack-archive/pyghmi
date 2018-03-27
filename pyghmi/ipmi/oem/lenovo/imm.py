@@ -1123,6 +1123,16 @@ class XCCClient(IMMClient):
         if '_csrf_token' in wc.cookies:
             wc.set_header('X-XSRF-TOKEN', self.wc.cookies['_csrf_token'])
 
+    def set_hostname(self, hostname):
+        self.wc.grab_json_response('/api/dataset', {'IMM_HostName': hostname})
+        self.wc.grab_json_response('/api/dataset', {'IMM_DescName': hostname})
+        self.weblogout()
+
+    def get_hostname(self):
+        rsp = self.wc.grab_json_response('/api/dataset/sys_info')
+        self.weblogout()
+        return rsp['items'][0]['system_name']
+
     def update_firmware_backend(self, filename, data=None, progress=None,
                                 bank=None):
         self.weblogout()
