@@ -69,6 +69,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
                  **kwargs):
         if 'timeout' not in kwargs:
             kwargs['timeout'] = 60
+        self.broken = False
         self.thehost = host
         self.theport = port
         httplib.HTTPConnection.__init__(self, host, port, strict, **kwargs)
@@ -107,12 +108,16 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
                                                  bincert)
 
     def getresponse(self):
-        rsp = super(SecureHTTPConnection, self).getresponse()
-        for hdr in rsp.msg.headers:
-            if hdr.startswith('Set-Cookie:'):
-                c = Cookie.BaseCookie(hdr[11:])
-                for k in c:
-                    self.cookies[k] = c[k].value
+        try:
+            rsp = super(SecureHTTPConnection, self).getresponse()
+            for hdr in rsp.msg.headers:
+                if hdr.startswith('Set-Cookie:'):
+                    c = Cookie.BaseCookie(hdr[11:])
+                    for k in c:
+                        self.cookies[k] = c[k].value
+        except httplib.BadStatusLine:
+            self.broken = True
+            raise
         return rsp
 
     def grab_json_response(self, url, data=None, referer=None):
@@ -164,6 +169,8 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
             headers = self.stdheaders.copy()
         if method == 'GET' and 'Content-Type' in headers:
             del headers['Content-Type']
+        if method == 'POST' and body and 'Content-Type' not in headers:
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
         if self.cookies:
             cookies = []
             for ckey in self.cookies:
@@ -175,5 +182,9 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
                 headers['Cookie'] += '; ' + '; '.join(cookies)
         if referer:
             headers['Referer'] = referer
-        return super(SecureHTTPConnection, self).request(method, url, body,
-                                                         headers)
+        try:
+            return super(SecureHTTPConnection, self).request(method, url, body,
+                                                            headers)
+        except httplib.CannotSendRequest:
+            self.broken = True
+            raise

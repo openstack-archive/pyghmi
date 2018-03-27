@@ -652,6 +652,8 @@ class OEMHandler(generic.OEMHandler):
                                                 data=(4, i))
                 name += rsp['data'][:]
             return name.rstrip('\x00')
+        elif self.is_fpc:
+            return self.smmhandler.get_domain()
 
     def set_oem_domain_name(self, name):
         if self.has_tsm:
@@ -669,6 +671,18 @@ class OEMHandler(generic.OEMHandler):
 
             self._restart_dns()
             return
+        elif self.is_fpc:
+            self.smmhandler.set_domain(name)
+
+    def set_hostname(self, hostname):
+        if self.is_fpc:
+            return self.smmhandler.set_hostname(hostname)
+        return super(OEMHandler, self).set_hostname(hostname)
+
+    def get_hostname(self):
+        if self.is_fpc:
+            return self.smmhandler.get_hostname()
+        return super(OEMHandler, self).get_hostname()
 
     """ Gets a remote console launcher for a Lenovo ThinkServer.
 

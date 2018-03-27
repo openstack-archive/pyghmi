@@ -233,6 +233,7 @@ def get_sensor_reading(name, ipmicmd, sz):
 
 
 class SMMClient(object):
+
     def __init__(self, ipmicmd):
         self.ipmicmd = weakref.proxy(ipmicmd)
         self.smm = ipmicmd.bmc
@@ -275,8 +276,55 @@ class SMMClient(object):
             self.st1 = data.text
         for data in authdata.findall('st2'):
             self.st2 = data.text
+        if not self.st2:
+            # This firmware puts tokens in the html file, parse that
+            wc.request('GET', '/index.html')
+            rsp = wc.getresponse()
+            if rsp.status != 200:
+                raise Exception(rsp.read())
+            indexhtml = rsp.read()
+            for line in indexhtml.split('\n'):
+                if '"ST1"' in line:
+                    self.st1 = line.split()[-1].replace(
+                        '"', '').replace(',', '')
+                if '"ST2"' in line:
+                    self.st2 = line.split()[-1].replace(
+                        '"', '').replace(',', '')
         wc.set_header('ST2', self.st2)
         return wc
+
+    def set_hostname(self, hostname):
+        self.wc.request( 'POST', '/data', 'set=hostname:' + hostname)
+        rsp = self.wc.getresponse()
+        if rsp.status != 200:
+            raise Exception(rsp.read())
+        rsp.read()
+
+    def get_hostname(self):
+        currinfo = self.get_netinfo()
+        for data in currinfo.find('netConfig').findall('hostname'):
+            return data.text
+
+    def get_netinfo(self):
+        self.wc.request('POST', '/data', 'get=hostname')
+        rsp = self.wc.getresponse()
+        if rsp.status != 200:
+            raise Exception(rsp.read())
+        currinfo = fromstring(rsp.read())
+        return currinfo
+
+    def set_domain(self, domain):
+        self.wc.request( 'POST', '/data', 'set=dnsDomain:' + domain)
+        rsp = self.wc.getresponse()
+        if rsp.status != 200:
+            raise Exception(rsp.read())
+        rsp.read()
+
+    def get_domain(self):
+        currinfo = self.get_netinfo()
+        for data in currinfo.find('netConfig').findall('dnsDomain'):
+            return data.text
+
 
     def get_ntp_enabled(self, variant):
         self.wc.request('POST', '/data', 'get=ntpOpMode')
@@ -370,6 +418,6 @@ class SMMClient(object):
 
     @property
     def wc(self):
-        if not self._wc:
+        if not self._wc or self._wc.broken:
             self._wc = self.get_webclient()
         return self._wc
