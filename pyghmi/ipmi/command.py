@@ -657,10 +657,15 @@ class Command(object):
         warning, critical, or failed assessments.
         """
         summary = {'badreadings': [], 'health': const.Health.Ok}
-        for reading in self.get_sensor_data():
-            if reading.health != const.Health.Ok:
-                summary['health'] |= reading.health
-                summary['badreadings'].append(reading)
+        try:
+            self.oem_init()
+            self._oem.extend_health(summary)
+            for reading in self.get_sensor_data():
+                if reading.health != const.Health.Ok:
+                    summary['health'] |= reading.health
+                    summary['badreadings'].append(reading)
+        except exc.BypassGenericBehavior:
+            pass
         return summary
 
     def get_sensor_reading(self, sensorname):

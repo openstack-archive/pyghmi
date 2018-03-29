@@ -569,7 +569,7 @@ class XCCClient(IMMClient):
         super(XCCClient, self).__init__(ipmicmd)
         self.adp_referer = None
 
-    def get_webclient(self):
+    def get_webclient(self, login=True):
         cv = self.ipmicmd.certverify
         wc = webclient.SecureHTTPConnection(self.imm, 443, verifycallback=cv)
         try:
@@ -578,6 +578,8 @@ class XCCClient(IMMClient):
             if se.errno != errno.ECONNREFUSED:
                 raise
             return None
+        if not login:
+            return wc
         adata = json.dumps({'username': self.username,
                             'password': self.password
                             })
@@ -1251,3 +1253,11 @@ class XCCClient(IMMClient):
         if bank == 'backup':
             return 'complete'
         return 'pending'
+
+    def get_health(self, summary):
+        wc = self.get_webclient(False)
+        rsp = wc.grab_json_response('/api/providers/imm_active_events')
+        if 'items' in rsp and len(rsp['items']) == 0:
+            # The XCC reports healthy, no need to interrogate
+            raise pygexc.BypassGenericBehavior()
+        # Will use the generic handling for unhealthy systems

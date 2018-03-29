@@ -265,6 +265,19 @@ class OEMHandler(object):
         """
         raise exc.UnsupportedFunctionality()
 
+    def get_health(self, summary):
+        """Provide an alternative or augmented health assessment
+
+        An OEM handler can preprocess the summary and extend it with OEM
+        specific data, and then return to let generic processing occur.
+        It can also raise the pyghmi exception BypassGenericBehavior to
+        suppress the standards based routine, for enhanced performance.
+
+        :param summary: The health summary as prepared by the generic function
+        :return: Nothing, modifies the summary object
+        """
+        return
+
     def set_alert_ipv6_destination(self, ip, destination, channel):
         """Set an IPv6 alert destination
 

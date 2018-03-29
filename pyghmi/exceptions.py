@@ -54,3 +54,8 @@ class UnsupportedFunctionality(PyghmiException):
     # Indicates when functionality is requested that is not supported by
     # current endpoint
     pass
+
+class BypassGenericBehavior(PyghmiException):
+    # Indicates that an OEM handler wants to abort any standards based
+    # follow up
+    pass
