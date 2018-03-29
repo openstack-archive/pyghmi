@@ -923,3 +923,8 @@ class OEMHandler(generic.OEMHandler):
         if self.has_xcc:
             return self.immhandler.list_media()
         return super(OEMHandler, self).list_media()
+
+    def get_health(self, summary):
+        if self.has_xcc:
+            return self.immhandler.get_health(summary)
+        return super(OEMHandler, self).get_health(summary)
