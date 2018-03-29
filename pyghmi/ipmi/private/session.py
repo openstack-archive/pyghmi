@@ -471,6 +471,7 @@ class Session(object):
                     self.iterwaiters.append(onlogon)
             return
         self.broken = False
+        self.logged = 0
         self.privlevel = 4
         self.maxtimeout = 3  # be aggressive about giving up on initial packet
         self.incommand = False
