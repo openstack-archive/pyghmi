@@ -27,7 +27,10 @@ import socket
 import struct
 import threading
 
-from Crypto.Cipher import AES
+try:
+    from Cryptodome.Cipher import AES
+except ImportError:
+    from Crypto.Cipher import AES
 
 import pyghmi.exceptions as exc
 from pyghmi.ipmi.private import constants
