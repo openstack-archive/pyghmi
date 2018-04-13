@@ -98,20 +98,25 @@ def fpc_get_nodeperm(ipmicmd, number, sz):
     states = []
     if len(rsp['data']) == 4:  # different gens handled rc differently
         rsp['data'] = b'\x00' + bytes(rsp['data'])
+    elif len(rsp['data']) == 6:  # New FPC format
+        rsp['data'] = rsp['data'][:2] + rsp['data'][3:]
     perminfo = ord(rsp['data'][1])
     if sz == 6:  # FPC
         permfail = ('\x02', '\x03')
     elif sz == 2:  # SMM
         permfail = ('\x02',)
-    if rsp['data'][4] in permfail:
-        states.append('Insufficient Power')
-        health = pygconst.Health.Failed
+    if perminfo & 0x20:
+        if rsp['data'][4] in permfail:
+            states.append('Insufficient Power')
+            health = pygconst.Health.Failed
+        elif rsp['data'][3:5] != '\x00\x00':
+            states.append('No Power Permission')
+            health = pygconst.Health.Failed
     if perminfo & 0x40:
         states.append('Node Fault')
         health = pygconst.Health.Failed
-    if perminfo & 0x20:
-        states.append('No Power Permission')
-        health = pygconst.Health.Failed
+    if rsp['data'][3:5] == '\x00\x00':
+        states.append('Absent')
     return (health, states)
 
 
