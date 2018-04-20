@@ -29,6 +29,7 @@ import pyghmi.media as media
 import pyghmi.storage as storage
 import pyghmi.util.webclient as webclient
 import random
+import re
 import socket
 import struct
 import threading
@@ -178,14 +179,16 @@ class IMMClient(object):
                 newvalues = [newvalue]
             newnewvalues = []
             for newvalue in newvalues:
+                newv = re.sub('\s+', ' ', newvalue)
                 if (self.fwo[key]['possible'] and
                         newvalue not in self.fwo[key]['possible']):
                     candlist = []
                     for candidate in self.fwo[key]['possible']:
-                        if newvalue.lower().startswith(candidate.lower()):
+                        candid = re.sub('\s+', ' ', candidate)
+                        if newv.lower().startswith(candid.lower()):
                             newvalue = candidate
                             break
-                        if candidate.lower().startswith(newvalue.lower()):
+                        if candid.lower().startswith(newv.lower()):
                             candlist.append(candidate)
                     else:
                         if len(candlist) == 1:
