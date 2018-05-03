@@ -174,7 +174,12 @@ class IMMClient(object):
                 changeset[key] = {'value': changeset[key]}
             newvalue = changeset[key]['value']
             if self.fwo[key]['is_list'] and not isinstance(newvalue, list):
-                newvalues = newvalue.split(',')
+                if '=' in newvalue:
+                    # ASU set a precedent of = delimited settings
+                    # for now, honor that delimiter as well
+                    newvalues = newvalue.split('=')
+                else:
+                    newvalues = newvalue.split(',')
             else:
                 newvalues = [newvalue]
             newnewvalues = []
