@@ -12,7 +12,7 @@
 # limitations under the License.
 
 # Written by pmartini2, but mostly a clone of fakebmc, written by jjohnson2
-__author__ = 'pmartini2@bloomberg.net'
+#__author__ = 'pmartini2@bloomberg.net'
 
 # This is a simple, but working proof of concept of using pyghmi.ipmi.bmc to
 # control a VM
