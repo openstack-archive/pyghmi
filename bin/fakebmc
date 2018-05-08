@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-__author__ = 'jjohnson2@lenovo.com'
+# __author__ = 'jjohnson2@lenovo.com'
 
 # this is a quick sample of how to write something that acts like a bmc
 # to play:
