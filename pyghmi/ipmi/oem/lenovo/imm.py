@@ -884,7 +884,7 @@ class XCCClient(IMMClient):
                     standalonedisks.append(
                         storage.Disk(
                             name=disk['name'], description=disk['type'],
-                            id=(cid, disk['id']),  status=disk['RAIDState'],
+                            id=(cid, disk['id']), status=disk['RAIDState'],
                             serial=disk['serialNo'], fru=disk['fruPartNo']))
         return storage.ConfigSpec(disks=standalonedisks, arrays=pools)
 
