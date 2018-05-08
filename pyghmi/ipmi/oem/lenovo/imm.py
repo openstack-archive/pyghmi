@@ -46,6 +46,8 @@ def fixup_uuid(uuidprop):
 
 
 def fixup_str(propstr):
+    if propstr is None:
+        return ''
     return ''.join([chr(int(c, 16)) for c in propstr.split()]).strip(
         ' \xff\x00')
 
@@ -884,7 +886,7 @@ class XCCClient(IMMClient):
                     standalonedisks.append(
                         storage.Disk(
                             name=disk['name'], description=disk['type'],
-                            id=(cid, disk['id']),  status=disk['RAIDState'],
+                            id=(cid, disk['id']), status=disk['RAIDState'],
                             serial=disk['serialNo'], fru=disk['fruPartNo']))
         return storage.ConfigSpec(disks=standalonedisks, arrays=pools)
 
