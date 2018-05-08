@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-@author: Jarrod Johnson <jbjohnso@us.ibm.com>
-"""
-
-"""A simple little script to exemplify/test ipmi.console module
-"""
+# """
+# @author: Jarrod Johnson <jbjohnso@us.ibm.com>
+# """
+#
+# """A simple little script to exemplify/test ipmi.console module
+# """
 import fcntl
 import os
 import select

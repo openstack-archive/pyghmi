@@ -1285,7 +1285,7 @@ sensor_type_offsets = {
             'deassertion_severity': const.Health.Ok,
         },
     },
-    0x21:  {  # slot/connector
+    0x21: {  # slot/connector
         0x0: {
             'desc': 'Fault',
             'severity': const.Health.Critical,
