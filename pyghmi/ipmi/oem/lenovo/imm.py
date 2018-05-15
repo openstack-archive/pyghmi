@@ -37,6 +37,32 @@ import urllib
 import weakref
 
 
+numregex = re.compile('([0-9]+)')
+
+
+def naturalize_string(key):
+    """Analyzes string in a human way to enable natural sort
+
+    :param nodename: The node name to analyze
+    :returns: A structure that can be consumed by 'sorted'
+    """
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split(numregex, key)]
+
+
+def natural_sort(iterable):
+    """Return a sort using natural sort if possible
+
+    :param iterable:
+    :return:
+    """
+    try:
+        return sorted(iterable, key=naturalize_string)
+    except TypeError:
+        # The natural sort attempt failed, fallback to ascii sort
+        return sorted(iterable)
+
+
 def fixup_uuid(uuidprop):
     baduuid = ''.join(uuidprop.split())
     uuidprefix = (baduuid[:8], baduuid[8:12], baduuid[12:16])
@@ -331,8 +357,14 @@ class IMMClient(object):
                     self.datacache['lenovo_cached_adapters'] = (
                         adapterdata, util._monotonic_time())
         if adapterdata and 'items' in adapterdata:
+            anames = {}
             for adata in adapterdata['items']:
                 aname = adata[self.ADP_NAME]
+                if aname in anames:
+                    anames[aname] += 1
+                    aname = '{0} {1}'.format(aname, anames[aname])
+                else:
+                    anames[aname] = 1
                 donenames = set([])
                 for fundata in adata[self.ADP_FUN]:
                     fdata = fundata.get('firmwares', ())
@@ -385,12 +417,12 @@ class IMMClient(object):
 
     def get_hw_inventory(self):
         hwmap = self.hardware_inventory_map()
-        for key in hwmap:
+        for key in natural_sort(hwmap):
             yield (key, hwmap[key])
 
     def get_hw_descriptions(self):
         hwmap = self.hardware_inventory_map()
-        for key in hwmap:
+        for key in natural_sort(hwmap):
             yield key
 
     def get_component_inventory(self, compname):
@@ -460,11 +492,17 @@ class IMMClient(object):
                     self.datacache['lenovo_cached_adapters'] = (
                         adapterdata, util._monotonic_time())
         if adapterdata and 'items' in adapterdata:
+            anames = {}
             for adata in adapterdata['items']:
                 skipadapter = False
                 if not adata[self.ADP_OOB]:
                     continue
                 aname = adata[self.ADP_NAME]
+                if aname in anames:
+                    anames[aname] += 1
+                    aname = '{0} {1}'.format(aname, anames[aname])
+                else:
+                    anames[aname] = 1
                 clabel = adata[self.ADP_LABEL]
                 if clabel == 'Unknown':
                     continue
