@@ -329,8 +329,14 @@ class IMMClient(object):
                     self.datacache['lenovo_cached_adapters'] = (
                         adapterdata, util._monotonic_time())
         if adapterdata and 'items' in adapterdata:
+            anames = {}
             for adata in adapterdata['items']:
                 aname = adata[self.ADP_NAME]
+                if aname in anames:
+                    anames[aname] += 1
+                    aname = '{0} {1}'.format(anames[aname])
+                else:
+                    anames[aname] = 1
                 donenames = set([])
                 for fundata in adata[self.ADP_FUN]:
                     fdata = fundata.get('firmwares', ())
@@ -458,11 +464,17 @@ class IMMClient(object):
                     self.datacache['lenovo_cached_adapters'] = (
                         adapterdata, util._monotonic_time())
         if adapterdata and 'items' in adapterdata:
+            anames = {}
             for adata in adapterdata['items']:
                 skipadapter = False
                 if not adata[self.ADP_OOB]:
                     continue
                 aname = adata[self.ADP_NAME]
+                if aname in anames:
+                    anames[aname] += 1
+                    aname = '{0} {1}'.format(aname, anames[aname])
+                else:
+                    anames[aname] = 1
                 clabel = adata[self.ADP_LABEL]
                 if clabel == 'Unknown':
                     continue
