@@ -46,6 +46,8 @@ def fixup_uuid(uuidprop):
 
 
 def fixup_str(propstr):
+    if propstr is None:
+        return ''
     return ''.join([chr(int(c, 16)) for c in propstr.split()]).strip(
         ' \xff\x00')
 
