@@ -400,6 +400,9 @@ class SMMClient(object):
                     break
         progress({'phase': 'upload', 'progress': 0.0})
         url = self.wc  # this is just to get self.st1 initted
+        self.wc.request('POST', '/data', 'set=fwType:10')  # SMM firmware
+        rsp = self.wc.getresponse()
+        rsp.read()
         url = '/fwupload/fwupload.esp?ST1={0}'.format(self.st1)
         self.wc.upload(url, filename, data, formname='fileUpload',
                        otherfields={'preConfig': 'on'})
