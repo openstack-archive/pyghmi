@@ -278,6 +278,10 @@ class SMMClient(object):
         for data in authdata.findall('authResult'):
             if int(data.text) != 0:
                 raise Exception("Firmware update already in progress")
+        for data in authdata.findall('forwardUrl'):
+            if 'renew' in data.text:
+                raise Exception("Account password has expired, "
+                                "must to be changed to continue")
         self.st1 = None
         self.st2 = None
         for data in authdata.findall('st1'):
