@@ -1,0 +1,9 @@
+- project:
+    check:
+      jobs:
+        - sushy-tempest-dsvm-ironic-ipa-partition-redfish-src
+        - openstack-tox-lower-constraints
+    gate:
+      jobs:
+        - sushy-tempest-dsvm-ironic-ipa-partition-redfish-src
+        - openstack-tox-lower-constraints
