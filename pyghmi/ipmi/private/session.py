@@ -27,10 +27,9 @@ import socket
 import struct
 import threading
 
-try:
-    from Cryptodome.Cipher import AES
-except ImportError:
-    from Crypto.Cipher import AES
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
 
 import pyghmi.exceptions as exc
 from pyghmi.ipmi.private import constants
@@ -304,6 +303,10 @@ class Session(object):
     # this will be a lock.  Delay the assignment so that a calling framework
     # can do something like reassign our threading and select modules
     socketchecking = None
+
+    # Maintain signle Cryptography backend for all IMPI sessions (seems to be
+    # thread-safe)
+    _crypto_backend = default_backend()
 
     @classmethod
     def _cleanup(cls):
@@ -872,10 +875,15 @@ class Session(object):
                 iv = os.urandom(16)
                 message += list(struct.unpack("16B", iv))
                 payloadtocrypt = _aespad(payload)
-                crypter = AES.new(self.aeskey, AES.MODE_CBC, iv)
-                crypted = crypter.encrypt(struct.pack("%dB" %
-                                                      len(payloadtocrypt),
-                                                      *payloadtocrypt))
+                crypter = Cipher(
+                    algorithm=algorithms.AES(self.aeskey),
+                    mode=modes.CBC(iv),
+                    backend=self._crypto_backend
+                )
+                encryptor = crypter.encryptor()
+                plaintext = struct.pack("%dB" % len(payloadtocrypt),
+                                        *payloadtocrypt)
+                crypted = encryptor.update(plaintext) + encryptor.finalize()
                 crypted = list(struct.unpack("%dB" % len(crypted), crypted))
                 message += crypted
             else:  # no confidetiality algorithm
@@ -1378,10 +1386,15 @@ class Session(object):
             payload = data[16:16 + psize]
             if encrypted:
                 iv = data[16:32]
-                decrypter = AES.new(self.aeskey, AES.MODE_CBC, bytes(iv))
-                decrypted = decrypter.decrypt(
-                    struct.pack("%dB" % len(payload[16:]),
-                                *payload[16:]))
+                crypter = Cipher(
+                    algorithm=algorithms.AES(self.aeskey),
+                    mode=modes.CBC(bytes(iv)),
+                    backend=self._crypto_backend
+                )
+                decryptor = crypter.decryptor()
+                ciphertext = struct.pack("%dB" % len(payload[16:]),
+                                         *payload[16:])
+                decrypted = decryptor.update(ciphertext) + decryptor.finalize()
                 payload = struct.unpack("%dB" % len(decrypted), decrypted)
                 padsize = payload[-1] + 1
                 payload = list(payload[:-padsize])
