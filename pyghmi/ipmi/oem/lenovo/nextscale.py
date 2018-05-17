@@ -426,6 +426,8 @@ class SMMClient(object):
             if rsp.status != 200:
                 raise Exception('Error applying firmware')
             progdata = fromstring(progdata)
+            if progdata.findall('fwUpdate')[0].text == 'invalid signature':
+                raise Exception('Firmware signature invalid')
             percent = float(progdata.findall('fwProgress')[0].text)
 
             progress({'phase': 'apply',
