@@ -954,6 +954,9 @@ class XCCClient(IMMClient):
             if rt['return'] in (657, 659, 656):
                 raise pygexc.InvalidParameterValue(
                     'Given location was unreachable by the XCC')
+            if rt['return'] == 32:
+                raise pygexc.InvalidParameterValue(
+                    'XCC does not have required license for operation')
             raise Exception('Unhandled return: ' + repr(rt))
         rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_mountall',
                                         '{}')
