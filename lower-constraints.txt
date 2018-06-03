@@ -2,9 +2,9 @@ coverage===4.0
 cryptography===2.1
 fixtures===3.0.0
 oslotest===3.2.0
-os-testr===1.0.0
 python-subunit===1.0.0
 Sphinx===1.6.5
 testrepository===0.0.18
 testscenarios===0.4
 testtools===2.2.0
+stestr===1.0.0
