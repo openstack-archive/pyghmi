@@ -13,6 +13,7 @@ sdist
 
 # Other
 .testrepository
+.stestr
 AUTHORS
 ChangeLog
 .tox
