@@ -22,6 +22,7 @@ import threading
 
 from pyghmi.ipmi.private import constants
 from pyghmi.ipmi.private import session
+from pyghmi.ipmi.private.util import _monotonic_time
 
 
 class Console(object):
@@ -266,7 +267,18 @@ class Console(object):
         self.awaitingack = True
         payload = struct.unpack("%dB" % len(payload), payload)
         self.lastpayload = payload
-        self.send_payload(payload, needskeepalive=needskeepalive)
+        self.send_payload(payload, retry=False, needskeepalive=needskeepalive)
+        retries = 5
+        while retries and self.awaitingack:
+            expiry = _monotonic_time() + 5.5 - retries
+            while self.awaitingack and _monotonic_time() < expiry:
+                self.wait_for_rsp(0.5)
+            if self.awaitingack:
+                self.send_payload(payload, retry=False,
+                                  needskeepalive=needskeepalive)
+            retries -= 1
+        if not retries:
+            self._print_error('Connection lost')
 
     def send_payload(self, payload, payload_type=1, retry=True,
                      needskeepalive=False):
@@ -382,7 +394,7 @@ class Console(object):
             # try to mitigate by avoiding overeager retries
             # occasional retry of a packet
             # sooner than timeout suggests is evidently a big deal
-            self.send_payload(payload=self.lastpayload)
+            self.send_payload(payload=self.lastpayload, retry=False)
 
     def main_loop(self):
         """Process all events until no more sessions exist.
