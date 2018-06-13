@@ -321,14 +321,19 @@ class IMMClient(object):
             'RP_VmAllocateMountUrl({0},{1},1,,)'.format(
                 self.username, url): ''
         })
-        result = self.wc.grab_json_response('/data?set', params)
+        result = self.wc.grab_json_response('/data?set', params,
+                                            referer=self.adp_referer)
+        if not result:
+            result = self.wc.grab_json_response('/data/set', params,
+                                                referer=self.adp_referer)
         if result['return'] != 'Success':
             raise Exception(result['reason'])
         self.weblogout()
 
     def detach_remote_media(self):
         mnt = self.wc.grab_json_response(
-            '/designs/imm/dataproviders/imm_rp_images.php')
+            '/designs/imm/dataproviders/imm_rp_images.php',
+            referer=self.adp_referer)
         removeurls = []
         for item in mnt['items']:
             if 'urls' in item:
@@ -339,7 +344,11 @@ class IMMClient(object):
             params = urllib.urlencode({
                 'RP_VmAllocateUnMountUrl({0},{1},0,)'.format(
                     self.username, url): ''})
-            result = self.wc.grab_json_response('/data?set', params)
+            result = self.wc.grab_json_response('/data?set', params,
+                                                referer=self.adp_referer)
+            if not result:
+                result = self.wc.grab_json_response('/data/set', params,
+                                                    referer=self.adp_referer)
             if result['return'] != 'Success':
                 raise Exception(result['reason'])
         self.weblogout()
