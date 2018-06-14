@@ -24,9 +24,11 @@ import ssl
 try:
     import Cookie
     import httplib
+    import StringIO
 except ImportError:
     import http.client as httplib
     import http.cookies as Cookie
+    import io as StringIO
 
 __author__ = 'jjohnson2'
 
@@ -146,7 +148,8 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         """
         if data is None:
             data = open(filename, 'rb')
-        form = get_upload_form(filename, data, formname, otherfields)
+        form = StringIO.StringIO(get_upload_form(filename, data, formname,
+                                                 otherfields))
         ulheaders = self.stdheaders.copy()
         ulheaders['Content-Type'] = 'multipart/form-data; boundary=' + BND
         webclient = self.dupe()
