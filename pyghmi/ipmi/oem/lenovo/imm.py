@@ -80,15 +80,17 @@ def fixup_str(propstr):
 
 class FileUploader(threading.Thread):
 
-    def __init__(self, webclient, url, filename, data):
+    def __init__(self, webclient, url, filename, data=None, otherfields=None):
         self.wc = webclient
         self.url = url
         self.filename = filename
         self.data = data
+        self.otherfields = otherfields
         super(FileUploader, self).__init__()
 
     def run(self):
-        self.rsp = self.wc.upload(self.url, self.filename, self.data)
+        self.rsp = self.wc.upload(self.url, self.filename, self.data,
+                                  otherfields=self.otherfields)
 
 
 class IMMClient(object):
@@ -284,6 +286,13 @@ class IMMClient(object):
                 if 'token2_name' in rspdata and 'token2_value' in rspdata:
                     wc.set_header(rspdata['token2_name'],
                                   rspdata['token2_value'])
+                if 'token3_name' in rspdata and 'token3_value' in rspdata:
+                    self.uploadtoken = {rspdata['token3_name']:
+                                        rspdata['token3_value']}
+                else:
+                    self.uploadtoken = {}
+                wc.set_header('Referer', self.adp_referer)
+                wc.set_header('Host', self.imm)
                 return wc
 
     @property
@@ -315,6 +324,46 @@ class IMMClient(object):
         except KeyError:
             return None
 
+    def upload_media(self, filename, progress=None):
+        xid = random.randint(0, 1000000000)
+        alloc = self.wc.grab_json_response(
+            '/data/set',
+            'RP_VmAllocateLoc({0},{1},1)'.format(self.username, filename))
+        if alloc['return'] != 'Success':
+            raise Exception('Unexpected reply to allocation: ' + repr(alloc))
+        slotid = alloc['slotId']
+        uploadfields = self.uploadtoken
+        uploadfields['filePath'] = alloc['filePath']
+        uploadfields['uploadType'] = 'iframe'
+        uploadfields['available'] = alloc['available']
+        uploadfields['checksum'] = xid
+        ut = FileUploader(self.wc, '/designs/imm/upload/rp_image_upload.esp',
+                          filename, otherfields=uploadfields)
+        ut.start()
+        while ut.isAlive():
+            ut.join(3)
+            if progress:
+                progress({'phase': 'upload',
+                          'progress': 100 * self.wc.get_upload_progress()})
+        status = self.wc.grab_json_response(
+            '/designs/imm/upload/rp_image_upload_status.esp',
+            'filePath={0}'.format(alloc['filePath']))
+        if not status['rpImgUploadResult'].endswith('Success'):
+            raise Exception(
+                'Upload status returned unexpected data: ' + repr(alloc))
+        ups = self.wc.grab_json_response(
+            '/data/set',
+            'RP_VmUpdateSize({1}, {0})'.format(status['originalFileSize'],
+                                               slotid))
+        if ups['return'] != 'Success':
+            raise Exception('Unexpected return to update size: ' + repr(ups))
+        ups = self.wc.grab_json_response('/data/set',
+                                         'RP_VmMount({0})'.format(slotid))
+        if ups['return'] != 'Success':
+            raise Exception('Unexpected return to mount: ' + repr(ups))
+        if progress:
+            progress({'phase': 'complete'})
+
     def attach_remote_media(self, url, user, password):
         url = url.replace(':', '\:')
         params = urllib.urlencode({
@@ -330,6 +379,16 @@ class IMMClient(object):
             raise Exception(result['reason'])
         self.weblogout()
 
+    def list_media(self):
+        rt = self.wc.grab_json_response(
+            '/designs/imm/dataproviders/imm_rp_images.php',
+            referer=self.adp_referer)
+        for item in rt['items']:
+            if 'images' in item:
+                for uload in item['images']:
+                    if uload['status'] != 0:
+                        yield media.Media(uload['filename'])
+
     def detach_remote_media(self):
         mnt = self.wc.grab_json_response(
             '/designs/imm/dataproviders/imm_rp_images.php',
@@ -339,6 +398,10 @@ class IMMClient(object):
             if 'urls' in item:
                 for url in item['urls']:
                     removeurls.append(url['url'])
+            if 'images' in item:
+                for uload in item['images']:
+                    self.wc.grab_json_response(
+                        '/data/set', 'RP_RemoveFile({0}, 0)'.format(uload['slotId']))
         for url in removeurls:
             url = url.replace(':', '\:')
             params = urllib.urlencode({

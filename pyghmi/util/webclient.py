@@ -148,13 +148,15 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         """
         if data is None:
             data = open(filename, 'rb')
-        form = StringIO.StringIO(get_upload_form(filename, data, formname,
-                                                 otherfields))
+        self._upbuffer = StringIO.StringIO(get_upload_form(filename, data,
+                                                           formname,
+                                                           otherfields))
         ulheaders = self.stdheaders.copy()
         ulheaders['Content-Type'] = 'multipart/form-data; boundary=' + BND
         ulheaders['Content-Length'] = len(uploadforms[filename])
+        self.ulsize = len(uploadforms[filename])
         webclient = self.dupe()
-        webclient.request('POST', url, form, ulheaders)
+        webclient.request('POST', url, self._upbuffer, ulheaders)
         rsp = webclient.getresponse()
         # peer updates in progress should already have pointers,
         # subsequent transactions will cause memory to needlessly double,
@@ -167,6 +169,9 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
             raise Exception('Unexpected response in file upload: ' +
                             rsp.read())
         return rsp.read()
+
+    def get_upload_progress(self):
+        return float(self._upbuffer.tell()) / float(self.ulsize)
 
     def request(self, method, url, body=None, headers=None, referer=None):
         if headers is None:
