@@ -284,6 +284,13 @@ class IMMClient(object):
                 if 'token2_name' in rspdata and 'token2_value' in rspdata:
                     wc.set_header(rspdata['token2_name'],
                                   rspdata['token2_value'])
+                if 'token3_name' in rspdata and 'token3_value' in rspdata:
+                    self.uploadtoken = {rspdata['token3_name']:
+                                        rspdata['token3_value']}
+                else:
+                    self.uploadtoken = {}
+                wc.set_header('Referer', self.adp_referer)
+                wc.set_header('Host', self.imm)
                 return wc
 
     @property
@@ -315,6 +322,24 @@ class IMMClient(object):
         except KeyError:
             return None
 
+    def upload_media(self, filename, progress=None):
+        alloc = self.wc.grab_json_response(
+            '/data/set',
+            'RP_VmAllocateLoc({0},{1},1)'.format(self.username, filename))
+        uploadfields = self.uploadtoken
+        uploadfields['filePath'] = alloc['filePath']
+        uploadfields['uploadType'] = 'iframe'
+        uploadfields['available'] = alloc['available']
+        self.wc.upload('/designs/imm/upload/rp_image_upload.esp',
+                                filename, otherfields=uploadfields)
+        status = self.wc.grab_json_response(
+            '/designs/imm/upload/rp_image_upload_status.esp',
+            'filePath={0}'.format(alloc['filePath']))
+        self.wc.grab_json_response(
+            '/data/set',
+            'RP_VmUpdateSize(0, {0})'.format(status['originalFileSize']))
+        self.wc.grab_json_response('/data/set', 'RP_VmMount(0)')
+
     def attach_remote_media(self, url, user, password):
         url = url.replace(':', '\:')
         params = urllib.urlencode({
@@ -334,6 +359,7 @@ class IMMClient(object):
         mnt = self.wc.grab_json_response(
             '/designs/imm/dataproviders/imm_rp_images.php',
             referer=self.adp_referer)
+        self.wc.grab_json_response('/data/set', 'RP_RemoveFile(0, 0)')
         removeurls = []
         for item in mnt['items']:
             if 'urls' in item:
