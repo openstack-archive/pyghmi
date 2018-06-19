@@ -51,11 +51,12 @@ class FileUploader(threading.Thread):
         self.filename = filename
         self.data = data
         self.otherfields = otherfields
+        self.formname = formname
         super(FileUploader, self).__init__()
 
     def run(self):
         self.rsp = self.wc.upload(self.url, self.filename, self.data,
-                                  otherfields=self.otherfields)
+                                  self.formname, otherfields=self.otherfields)
 
 
 def get_upload_form(filename, data, formname, otherfields):
