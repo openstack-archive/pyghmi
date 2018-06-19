@@ -20,6 +20,7 @@ import json
 import pyghmi.exceptions as pygexc
 import socket
 import ssl
+import threading
 
 try:
     import Cookie
@@ -39,6 +40,21 @@ BND = 'TbqbLUSn0QFjx9gxiQLtgBK4Zu6ehLqtLs4JOBS50EgxXJ2yoRMhTrmRXxO1lkoAQdZx16'
 # We will frequently be dealing with the same data across many instances,
 # consolidate forms to single memory location to get benefits..
 uploadforms = {}
+
+class FileUploader(threading.Thread):
+
+    def __init__(self, webclient, url, filename, data=None, formname=None,
+                 otherfields=None):
+        self.wc = webclient
+        self.url = url
+        self.filename = filename
+        self.data = data
+        self.otherfields = otherfields
+        super(FileUploader, self).__init__()
+
+    def run(self):
+        self.rsp = self.wc.upload(self.url, self.filename, self.data,
+                                  otherfields=self.otherfields)
 
 
 def get_upload_form(filename, data, formname, otherfields):
