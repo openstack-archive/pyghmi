@@ -32,7 +32,6 @@ import random
 import re
 import socket
 import struct
-import threading
 import urllib
 import weakref
 
@@ -76,21 +75,6 @@ def fixup_str(propstr):
         return ''
     return ''.join([chr(int(c, 16)) for c in propstr.split()]).strip(
         ' \xff\x00')
-
-
-class FileUploader(threading.Thread):
-
-    def __init__(self, webclient, url, filename, data=None, otherfields=None):
-        self.wc = webclient
-        self.url = url
-        self.filename = filename
-        self.data = data
-        self.otherfields = otherfields
-        super(FileUploader, self).__init__()
-
-    def run(self):
-        self.rsp = self.wc.upload(self.url, self.filename, self.data,
-                                  otherfields=self.otherfields)
 
 
 class IMMClient(object):
@@ -337,8 +321,9 @@ class IMMClient(object):
         uploadfields['uploadType'] = 'iframe'
         uploadfields['available'] = alloc['available']
         uploadfields['checksum'] = xid
-        ut = FileUploader(self.wc, '/designs/imm/upload/rp_image_upload.esp',
-                          filename, otherfields=uploadfields)
+        ut = webclient.FileUploader(
+            self.wc, '/designs/imm/upload/rp_image_upload.esp', filename,
+            otherfields=uploadfields)
         ut.start()
         while ut.isAlive():
             ut.join(3)
@@ -1181,9 +1166,8 @@ class XCCClient(IMMClient):
 
     def upload_media(self, filename, progress=None):
         xid = random.randint(0, 1000000000)
-        uploadthread = FileUploader(self.wc,
-                                    '/upload?X-Progress-ID={0}'.format(xid),
-                                    filename, None)
+        uploadthread = webclient.FileUploader(
+            self.wc, '/upload?X-Progress-ID={0}'.format(xid), filename, None)
         uploadthread.start()
         while uploadthread.isAlive():
             uploadthread.join(3)
@@ -1268,9 +1252,8 @@ class XCCClient(IMMClient):
         if rsv['return'] != 0:
             raise Exception('Unexpected return to reservation: ' + repr(rsv))
         xid = random.randint(0, 1000000000)
-        uploadthread = FileUploader(self.wc,
-                                    '/upload?X-Progress-ID={0}'.format(xid),
-                                    filename, data)
+        uploadthread = webclient.FileUploader(
+            self.wc, '/upload?X-Progress-ID={0}'.format(xid), filename, data)
         uploadthread.start()
         uploadstate = None
         while uploadthread.isAlive():
