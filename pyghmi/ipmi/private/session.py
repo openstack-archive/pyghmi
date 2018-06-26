@@ -537,6 +537,7 @@ class Session(object):
             Session.keepalive_sessions.pop(self, None)
         with util.protect(WAITING_SESSIONS):
             Session.waiting_sessions.pop(self, None)
+        self.logout()
         self.logging = False
         self.errormsg = error
         if self.logged:
