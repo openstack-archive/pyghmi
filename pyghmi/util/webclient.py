@@ -45,7 +45,7 @@ uploadforms = {}
 class FileUploader(threading.Thread):
 
     def __init__(self, webclient, url, filename, data=None, formname=None,
-                 otherfields=None):
+                 otherfields=()):
         self.wc = webclient
         self.url = url
         self.filename = filename
