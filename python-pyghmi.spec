@@ -10,6 +10,7 @@ Prefix: %{_prefix}
 BuildArch: noarch
 Vendor: Jarrod Johnson <jjohnson2@lenovo.com>
 Url: https://git.openstack.org/cgit/openstack/pyghmi
+Requires: python-cryptography
 
 
 %description
