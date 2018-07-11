@@ -209,7 +209,7 @@ def get_fpc_firmware(bmcver, ipmicmd, fpcorsmm):
     elif len(builddata) == 8:
         builddata = builddata[1:]  # discard the 'completion code'
         name = 'FPC'
-        buildid = '{0}{1}'.format(builddata[-2], chr(builddata[-1]))
+        buildid = '{0:02X}{1}'.format(builddata[-2], chr(builddata[-1]))
     yield (name, {'version': bmcver, 'build': buildid})
     yield ('PSOC', {'version': '{0}.{1}'.format(builddata[2], builddata[3])})
 
