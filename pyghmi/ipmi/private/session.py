@@ -406,7 +406,7 @@ class Session(object):
         with util.protect(KEEPALIVE_SESSIONS):
             sess = cls.keepalive_sessions.get(session, None)
             if sess is not None and 'timeout' in sess:
-                if sess['timeout'] < _monotonic_time():
+                if sess['timeout'] < _monotonic_time() - 15:
                     # session would have timed out by now, don't use it
                     return False
         return True
