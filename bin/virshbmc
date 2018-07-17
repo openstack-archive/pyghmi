@@ -60,7 +60,7 @@ class LibvirtBmc(bmc.Bmc):
 
     def cold_reset(self):
         # Reset of the BMC, not managed system, here we will exit the demo
-        print 'shutting down in response to BMC cold reset request'
+        print('shutting down in response to BMC cold reset request')
         sys.exit(0)
 
     def get_power_state(self):
