@@ -285,6 +285,7 @@ class Console(object):
         while not (self.connected or self.broken):
             session.Session.wait_for_rsp(timeout=10)
         if not self.ipmi_session.logged:
+            self._print_error('Session no longer connected')
             raise exc.IpmiException('Session no longer connected')
         self.ipmi_session.send_payload(payload,
                                        payload_type=payload_type,
