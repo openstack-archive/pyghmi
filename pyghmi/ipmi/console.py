@@ -258,14 +258,12 @@ class Console(object):
         breakbyte = 0
         if sendbreak:
             breakbyte = 0b10000
-        payload = struct.pack("BBBB", self.myseq, 0, 0, breakbyte)
-        payload += output
+        payload = bytearray((self.myseq, 0, 0, breakbyte)) + output
         self.lasttextsize = len(output)
         needskeepalive = False
         if self.lasttextsize == 0:
             needskeepalive = True
         self.awaitingack = True
-        payload = struct.unpack("%dB" % len(payload), payload)
         self.lastpayload = payload
         self.send_payload(payload, retry=False, needskeepalive=needskeepalive)
         retries = 5
@@ -344,7 +342,7 @@ class Console(object):
                 remdatalen = len(payload[4:])  # store remote len before dupe
                 # retry logic, we must ack *this* many even if it is
                 # a retry packet with new partial data
-                remdata = struct.pack("%dB" % remdatalen, *payload[4:])
+                remdata = payload[4:]
             if newseq == self.remseq:  # it is a retry, but could have new data
                 if remdatalen > self.lastsize:
                     remdata = remdata[4 + self.lastsize:]
@@ -355,7 +353,7 @@ class Console(object):
             self.lastsize = remdatalen
             if remdata:  # Do not subject callers to empty data
                 self._print_data(remdata)
-            ackpayload = (0, self.remseq, remdatalen, 0)
+            ackpayload = bytearray((0, self.remseq, remdatalen, 0))
             # Why not put pending data into the ack? because it's rare
             # and might be hard to decide what to do in the context of
             # retry situation
@@ -376,7 +374,6 @@ class Console(object):
                 else:  # retry all or part of packet, but in a new form
                     # also add pending output for efficiency and ease
                     newtext = self.lastpayload[4 + ackcount:]
-                    newtext = struct.pack("B"*len(newtext), *newtext)
                     with self.outputlock:
                         if (self.pendingoutput and
                                 not isinstance(self.pendingoutput[0], dict)):
@@ -474,16 +471,16 @@ class ServerConsole(Console):
                 remdatalen = len(payload[4:])  # store remote len before dupe
                 # retry logic, we must ack *this* many even if it is
                 # a retry packet with new partial data
-                remdata = struct.pack("%dB" % remdatalen, *payload[4:])
+                remdata = bytes(payload[4:])
             if newseq == self.remseq:  # it is a retry, but could have new data
                 if remdatalen > self.lastsize:
-                    remdata = remdata[4 + self.lastsize:]
+                    remdata = bytes(remdata[4 + self.lastsize:])
                 else:  # no new data...
                     remdata = ""
             else:  # TODO(jbjohnso) what if remote sequence number is wrong??
                 self.remseq = newseq
             self.lastsize = remdatalen
-            ackpayload = (0, self.remseq, remdatalen, flag)
+            ackpayload = bytearray((0, self.remseq, remdatalen, flag))
             # Why not put pending data into the ack? because it's rare
             # and might be hard to decide what to do in the context of
             # retry situation
@@ -499,7 +496,6 @@ class ServerConsole(Console):
             self.awaitingack = False
             if nacked and not breakdetected:  # the BMC was in some way unhappy
                 newtext = self.lastpayload[4 + ackcount:]
-                newtext = struct.pack("B"*len(newtext), *newtext)
                 with self.outputlock:
                     if (self.pendingoutput and
                             not isinstance(self.pendingoutput[0], dict)):
