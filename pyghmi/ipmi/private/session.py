@@ -537,6 +537,12 @@ class Session(object):
             Session.keepalive_sessions.pop(self, None)
         with util.protect(WAITING_SESSIONS):
             Session.waiting_sessions.pop(self, None)
+        try:
+            del Session.initting_sessions[(self.bmc, self.userid,
+                                           self.password, self.port,
+                                           self.kgo)]
+        except KeyError:
+            pass
         self.logout()
         self.logging = False
         self.errormsg = error
