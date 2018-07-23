@@ -514,17 +514,17 @@ class Session(object):
             self.kg = self.password
         self.port = port
         if onlogon is None:
-            self.async = False
+            self.async_ = False
             self.logonwaiters = [self._sync_login]
         else:
-            self.async = True
+            self.async_ = True
             self.logonwaiters = [onlogon]
         if self.__class__.socketchecking is None:
             self.__class__.socketchecking = threading.Lock()
         with self.socketchecking:
             self.socket = self._assignsocket(forbiddensockets=self.forbidsock)
         self.login()
-        if not self.async:
+        if not self.async_:
             while self.logging:
                 Session.wait_for_rsp()
         if self.broken:
