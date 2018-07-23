@@ -248,18 +248,18 @@ def _aespad(data):
     """ipmi demands a certain pad scheme,
     per table 13-20 AES-CBC encrypted payload fields.
     """
-    newdata = list(data)
     currlen = len(data) + 1  # need to count the pad length field as well
     neededpad = currlen % 16
     if neededpad:  # if it happens to be zero, hurray, but otherwise invert the
         # sense of the padding
         neededpad = 16 - neededpad
     padval = 1
+    pad = bytearray(neededpad)
     while padval <= neededpad:
-        newdata.append(padval)
+        pad[padval - 1] = padval
         padval += 1
-    newdata.append(neededpad)
-    return newdata
+    pad.append(neededpad)
+    return pad
 
 
 def _checksum(*data):  # Two's complement over the data
@@ -628,16 +628,16 @@ class Session(object):
         """This function generate message for bridge request. It is a
         part of ipmi payload.
         """
-        head = [constants.IPMI_BMC_ADDRESS,
-                constants.netfn_codes['application'] << 2]
+        head = bytearray((constants.IPMI_BMC_ADDRESS,
+                          constants.netfn_codes['application'] << 2))
         check_sum = _checksum(*head)
         # NOTE(fengqian): according IPMI Figure 14-11, rqSWID is set to 81h
-        boday = [0x81, self.seqlun, constants.IPMI_SEND_MESSAGE_CMD,
-                 0x40 | channel]
+        boday = bytearray((0x81, self.seqlun, constants.IPMI_SEND_MESSAGE_CMD,
+                           0x40 | channel))
         # NOTE(fengqian): Track request
         self._add_request_entry((constants.netfn_codes['application'] + 1,
                                  self.seqlun, constants.IPMI_SEND_MESSAGE_CMD))
-        return head + [check_sum] + boday
+        return head + bytearray((check_sum,)) + boday
 
     def _add_request_entry(self, entry=()):
         """This function record the request with netfn, sequence number and
@@ -691,12 +691,12 @@ class Session(object):
         # figure 13-4, first two bytes are rsaddr and
         # netfn, for non-bridge request, rsaddr is always 0x20 since we are
         # addressing BMC while rsaddr is specified forbridge request
-        header = [rsaddr, netfn << 2]
+        header = bytearray((rsaddr, netfn << 2))
 
-        reqbody = [rqaddr, self.seqlun, command] + list(data)
-        headsum = _checksum(*header)
-        bodysum = _checksum(*reqbody)
-        payload = header + [headsum] + reqbody + [bodysum]
+        reqbody = bytearray((rqaddr, self.seqlun, command)) + data
+        headsum = bytearray((_checksum(*header),))
+        bodysum = bytearray((_checksum(*reqbody),))
+        payload = header + headsum + reqbody + bodysum
         if bridge_request:
             payload = bridge_msg + payload
             # NOTE(fengqian): For bridge request, another check sum is needed.
@@ -799,11 +799,13 @@ class Session(object):
         if retry is None:
             retry = not self.servermode
         if self.servermode:
-            data = [code] + list(data)
+            data = bytearray((code,)) + bytearray(data)
             if netfn is None:
                 netfn = self.clientnetfn
             if command is None:
                 command = self.clientcommand
+        else:
+            data = bytearray(data)
         ipmipayload = self._make_ipmi_payload(netfn, command, bridge_request,
                                               data)
         payload_type = constants.payload_types['ipmi']
@@ -835,10 +837,12 @@ class Session(object):
             payload_type = self.last_payload_type
         if not payload:
             payload = self.lastpayload
-        message = [0x6, 0, 0xff, 0x07]  # constant RMCP header for IPMI
+        message = bytearray(b'\x06\x00\xff\x07')  # constant IPMI RMCP header
         if retry:
             self.lastpayload = payload
             self.last_payload_type = payload_type
+        if not isinstance(payload, bytearray):
+            payload = bytearray(payload)
         message.append(self.authtype)
         baretype = payload_type
         if self.integrityalgo:
@@ -853,10 +857,10 @@ class Session(object):
             elif baretype not in constants.payload_types.values():
                 raise NotImplementedError(
                     "Unrecognized payload type %d" % baretype)
-            message += struct.unpack("!4B", struct.pack("<I", self.sessionid))
-        message += struct.unpack("!4B", struct.pack("<I", self.sequencenumber))
+            message += struct.pack("<I", self.sessionid)
+        message += struct.pack("<I", self.sequencenumber)
         if self.ipmiversion == 1.5:
-            message += struct.unpack("!4B", struct.pack("<I", self.sessionid))
+            message += struct.pack("<I", self.sessionid)
             if not self.authtype == 0:
                 message += self._ipmi15authcode(payload)
             message.append(len(payload))
@@ -880,23 +884,20 @@ class Session(object):
                 message.append(newpsize & 0xff)
                 message.append(newpsize >> 8)
                 iv = os.urandom(16)
-                message += list(struct.unpack("16B", iv))
-                payloadtocrypt = _aespad(payload)
+                message += iv
+                payloadtocrypt = bytes(payload + _aespad(payload))
                 crypter = Cipher(
                     algorithm=algorithms.AES(self.aeskey),
                     mode=modes.CBC(iv),
                     backend=self._crypto_backend
                 )
                 encryptor = crypter.encryptor()
-                plaintext = struct.pack("%dB" % len(payloadtocrypt),
-                                        *payloadtocrypt)
-                crypted = encryptor.update(plaintext) + encryptor.finalize()
-                crypted = list(struct.unpack("%dB" % len(crypted), crypted))
-                message += crypted
+                message += encryptor.update(payloadtocrypt
+                                            ) + encryptor.finalize()
             else:  # no confidetiality algorithm
                 message.append(psize & 0xff)
                 message.append(psize >> 8)
-                message += list(payload)
+                message += payload
             if self.integrityalgo:  # see table 13-8,
                 # RMCP+ packet format
                 # TODO(jbjohnso): SHA256 which is now
@@ -904,18 +905,15 @@ class Session(object):
                 neededpad = (len(message) - 2) % 4
                 if neededpad:
                     neededpad = 4 - neededpad
-                message += [0xff] * neededpad
+                message += b'\xff' * neededpad
                 message.append(neededpad)
                 message.append(7)  # reserved, 7 is the required value for the
                 # specification followed
-                integdata = message[4:]
-                authcode = hmac.new(self.k1,
-                                    struct.pack("%dB" % len(integdata),
-                                                *integdata),
+                message += hmac.new(self.k1,
+                                    bytes(message[4:]),
                                     hashlib.sha1).digest()[:12]  # SHA1-96
                 # per RFC2404 truncates to 96 bits
-                message += struct.unpack("12B", authcode)
-        self.netpacket = struct.pack("!%dB" % len(message), *message)
+        self.netpacket = message
         # advance idle timer since we don't need keepalive while sending
         # packets out naturally
         with util.protect(KEEPALIVE_SESSIONS):
@@ -937,19 +935,14 @@ class Session(object):
         if padneeded < 0:
             raise exc.IpmiException("Password is too long for ipmi 1.5")
         password += '\x00' * padneeded
-        passdata = struct.unpack("16B", password)
         if checkremotecode:
-            seqbytes = struct.unpack("!4B",
-                                     struct.pack("<I", self.remsequencenumber))
+            seqbytes = struct.pack("<I", self.remsequencenumber)
         else:
-            seqbytes = struct.unpack("!4B",
-                                     struct.pack("<I", self.sequencenumber))
-        sessdata = struct.unpack("!4B", struct.pack("<I", self.sessionid))
-        bodydata = passdata + sessdata + tuple(payload) + seqbytes + passdata
-        dgst = hashlib.md5(
-            struct.pack("%dB" % len(bodydata), *bodydata)).digest()
-        hashdata = struct.unpack("!%dB" % len(dgst), dgst)
-        return hashdata
+            seqbytes = struct.pack("<I", self.sequencenumber)
+        sessdata = struct.pack("<I", self.sessionid)
+        bodydata = password + sessdata + payload + seqbytes + password
+        dgst = hashlib.md5(bodydata).digest()
+        return dgst
 
     def _got_channel_auth_cap(self, response):
         if 'error' in response:
@@ -1290,8 +1283,8 @@ class Session(object):
             # things off ignore the second reply since we have one
             # satisfactory answer
         if data[4] in (0, 2):  # This is an ipmi 1.5 paylod
-            remsequencenumber = struct.unpack('<I', bytes(data[5:9]))[0]
-            remsessid = struct.unpack("<I", bytes(data[9:13]))[0]
+            remsequencenumber = struct.unpack('<I', data[5:9])[0]
+            remsessid = struct.unpack("<I", data[9:13])[0]
             if (remsequencenumber == 0 and remsessid == 0 and
                     qent[2] in Session.bmc_handlers):
                 # So a new ipmi client happens to get a previously seen and
@@ -1314,20 +1307,15 @@ class Session(object):
 
             if remsessid != self.sessionid:
                 return -1  # does not match our session id, drop it
-            # now we need a mutable representation of the packet, rather than
-            # copying pieces of the packet over and over
-            rsp = list(struct.unpack("!%dB" % len(data), bytes(data)))
             authcode = False
             if data[4] == 2:  # we have authcode in this ipmi 1.5 packet
                 authcode = data[13:29]
-                del rsp[13:29]
+                del data[13:29]
                 # this is why we needed a mutable representation
-            payload = list(rsp[14:14 + rsp[13]])
+            payload = data[14:14 + data[13]]
             if authcode:
                 expectedauthcode = self._ipmi15authcode(payload,
                                                         checkremotecode=True)
-                expectedauthcode = struct.pack("%dB" % len(expectedauthcode),
-                                               *expectedauthcode)
                 if expectedauthcode != authcode:
                     return
             self._parse_ipmi_payload(payload)
@@ -1377,13 +1365,13 @@ class Session(object):
             if self.k1 is None:  # we are in no shape to process a packet now
                 return
             expectedauthcode = hmac.new(
-                self.k1, bytes(data[4:-12]), hashlib.sha1).digest()[:12]
+                self.k1, data[4:-12], hashlib.sha1).digest()[:12]
             if authcode != expectedauthcode:
                 return  # BMC failed to assure integrity to us, drop it
-            sid = struct.unpack("<I", bytes(data[6:10]))[0]
+            sid = struct.unpack("<I", data[6:10])[0]
             if sid != self.localsid:  # session id mismatch, drop it
                 return
-            remseqnumber = struct.unpack("<I", bytes(data[10:14]))[0]
+            remseqnumber = struct.unpack("<I", data[10:14])[0]
             if (hasattr(self, 'remseqnumber') and
                 (remseqnumber < self.remseqnumber) and
                     (self.remseqnumber != 0xffffffff)):
@@ -1399,12 +1387,10 @@ class Session(object):
                     backend=self._crypto_backend
                 )
                 decryptor = crypter.decryptor()
-                ciphertext = struct.pack("%dB" % len(payload[16:]),
-                                         *payload[16:])
-                decrypted = decryptor.update(ciphertext) + decryptor.finalize()
-                payload = struct.unpack("%dB" % len(decrypted), decrypted)
+                payload = bytearray(decryptor.update(bytes(payload[16:])
+                                           ) + decryptor.finalize())
                 padsize = payload[-1] + 1
-                payload = list(payload[:-padsize])
+                payload = payload[:-padsize]
             if ptype == 0:
                 self._parse_ipmi_payload(payload)
             elif ptype == 1:  # There should be no other option
@@ -1654,8 +1640,7 @@ class Session(object):
         # doing anything, though it shouldn't matter
         self.lastpayload = None
         self.last_payload_type = None
-        response = {}
-        response['netfn'] = payload[1] >> 2
+        response = {'netfn': payload[1] >> 2}
         # ^^ remove header of rsaddr/netfn/lun/checksum/rq/seq/lun
         del payload[0:5]
         # remove the trailing checksum
