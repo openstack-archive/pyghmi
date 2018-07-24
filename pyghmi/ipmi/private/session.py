@@ -468,7 +468,7 @@ class Session(object):
         if hasattr(self, 'initialized'):
             # new found an existing session, do not corrupt it
             if onlogon is None:
-                while self.logging:
+                while self.logging and not self.broken:
                     Session.wait_for_rsp()
             else:
                 if self.logging:
