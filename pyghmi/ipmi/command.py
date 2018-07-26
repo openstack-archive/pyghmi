@@ -412,7 +412,7 @@ class Command(object):
                                             retry=retry, timeout=timeout)
         if 'error' in rsp:
             raise exc.IpmiException(rsp['error'], rsp['code'])
-        rsp['data'] = buffer(bytearray(rsp['data']))
+        rsp['data'] = buffer(rsp['data'])
         return rsp
 
     def raw_command(self, netfn, command, bridge_request=(), data=(),
@@ -434,10 +434,13 @@ class Command(object):
         :param timeout: A custom amount of time to wait for initial reply
         :returns: dict -- The response from IPMI device
         """
-        return self.ipmi_session.raw_command(netfn=netfn, command=command,
-                                             bridge_request=bridge_request,
-                                             data=data, delay_xmit=delay_xmit,
-                                             retry=retry, timeout=timeout)
+        rsp = self.ipmi_session.raw_command(netfn=netfn, command=command,
+                                            bridge_request=bridge_request,
+                                            data=data, delay_xmit=delay_xmit,
+                                            retry=retry, timeout=timeout)
+        if 'data' in rsp:
+            rsp['data'] = list(rsp['data'])
+        return rsp
 
     def get_power(self):
         """Get current power state of the managed system
