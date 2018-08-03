@@ -258,7 +258,11 @@ class Console(object):
         breakbyte = 0
         if sendbreak:
             breakbyte = 0b10000
-        payload = bytearray((self.myseq, 0, 0, breakbyte)) + output
+        try:
+            payload = bytearray((self.myseq, 0, 0, breakbyte)) + output
+        except TypeError:  # bytearray hits unicode...
+            payload = bytearray((self.myseq, 0, 0, breakbyte
+                                 )) + output.encode('utf8')
         self.lasttextsize = len(output)
         needskeepalive = False
         if self.lasttextsize == 0:
