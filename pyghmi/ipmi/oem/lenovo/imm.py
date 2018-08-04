@@ -148,14 +148,15 @@ class IMMClient(object):
             return None
         return cls._parse_builddate(propstr)
 
-    def get_system_configuration(self):
+    def get_system_configuration(self, hideadvanced=True):
         if not self.fwc:
             self.fwc = config.LenovoFirmwareConfig(self.ipmicmd)
         self.fwo = self.fwc.get_fw_options()
         self.fwovintage = util._monotonic_time()
         retcfg = {}
         for opt in self.fwo:
-            if self.fwo[opt]['lenovo_protect'] or self.fwo[opt]['hidden']:
+            if (hideadvanced and self.fwo[opt]['lenovo_protect'] or
+                    self.fwo[opt]['hidden']):
                 # Do not enumerate hidden settings
                 continue
             retcfg[opt] = {}
