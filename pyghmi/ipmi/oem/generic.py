@@ -305,11 +305,14 @@ class OEMHandler(object):
         """
         return False
 
-    def get_system_configuration(self):
+    def get_system_configuration(self, hideadvanced):
         """Retrieve system configuration
 
         This returns a dictionary of settings names to dictionaries including
         'current', 'default' and 'possible' values as well as 'help'
+
+        :param hideadvanced: Whether to hide 'advanced' settings that most users
+                             should not need.
         """
         return {}
 

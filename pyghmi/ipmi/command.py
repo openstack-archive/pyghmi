@@ -723,9 +723,9 @@ class Command(object):
         else:
             raise Exception("Unrecognized data format " + repr(fetchdata))
 
-    def get_system_configuration(self):
+    def get_system_configuration(self, hideadvanced=True):
         self.oem_init()
-        return self._oem.get_system_configuration()
+        return self._oem.get_system_configuration(hideadvanced)
 
     def set_system_configuration(self, changeset):
         self.oem_init()
