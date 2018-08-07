@@ -546,33 +546,7 @@ class Session(object):
         self.logout()
         self.logging = False
         self.errormsg = error
-        if self.logged:
-            self.logged = 0  # mark session as busted
-            self.logging = False
-            if self._customkeepalives:
-                for ka in list(self._customkeepalives):
-                    # Be thorough and notify parties through their custom
-                    # keepalives.  In practice, this *should* be the same, but
-                    # if a code somehow makes duplicate SOL handlers,
-                    # this would notify all the handlers rather than just the
-                    # last one to take ownership
-                    self._customkeepalives[ka][1](
-                        {'error': 'Session Disconnected'})
-            self._customkeepalives = None
-            if not self.broken:
-                self.socketpool[self.socket] -= 1
-                self.broken = True
-                # since this session is broken, remove it from the handler list
-                # This allows constructor to create a new, functional object to
-                # replace this one
-                myport = self.socket.getsockname()[1]
-                for sockaddr in self.allsockaddrs:
-                    if (sockaddr in Session.bmc_handlers and
-                            myport in Session.bmc_handlers[sockaddr]):
-                        del Session.bmc_handlers[sockaddr][myport]
-                        if Session.bmc_handlers[sockaddr] == {}:
-                            del Session.bmc_handlers[sockaddr]
-        elif not self.broken:
+        if not self.broken:
             self.broken = True
             self.socketpool[self.socket] -= 1
 
@@ -1769,7 +1743,29 @@ class Session(object):
             Session.keepalive_sessions.pop(self, None)
         self.logged = 0
         self.logging = False
+        if self._customkeepalives:
+            for ka in list(self._customkeepalives):
+                # Be thorough and notify parties through their custom
+                # keepalives.  In practice, this *should* be the same, but
+                # if a code somehow makes duplicate SOL handlers,
+                # this would notify all the handlers rather than just the
+                # last one to take ownership
+                self._customkeepalives[ka][1](
+                    {'error': 'Session Disconnected'})
         self._customkeepalives = None
+        if not self.broken:
+            self.socketpool[self.socket] -= 1
+            self.broken = True
+            # since this session is broken, remove it from the handler list
+            # This allows constructor to create a new, functional object to
+            # replace this one
+            myport = self.socket.getsockname()[1]
+            for sockaddr in self.allsockaddrs:
+                if (sockaddr in Session.bmc_handlers and
+                            myport in Session.bmc_handlers[sockaddr]):
+                    del Session.bmc_handlers[sockaddr][myport]
+                    if Session.bmc_handlers[sockaddr] == {}:
+                        del Session.bmc_handlers[sockaddr]
         self.nowait = False
         self.socketpool[self.socket] -= 1
         return {'success': True}
