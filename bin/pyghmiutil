@@ -27,8 +27,9 @@ import sys
 from pyghmi.ipmi import command
 
 if (len(sys.argv) < 3) or 'IPMIPASSWORD' not in os.environ:
-    print "Usage:"
-    print " IPMIPASSWORD=password %s bmc username <cmd> <optarg>" % sys.argv[0]
+    print("Usage:")
+    print(" IPMIPASSWORD=password %s bmc username <cmd> <optarg>"
+          % sys.argv[0])
     sys.exit(1)
 
 password = os.environ['IPMIPASSWORD']
@@ -44,40 +45,41 @@ ipmicmd = None
 
 def docommand(result, ipmisession):
     cmmand = sys.argv[3]
-    print "Logged into %s" % ipmisession.bmc
+    print("Logged into %s" % ipmisession.bmc)
     if 'error' in result:
-        print result['error']
+        print(result['error'])
         return
     if cmmand == 'power':
         if args:
-            print ipmisession.set_power(args[0], wait=True)
+            print(ipmisession.set_power(args[0], wait=True))
         else:
             value = ipmisession.get_power()
-            print "%s: %s" % (ipmisession.bmc, value['powerstate'])
+            print("%s: %s" % (ipmisession.bmc, value['powerstate']))
     elif cmmand == 'bootdev':
         if args:
-            print ipmisession.set_bootdev(args[0])
+            print(ipmisession.set_bootdev(args[0]))
         else:
-            print ipmisession.get_bootdev()
+            print(ipmisession.get_bootdev())
     elif cmmand == 'sensors':
         for reading in ipmisession.get_sensor_data():
-            print repr(reading)
+            print(reading)
     elif cmmand == 'health':
-        print repr(ipmisession.get_health())
+        print(ipmisession.get_health())
     elif cmmand == 'inventory':
         for item in ipmisession.get_inventory():
-            print repr(item)
+            print(item)
     elif cmmand == 'leds':
         for led in ipmisession.get_leds():
-            print repr(led)
+            print(led)
     elif cmmand == 'graphical':
-        print ipmisession.get_graphical_console()
+        print(ipmisession.get_graphical_console())
     elif cmmand == 'net':
-        print ipmisession.get_net_configuration()
+        print(ipmisession.get_net_configuration())
     elif cmmand == 'raw':
-        print ipmisession.raw_command(netfn=int(args[0]),
-                                      command=int(args[1]),
-                                      data=map(lambda x: int(x, 16), args[2:]))
+        print(ipmisession.raw_command(
+            netfn=int(args[0]),
+            command=int(args[1]),
+            data=map(lambda x: int(x, 16), args[2:])))
 
 bmcs = string.split(bmc, ",")
 for bmc in bmcs:

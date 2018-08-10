@@ -45,7 +45,7 @@ class FakeBmc(bmc.Bmc):
 
     def cold_reset(self):
         # Reset of the BMC, not managed system, here we will exit the demo
-        print 'shutting down in response to BMC cold reset request'
+        print('shutting down in response to BMC cold reset request')
         sys.exit(0)
 
     def get_power_state(self):
@@ -54,18 +54,18 @@ class FakeBmc(bmc.Bmc):
     def power_off(self):
         # this should be power down without waiting for clean shutdown
         self.powerstate = 'off'
-        print 'abruptly remove power'
+        print('abruptly remove power')
 
     def power_on(self):
         self.powerstate = 'on'
-        print 'powered on'
+        print('powered on')
 
     def power_reset(self):
         pass
 
     def power_shutdown(self):
         # should attempt a clean shutdown
-        print 'politely shut down the system'
+        print('politely shut down the system')
         self.powerstate = 'off'
 
     def is_active(self):
