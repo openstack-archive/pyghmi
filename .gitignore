@@ -1,19 +1,48 @@
-# Compiled python files
+# Compiled files
 *.py[co]
+*.a
+*.o
+*.so
 
 # Editors
 .*.sw[klmop]
 *~
 
+# Sphinx
+_build
+doc/source/contributor/api/
+_static
+
+# release notes build
+releasenotes/build
+
 # Packages/installer info
-*.egg[s]
+*.egg
 *.egg-info
 dist
+build
+eggs
+.eggs
+parts
+var
 sdist
+develop-eggs
+.installed.cfg
 
 # Other
+*.DS_Store
+.idea
 .testrepository
+.stestr
+.tox
+.venv
+.*.swp
+.coverage
+cover
 AUTHORS
 ChangeLog
-.tox
-doc/build
+*.sqlite
+*~
+
+# Vagrant
+.vagrant
