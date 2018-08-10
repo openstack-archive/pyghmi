@@ -29,21 +29,8 @@ import tty
 from pyghmi.ipmi import console
 import threading
 
-tcattr = termios.tcgetattr(sys.stdin)
-newtcattr = tcattr
-# TODO(jbjohnso): add our exit handler
-newtcattr[-1][termios.VINTR] = 0
-newtcattr[-1][termios.VSUSP] = 0
-termios.tcsetattr(sys.stdin, termios.TCSADRAIN, newtcattr)
 
-tty.setraw(sys.stdin.fileno())
-currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
-fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
-
-sol = None
-
-
-def _doinput():
+def _doinput(sol):
     while True:
         select.select((sys.stdin,), (), (), 600)
         try:
@@ -51,6 +38,8 @@ def _doinput():
         except (IOError, OSError) as e:
             if e.errno == 11:
                 continue
+            raise
+
         sol.send_data(data)
 
 
@@ -64,22 +53,40 @@ def _print(data):
     if bailout:
         raise Exception(data)
 
-try:
-    if sys.argv[3] is None:
-        passwd = os.environ['IPMIPASSWORD']
-    else:
-        passwd_file = sys.argv[3]
-        with open(passwd_file, "r") as f:
-            passwd = f.read()
 
-    sol = console.Console(bmc=sys.argv[1], userid=sys.argv[2], password=passwd,
-                          iohandler=_print, force=True)
-    inputthread = threading.Thread(target=_doinput)
-    inputthread.daemon = True
-    inputthread.start()
-    sol.main_loop()
-except Exception:
+def main():
+    tcattr = termios.tcgetattr(sys.stdin)
+    newtcattr = tcattr
+    # TODO(jbjohnso): add our exit handler
+    newtcattr[-1][termios.VINTR] = 0
+    newtcattr[-1][termios.VSUSP] = 0
+    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, newtcattr)
+
+    tty.setraw(sys.stdin.fileno())
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
-    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
-    termios.tcsetattr(sys.stdin, termios.TCSANOW, tcattr)
-    sys.exit(0)
+    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
+
+    try:
+        if sys.argv[3] is None:
+            passwd = os.environ['IPMIPASSWORD']
+        else:
+            passwd_file = sys.argv[3]
+            with open(passwd_file, "r") as f:
+                passwd = f.read()
+
+        sol = console.Console(bmc=sys.argv[1], userid=sys.argv[2], password=passwd,
+                              iohandler=_print, force=True)
+        inputthread = threading.Thread(target=_doinput, args=(sol,))
+        inputthread.daemon = True
+        inputthread.start()
+        sol.main_loop()
+
+    except Exception:
+        currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
+        termios.tcsetattr(sys.stdin, termios.TCSANOW, tcattr)
+        return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

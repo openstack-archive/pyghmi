@@ -20,67 +20,75 @@
 # it isn't conceived as a general utility to actually use, just help developers
 # understand how the ipmi_command class workes.
 # """
+import functools
 import os
 import string
 import sys
 
 from pyghmi.ipmi import command
 
-if (len(sys.argv) < 3) or 'IPMIPASSWORD' not in os.environ:
-    print("Usage:")
-    print(" IPMIPASSWORD=password %s bmc username <cmd> <optarg>" % sys.argv[0])
-    sys.exit(1)
 
-password = os.environ['IPMIPASSWORD']
-os.environ['IPMIPASSWORD'] = ""
-bmc = sys.argv[1]
-userid = sys.argv[2]
-args = None
-if len(sys.argv) >= 5:
-    args = sys.argv[4:]
-
-ipmicmd = None
-
-
-def docommand(result, ipmisession):
-    cmmand = sys.argv[3]
+def docommand(args, result, ipmisession):
+    command = args[0]
+    args = args[1:]
     print("Logged into %s" % ipmisession.bmc)
     if 'error' in result:
         print(result['error'])
         return
-    if cmmand == 'power':
+    if command == 'power':
         if args:
             print(ipmisession.set_power(args[0], wait=True))
         else:
             value = ipmisession.get_power()
             print("%s: %s" % (ipmisession.bmc, value['powerstate']))
-    elif cmmand == 'bootdev':
+    elif command == 'bootdev':
         if args:
             print(ipmisession.set_bootdev(args[0]))
         else:
             print(ipmisession.get_bootdev())
-    elif cmmand == 'sensors':
+    elif command == 'sensors':
         for reading in ipmisession.get_sensor_data():
             print(reading)
-    elif cmmand == 'health':
+    elif command == 'health':
         print(ipmisession.get_health())
-    elif cmmand == 'inventory':
+    elif command == 'inventory':
         for item in ipmisession.get_inventory():
             print(item)
-    elif cmmand == 'leds':
+    elif command == 'leds':
         for led in ipmisession.get_leds():
             print(led)
-    elif cmmand == 'graphical':
+    elif command == 'graphical':
         print(ipmisession.get_graphical_console())
-    elif cmmand == 'net':
+    elif command == 'net':
         print(ipmisession.get_net_configuration())
-    elif cmmand == 'raw':
+    elif command == 'raw':
         print(ipmisession.raw_command(netfn=int(args[0]),
                                       command=int(args[1]),
                                       data=map(lambda x: int(x, 16), args[2:])))
 
-bmcs = string.split(bmc, ",")
-for bmc in bmcs:
-    ipmicmd = command.Command(bmc=bmc, userid=userid, password=password,
-                              onlogon=docommand)
-ipmicmd.eventloop()
+
+def main():
+    if (len(sys.argv) < 3) or 'IPMIPASSWORD' not in os.environ:
+        print("Usage:")
+        print(" IPMIPASSWORD=password %s bmc username <cmd> <optarg>" % sys.argv[0])
+        return 1
+
+    password = os.environ['IPMIPASSWORD']
+    os.environ['IPMIPASSWORD'] = ""
+    bmc = sys.argv[1]
+    userid = sys.argv[2]
+
+    bmcs = string.split(bmc, ",")
+    ipmicmd = None
+    for bmc in bmcs:
+        # NOTE(etingof): is it right to have `ipmicmd` overridden?
+        ipmicmd = command.Command(
+            bmc=bmc, userid=userid, password=password,
+            onlogon=functools.partial(docommand, sys.argv[3:]))
+
+    if ipmicmd:
+        ipmicmd.eventloop()
+
+
+if __name__ == '__main__':
+    sys.exit(main())
