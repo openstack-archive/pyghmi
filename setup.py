@@ -20,6 +20,5 @@ import setuptools
 
 setuptools.setup(
     license='Apache License, Version 2.0',
-    scripts=['bin/pyghmicons', 'bin/pyghmiutil', 'bin/virshbmc'],
     setup_requires=['pbr'],
     pbr=True)

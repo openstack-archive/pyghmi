@@ -77,7 +77,7 @@ class FakeBmc(bmc.Bmc):
             self.sol.send_data(data)
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(
         prog='fakebmc',
         description='Pretend to be a BMC',
@@ -90,3 +90,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     mybmc = FakeBmc({'admin': 'password'}, port=args.port)
     mybmc.listen()
+
+
+if __name__ == '__main__':
+    sys.exit(main())

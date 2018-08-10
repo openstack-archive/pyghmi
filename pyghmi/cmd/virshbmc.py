@@ -127,7 +127,7 @@ class LibvirtBmc(bmc.Bmc):
             libvirt.virEventRunDefaultImpl()
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(
         prog='virshbmc',
         description='Pretend to be a BMC and proxy to virsh',
@@ -156,3 +156,7 @@ if __name__ == '__main__':
                        domain=args.domain,
                        port=args.port)
     mybmc.listen()
+
+
+if __name__ == '__main__':
+    sys.exit(main())
