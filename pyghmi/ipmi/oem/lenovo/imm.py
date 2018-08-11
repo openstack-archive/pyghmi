@@ -491,9 +491,12 @@ class IMMClient(object):
             return None
 
     def get_oem_sensor_names(self, ipmicmd):
-        if self._energymanager is None:
-            self._energymanager = energy.EnergyManager(ipmicmd)
-        return self._energymanager.supportedmeters
+        try:
+            if self._energymanager is None:
+                self._energymanager = energy.EnergyManager(ipmicmd)
+            return self._energymanager.supportedmeters
+        except pygexc.UnsupportedFunctionality:
+            return ()
 
     def get_oem_sensor_descriptions(self, ipmicmd):
         return [{'name': x, 'type': 'Energy'
