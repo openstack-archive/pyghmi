@@ -914,10 +914,10 @@ class OEMHandler(generic.OEMHandler):
                                                        progress=progress,
                                                        bank=bank)
 
-    def get_system_configuration(self):
+    def get_system_configuration(self, hideadvanced):
         if self.has_imm or self.has_xcc:
-            return self.immhandler.get_system_configuration()
-        return super(OEMHandler, self).get_system_configuration()
+            return self.immhandler.get_system_configuration(hideadvanced)
+        return super(OEMHandler, self).get_system_configuration(hideadvanced)
 
     def set_system_configuration(self, changeset):
         if self.has_imm or self.has_xcc:
