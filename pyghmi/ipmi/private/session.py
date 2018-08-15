@@ -124,12 +124,15 @@ def define_worker():
                     # deadline if they still have time waiting, or
                     # if they have expired, wake them now to let them
                     # process their timeout
-                    for w in directediowaiters[d]:
+                    for idx, w in enumerate(list(directediowaiters[d])):
                         ltimeout = w[0] - _monotonic_time()
                         if ltimeout < 0:
                             w[1].set()  # time is up, wake the caller
+                            del directediowaiters[d][idx]
                         elif ltimeout < timeout:
                             timeout = ltimeout
+                    if not directediowaiters[d]:
+                        del directediowaiters[d]
                 while ioqueue:
                     workitem = ioqueue.popleft()
                     # order: function, args, list to append to , event to set
