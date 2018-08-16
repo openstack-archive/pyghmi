@@ -124,8 +124,9 @@ def define_worker():
                     # deadline if they still have time waiting, or
                     # if they have expired, wake them now to let them
                     # process their timeout
+                    rightnow = _monotonic_time()
                     for idx, w in enumerate(list(directediowaiters[d])):
-                        ltimeout = w[0] - _monotonic_time()
+                        ltimeout = w[0] - rightnow
                         if ltimeout < 0:
                             w[1].set()  # time is up, wake the caller
                             del directediowaiters[d][idx]
