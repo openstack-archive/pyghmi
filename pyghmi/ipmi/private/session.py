@@ -125,7 +125,8 @@ def define_worker():
                     # if they have expired, wake them now to let them
                     # process their timeout
                     rightnow = _monotonic_time()
-                    for idx, w in enumerate(list(directediowaiters[d])):
+                    for idx, w in reversed(list(
+                            enumerate(directediowaiters[d]))):
                         ltimeout = w[0] - rightnow
                         if ltimeout < 0:
                             w[1].set()  # time is up, wake the caller
@@ -413,7 +414,7 @@ class Session(object):
                 if sess['timeout'] < _monotonic_time() - 15:
                     # session would have timed out by now, don't use it
                     return False
-        return True
+        return not session.broken
 
     def __new__(cls,
                 bmc,
