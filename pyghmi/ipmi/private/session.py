@@ -118,7 +118,7 @@ def define_worker():
                 for w in iowaiters:
                     w[1].set()
                 iowaiters = []
-                for d in directediowaiters:
+                for d in list(directediowaiters):
                     # these are the existing waiters that didn't get
                     # satisfied last graball, allow them to set a new
                     # deadline if they still have time waiting, or
