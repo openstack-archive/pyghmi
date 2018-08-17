@@ -36,6 +36,7 @@ import pyghmi.ipmi.private.util as pygutil
 import pyghmi.ipmi.sdr as sdr
 import socket
 import struct
+import threading
 
 try:
     range = xrange
@@ -94,6 +95,19 @@ def _mask_to_cidr(mask):
 
 def _cidr_to_mask(prefix):
     return struct.pack('>I', 2 ** prefix - 1 << (32 - prefix))
+
+class Housekeeper(threading.Thread):
+    """A Maintenance thread for housekeeping
+
+    Long lived use of pyghmi may warrant some recurring asynchronous behavior.
+    This stock thread provides a simple minimal context for these housekeeping
+    tasks to run in.  To use, do 'pyghmi.ipmi.command.Maintenance().start()'
+    and from that point forward, pyghmi should execute any needed ongoing
+    tasks automatically as needed.  This is an alternative to calling
+    wait_for_rsp or eventloop in a thread of the callers design.
+    """
+    def run(self):
+        Command.eventloop()
 
 
 class Command(object):
@@ -172,8 +186,8 @@ class Command(object):
 
     @classmethod
     def eventloop(cls):
-        while session.Session.wait_for_rsp():
-            pass
+        while True:
+            session.Session.wait_for_rsp()
 
     @classmethod
     def wait_for_rsp(cls, timeout):
