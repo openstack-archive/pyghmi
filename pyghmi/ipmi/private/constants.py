@@ -1877,3 +1877,11 @@ ipmi_completion_codes = {
     0xff: "Unspecified",
     0xffff: "Timeout",  # not ipmi, but used internally
 }
+
+priv_levels = {
+     'callback': 1,
+     'user': 2,
+     'operator': 3,
+     'admin': 4,
+     'oem': 5,
+}
