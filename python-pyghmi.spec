@@ -14,7 +14,7 @@ Name: python-%{sname}
 Version: %{?version:%{version}}%{!?version:%(python setup.py --version)}
 Release: %{?release:%{release}}%{!?release:1}
 Source0: http://tarballs.openstack.org/%{sname}/%{sname}-%{version}.tar.gz
-License: Apache License, Version 2.0
+License: ASL 2.0
 Group: Development/Libraries
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
@@ -33,7 +33,7 @@ BuildRequires: python2-devel
 BuildRequires: python2-pbr
 BuildRequires: python2-setuptools
 
-Requires: python2-cryptography
+Requires: python2-cryptography >= 2.1
 
 %description -n python2-%{sname}
 %{common_desc}
@@ -55,7 +55,7 @@ BuildRequires: python3-devel
 BuildRequires: python3-pbr
 BuildRequires: python3-setuptools
 
-Requires: python3-cryptography
+Requires: python3-cryptography >= 2.1
 
 %description -n python3-%{sname}
 %{common_desc}
@@ -78,7 +78,7 @@ BuildRequires: python2-sphinx
 Documentation for the pyghmi library
 
 %prep
-%setup -n %{sname}-%{version}
+%setup -qn %{sname}-%{version}
 
 %build
 %if 0%{?with_python3}
