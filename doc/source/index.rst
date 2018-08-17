@@ -1,17 +1,15 @@
-.. pyghmi documentation master file, created by
-   sphinx-quickstart on Tue Jun 18 09:15:24 2013.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
-Welcome to pyghmi's documentation!
-=======================================
+.. include:: ../../README
 
-Contents:
+Documentation
+=============
 
 .. toctree::
-   :maxdepth: 2
+  :maxdepth: 2
 
-.. autoclass:: pyghmi.ipmi.command.Command
+  install/index
+  reference/index
+  contributor/index
 
 Indices and tables
 ==================
@@ -19,4 +17,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
