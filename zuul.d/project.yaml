@@ -1,7 +1,10 @@
 - project:
     check:
       jobs:
+        - build-openstack-sphinx-docs
         - openstack-tox-lower-constraints
+
     gate:
       jobs:
+        - build-openstack-sphinx-docs
         - openstack-tox-lower-constraints
