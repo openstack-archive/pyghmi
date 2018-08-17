@@ -119,7 +119,7 @@ class Command(object):
     """
 
     def __init__(self, bmc=None, userid=None, password=None, port=623,
-                 onlogon=None, kg=None):
+                 onlogon=None, kg=None, privlevel=4):
         # TODO(jbjohnso): accept tuples and lists of each parameter for mass
         # operations without pushing the async complexities up the stack
         self.onlogon = onlogon
@@ -137,7 +137,8 @@ class Command(object):
                                                 password=password,
                                                 onlogon=self.logged,
                                                 port=port,
-                                                kg=kg)
+                                                kg=kg,
+                                                privlevel=privlevel)
             # induce one iteration of the loop, now that we would be
             # prepared for it in theory
             session.Session.wait_for_rsp(0)
@@ -146,7 +147,8 @@ class Command(object):
                                                 userid=userid,
                                                 password=password,
                                                 port=port,
-                                                kg=kg)
+                                                kg=kg,
+                                                privlevel=privlevel)
 
     def register_key_handler(self, callback, type='tls'):
         """Assign a verification handler for a public key

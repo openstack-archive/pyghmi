@@ -422,7 +422,8 @@ class Session(object):
                 password,
                 port=623,
                 kg=None,
-                onlogon=None):
+                onlogon=None,
+                privlevel=4):
         trueself = None
         forbidsock = []
         for res in socket.getaddrinfo(bmc, port, 0, socket.SOCK_DGRAM):
@@ -469,7 +470,8 @@ class Session(object):
                  password,
                  port=623,
                  kg=None,
-                 onlogon=None):
+                 onlogon=None,
+                 privlevel=4):
         if hasattr(self, 'initialized'):
             # new found an existing session, do not corrupt it
             if onlogon is None:
@@ -483,7 +485,7 @@ class Session(object):
             return
         self.broken = False
         self.logged = 0
-        self.privlevel = 4
+        self.privlevel = privlevel
         self.maxtimeout = 3  # be aggressive about giving up on initial packet
         self.incommand = False
         self.nameonly = 16  # default to name only lookups in RAKP exchange
