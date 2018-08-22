@@ -431,6 +431,10 @@ class Command(object):
         rsp['data'] = buffer(rsp['data'])
         return rsp
 
+    def get_diagnostic_data(self, savefile, progress=None):
+        self.oem_init()
+        return self._oem.get_diagnostic_data(savefile)
+
     def get_description(self):
         """Get physical attributes for the system, e.g. for GUI use
 
