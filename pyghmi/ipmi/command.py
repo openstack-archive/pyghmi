@@ -417,6 +417,16 @@ class Command(object):
         rsp['data'] = buffer(rsp['data'])
         return rsp
 
+    def get_description(self):
+        """Get physical attributes for the system, e.g. for GUI use
+
+        :returns: dict -- dict containing attributes, 'height' is for
+               how many U tall, 'slot' for what slot in a blade enclosure
+               or 0 if not blade, for example.
+        """
+        self.oem_init()
+        return self._oem.get_description()
+
     def raw_command(self, netfn, command, bridge_request=(), data=(),
                     delay_xmit=None, retry=True, timeout=None):
         """Send raw ipmi command to BMC
