@@ -738,6 +738,33 @@ class XCCClient(IMMClient):
             self._parse_storage_cfgspec(pool)
         return True
 
+    def get_diagnostic_data(self, savefile, progress=None):
+        self.wc.grab_json_response('/api/providers/ffdc',
+                                   {'Generate_FFDC': 1})
+        percent = 0
+        while percent != 100:
+            ipmisession.Session.pause(3)
+            result = self.wc.grab_json_response('/api/providers/ffdc',
+                                                {'Generate_FFDC_status': 1})
+            self._refresh_token()
+            if progress:
+                progress({'phase': 'generate', 'progress': float(percent)})
+            percent = result['progress']
+        while 'FileName' not in result:
+            result = self.wc.grab_json_response('/api/providers/ffdc',
+                                                {'Generate_FFDC_status': 1})
+        url = '/ffdc/{0}'.format(result['FileName'])
+        fd = webclient.FileDownloader(self.wc, url, savefile)
+        fd.start()
+        while fd.isAlive():
+            fd.join(1)
+            if progress and self.wc.get_download_progress():
+                progress({'phase': 'download',
+                          'progress': 100 * self.wc.get_download_progress()})
+            self._refresh_token()
+        if progress:
+            progress({'phase': 'complete'})
+
     def _parse_array_spec(self, arrayspec):
         controller = None
         if arrayspec.disks:

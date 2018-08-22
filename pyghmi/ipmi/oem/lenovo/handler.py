@@ -607,6 +607,10 @@ class OEMHandler(generic.OEMHandler):
                                               self._fpc_variant)
         return super(OEMHandler, self).get_oem_firmware(bmcver)
 
+    def get_diagnostic_data(self, savefile, progress):
+        if self.has_xcc:
+            return self.immhandler.get_diagnostic_data(savefile, progress)
+
     def get_oem_capping_enabled(self):
         if self.has_tsm:
             rsp = self.ipmicmd.xraw_command(netfn=0x3a, command=0x1b,

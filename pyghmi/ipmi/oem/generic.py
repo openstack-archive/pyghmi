@@ -85,6 +85,18 @@ class OEMHandler(object):
         """
         return ()
 
+    def get_diagnostic_data(self, savefile, progress=None):
+        """Download diagnostic data about target to a file
+
+        This should be a payload that the vendor's support team can use
+        to do diagnostics.
+        :param savefile: File object or filename to save to
+        :param progress: Callback to be informed about progress
+        :return:
+        """
+        raise exc.UnsupportedFunctionality(
+            'Do not know how to get diagnostic data for this platform')
+
     def get_sensor_data(self):
         """Get OEM sensor data
 

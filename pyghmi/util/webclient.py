@@ -59,6 +59,17 @@ class FileUploader(threading.Thread):
                                   self.formname, otherfields=self.otherfields)
 
 
+class FileDownloader(threading.Thread):
+
+    def __init__(self, webclient, url, savefile):
+        self.wc = webclient
+        self.url = url
+        self.savefile = savefile
+        super(FileDownloader, self).__init__()
+
+    def run(self):
+        self.wc.download(self.url, self.savefile)
+
 def get_upload_form(filename, data, formname, otherfields):
     if not formname:
         formname = filename
@@ -153,6 +164,28 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
             return json.loads(rsp.read())
         rsp.read()
         return {}
+
+    def download(self, url, file):
+        """Download a file to filename or file object
+
+        """
+        if isinstance(file, str) or isinstance(file, unicode):
+            file = open(file, 'wb')
+        webclient = self.dupe()
+        webclient.request('GET', url)
+        rsp = webclient.getresponse()
+        self._currdl = rsp
+        self._dlfile = file
+        for chunk in iter(lambda: rsp.read(16384), ''):
+            file.write(chunk)
+        self._currdl = None
+        file.close()
+
+    def get_download_progress(self):
+        if not self._currdl:
+            return None
+        return float(self._dlfile.tell()) / float(
+            self._currdl.getheader('content-length'))
 
     def upload(self, url, filename, data=None, formname=None,
                otherfields=()):
