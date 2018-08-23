@@ -914,6 +914,11 @@ class OEMHandler(generic.OEMHandler):
                                                        progress=progress,
                                                        bank=bank)
 
+    def get_description(self):
+        if self.has_xcc:
+            return self.immhandler.get_description()
+        return super(OEMHandler, self).get_description()
+
     def get_system_configuration(self, hideadvanced):
         if self.has_imm or self.has_xcc:
             return self.immhandler.get_system_configuration(hideadvanced)

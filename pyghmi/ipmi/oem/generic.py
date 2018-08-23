@@ -32,6 +32,16 @@ class OEMHandler(object):
     def get_video_launchdata(self):
         return {}
 
+    def get_description(self):
+        """Get a description of descriptive attributes of a node.
+
+        Height describes, in U how tall the system is, and slot is 0 if
+        not a blade type server, and slot if it is.
+
+        :return: dictionary with 'height' and 'slot' members
+        """
+        return {}
+
     def process_event(self, event, ipmicmd, seldata):
         """Modify an event according with OEM understanding.
 

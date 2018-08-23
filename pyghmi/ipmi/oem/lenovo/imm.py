@@ -679,6 +679,11 @@ class XCCClient(IMMClient):
         super(XCCClient, self).__init__(ipmicmd)
         self.adp_referer = None
 
+    def get_description(self):
+        dsc = self.wc.grab_json_response('/DeviceDescription.json')
+        dsc = dsc[0]
+        return {'height': int(dsc['u-height']), 'slot': int(dsc['slot'])}
+
     def get_webclient(self, login=True):
         cv = self.ipmicmd.certverify
         wc = webclient.SecureHTTPConnection(self.imm, 443, verifycallback=cv)
