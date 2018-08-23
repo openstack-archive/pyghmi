@@ -433,7 +433,7 @@ class Command(object):
 
     def get_diagnostic_data(self, savefile, progress=None):
         self.oem_init()
-        return self._oem.get_diagnostic_data(savefile)
+        return self._oem.get_diagnostic_data(savefile, progress)
 
     def get_description(self):
         """Get physical attributes for the system, e.g. for GUI use

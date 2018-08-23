@@ -748,7 +748,7 @@ class XCCClient(IMMClient):
                                                 {'Generate_FFDC_status': 1})
             self._refresh_token()
             if progress:
-                progress({'phase': 'generate', 'progress': float(percent)})
+                progress({'phase': 'initializing', 'progress': float(percent)})
             percent = result['progress']
         while 'FileName' not in result:
             result = self.wc.grab_json_response('/api/providers/ffdc',
