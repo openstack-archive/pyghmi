@@ -761,6 +761,14 @@ class Command(object):
         self.oem_init()
         return self._oem.set_system_configuration(changeset)
 
+    def clear_system_configuration(self):
+        """Clear the Bios/UEFI configuration
+
+        This requests the system revert to factory default settings
+        """
+        self.oem_init()
+        self._oem.clear_system_configuration()
+
     def set_net_configuration(self, ipv4_address=None, ipv4_configuration=None,
                               ipv4_gateway=None, channel=None):
         """Set network configuration data.

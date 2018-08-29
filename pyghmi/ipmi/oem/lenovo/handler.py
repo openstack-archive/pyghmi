@@ -933,6 +933,11 @@ class OEMHandler(generic.OEMHandler):
             return self.immhandler.set_system_configuration(changeset)
         return super(OEMHandler, self).set_system_configuration(changeset)
 
+    def clear_system_configuration(self):
+        if self.has_xcc:
+            return self.immhandler.clear_system_configuration()
+        return super(OEMHandler, self).clear_system_configuration()
+
     def detach_remote_media(self):
         if self.has_imm:
             self.immhandler.detach_remote_media()

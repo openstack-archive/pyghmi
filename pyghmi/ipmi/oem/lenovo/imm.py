@@ -685,6 +685,11 @@ class XCCClient(IMMClient):
         dsc = dsc[0]
         return {'height': int(dsc['u-height']), 'slot': int(dsc['slot'])}
 
+    def clear_system_configuration(self):
+        self.wc.grab_json_response(
+            '/redfish/v1/Systems/1/Bios/Actions/Bios.ResetBios',
+            {"Action":"Bios.ResetBios"})
+
     def get_webclient(self, login=True):
         cv = self.ipmicmd.certverify
         wc = webclient.SecureHTTPConnection(self.imm, 443, verifycallback=cv)
