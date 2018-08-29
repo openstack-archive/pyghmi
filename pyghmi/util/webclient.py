@@ -151,14 +151,15 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
             raise
         return rsp
 
-    def grab_json_response(self, url, data=None, referer=None):
+    def grab_json_response(self, url, data=None, referer=None, headers=None):
         webclient = self.dupe()
         if isinstance(data, dict):
             data = json.dumps(data)
         if data:
-            webclient.request('POST', url, data, referer=referer)
+            webclient.request('POST', url, data, referer=referer,
+                              headers=headers)
         else:
-            webclient.request('GET', url, referer=referer)
+            webclient.request('GET', url, referer=referer, headers=headers)
         rsp = webclient.getresponse()
         if rsp.status == 200:
             return json.loads(rsp.read())

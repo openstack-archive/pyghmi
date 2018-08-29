@@ -56,6 +56,10 @@ class OEMHandler(object):
         if evdata[0] & 0b110000 == 0b100000:
             event['oem_byte3'] = evdata[2]
 
+    def clear_system_configuration(self):
+        raise exc.UnsupportedFunctionality(
+            'Clearing system configuration not implemented for this platform')
+
     def get_oem_inventory_descriptions(self):
         """Get descriptions of available additional inventory items
 

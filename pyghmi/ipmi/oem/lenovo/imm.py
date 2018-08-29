@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 from datetime import datetime
 import errno
 import json
@@ -684,6 +685,14 @@ class XCCClient(IMMClient):
         dsc = self.wc.grab_json_response('/DeviceDescription.json')
         dsc = dsc[0]
         return {'height': int(dsc['u-height']), 'slot': int(dsc['slot'])}
+
+    def clear_system_configuration(self):
+        self.wc.grab_json_response(
+            '/redfish/v1/Systems/1/Bios/Actions/Bios.ResetBios',
+            {'Action': 'Bios.ResetBios'},
+            headers={'Authorization': 'Basic ' + base64.b64encode(
+                self.username + ':' + self.password),
+                     'Content-Type': 'application/json'})
 
     def get_webclient(self, login=True):
         cv = self.ipmicmd.certverify
