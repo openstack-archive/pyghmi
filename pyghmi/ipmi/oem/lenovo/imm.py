@@ -533,7 +533,8 @@ class IMMClient(object):
         hwmap = {}
         enclosureuuid = self.get_property('/v2/ibmc/smm/chassis/uuid')
         if enclosureuuid:
-            bay = self.get_property('/v2/cmm/sp/7')
+            bay = hex(int(self.get_property('/v2/cmm/sp/7'))).replace(
+                '0x', '')
             serial = self.get_property('/v2/ibmc/smm/chassis/sn')
             model = self.get_property('/v2/ibmc/smm/chassis/mtm')
             hwmap['Enclosure'] = {
