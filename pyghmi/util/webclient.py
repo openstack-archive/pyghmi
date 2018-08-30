@@ -100,6 +100,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
                  **kwargs):
         if 'timeout' not in kwargs:
             kwargs['timeout'] = 60
+        self.lastjsonerror = None
         self.broken = False
         self.thehost = host
         self.theport = port
@@ -152,6 +153,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         return rsp
 
     def grab_json_response(self, url, data=None, referer=None, headers=None):
+        self.lastjsonerror = None
         webclient = self.dupe()
         if isinstance(data, dict):
             data = json.dumps(data)
@@ -163,7 +165,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         rsp = webclient.getresponse()
         if rsp.status == 200:
             return json.loads(rsp.read())
-        rsp.read()
+        self.lastjsonerror = rsp.read()
         return {}
 
     def download(self, url, file):

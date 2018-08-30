@@ -687,12 +687,16 @@ class XCCClient(IMMClient):
         return {'height': int(dsc['u-height']), 'slot': int(dsc['slot'])}
 
     def clear_system_configuration(self):
-        self.wc.grab_json_response(
-            '/redfish/v1/Systems/1/Bios/Actions/Bios.ResetBios',
-            {'Action': 'Bios.ResetBios'},
-            headers={'Authorization': 'Basic ' + base64.b64encode(
-                self.username + ':' + self.password),
-                     'Content-Type': 'application/json'})
+        res = self.wc.grab_json_response(
+                '/redfish/v1/Systems/1/Bios/Actions/Bios.ResetBios',
+                {'Action': 'Bios.ResetBios'},
+                headers={'Authorization': 'Basic ' + base64.b64encode(
+                    self.username + ':' + self.password),
+                         'Content-Type': 'application/json'})
+        if not res:
+            raise Exception(
+                'Unexpected response to clear configuration: {0}'.format(
+                    self.wc.lastjsonerror))
 
     def get_webclient(self, login=True):
         cv = self.ipmicmd.certverify
