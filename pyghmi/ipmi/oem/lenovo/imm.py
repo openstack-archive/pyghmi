@@ -17,6 +17,7 @@
 import base64
 from datetime import datetime
 import errno
+import fnmatch
 import json
 import os.path
 import pyghmi.constants as pygconst
@@ -176,11 +177,13 @@ class IMMClient(object):
             self.fwovintage = util._monotonic_time()
         for key in list(changeset):
             if key not in self.fwo:
+                found = False
                 for rkey in self.fwo:
-                    if rkey.lower() == key.lower():
+                    if fnmatch.fnmatch(rkey.lower(), key.lower()):
                         changeset[rkey] = changeset[key]
-                        del changeset[key]
-                        break
+                        found = True
+                if found:
+                    del changeset[key]
                 else:
                     raise pygexc.InvalidParameterValue(
                         '{0} not a known setting'.format(key))
