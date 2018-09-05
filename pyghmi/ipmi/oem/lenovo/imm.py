@@ -451,6 +451,14 @@ class IMMClient(object):
                             except ValueError:
                                 pass
                         yield ('{0} {1}'.format(aname, fname), bdata)
+        for disk in self.disk_inventory():
+            yield disk
+        self.weblogout()
+
+    def disk_inventory(self, mode=0):
+        if mode==1:
+            # Bypass IMM hardware inventory for now
+            return
         storagedata = self.get_cached_data('lenovo_cached_storage')
         if not storagedata:
             if self.wc:
@@ -476,7 +484,6 @@ class IMMClient(object):
                     bdata['version'] = diskent['storage.firmwares'][0][
                         'versionStr']
                     yield (diskname, bdata)
-        self.weblogout()
 
     def get_hw_inventory(self):
         hwmap = self.hardware_inventory_map()
@@ -547,6 +554,8 @@ class IMMClient(object):
                 'Model': fixup_str(model),
                 'Serial': fixup_str(serial),
             }
+        for disk in self.disk_inventory(mode=1): # hardware mode
+            hwmap[disk[0]] = disk[1]
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
         if not adapterdata:
             if self.updating:
@@ -781,6 +790,41 @@ class XCCClient(IMMClient):
             self._refresh_token()
         if progress:
             progress({'phase': 'complete'})
+
+    def disk_inventory(self, mode=0):
+        # mode 0 is firmware, 1 is hardware
+        storagedata = self.get_cached_data('lenovo_cached_storage')
+        if not storagedata:
+            if self.wc:
+                storagedata = self.wc.grab_json_response(
+                    '/api/function/raid_alldevices?params=storage_GetAllDisks')
+                if storagedata:
+                    self.datacache['lenovo_cached_storage'] = (
+                        storagedata, util._monotonic_time())
+        if storagedata and 'items' in storagedata:
+            for adp in storagedata['items']:
+                for diskent in adp.get('disks', ()):
+                    if mode==0:
+                        yield self.get_disk_firmware(diskent)
+                    elif mode==1:
+                        yield self.get_disk_hardware(diskent)
+
+    def get_disk_hardware(self, diskent):
+        bdata = {}
+        diskname = 'Disk {0}'.format(diskent['slotNo'])
+        bdata['Model'] = diskent['productName'].rstrip()
+        bdata['Serial Number'] = diskent['serialNo'].rstrip()
+        bdata['FRU Number'] = diskent['fruPartNo'].rstrip()
+        bdata['Description'] = diskent['type'].rstrip()
+        return (diskname, bdata)
+
+    def get_disk_firmware(self, diskent):
+        bdata = {}
+        diskname = 'Disk {0}'.format(diskent['slotNo'])
+        bdata['model'] = diskent[
+            'productName'].rstrip()
+        bdata['version'] = diskent['fwVersion']
+        return (diskname, bdata)
 
     def _parse_array_spec(self, arrayspec):
         controller = None
