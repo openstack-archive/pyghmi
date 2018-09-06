@@ -39,7 +39,15 @@ import weakref
 
 
 numregex = re.compile('([0-9]+)')
-
+funtypes = {
+    0: 'RAID Controller',
+    1: 'Ethernet',
+    2: 'Fibre Channel',
+    3: 'Infiniband',
+    4: 'GPU',
+    10: 'NVMe Controller',
+    12: 'Fabric Controller',
+}
 
 def naturalize_string(key):
     """Analyzes string in a human way to enable natural sort
@@ -88,6 +96,13 @@ class IMMClient(object):
     ADP_LABEL = 'adapter.connectorLabel'
     ADP_SLOTNO = 'adapter.slotNo'
     ADP_OOB = 'adapter.oobSupported'
+    ADP_PARTNUM = 'vpd.partNo'
+    ADP_SERIALNO = 'vpd.serialNo'
+    ADP_VENID = 'generic.vendorId'
+    ADP_SUBVENID = 'generic.subVendor'
+    ADP_DEVID = 'generic.devId'
+    ADP_SUBDEVID = 'generic.subDevId'
+    ADP_FRU = 'vpd.cardSKU'
     BUSNO = 'generic.busNo'
     PORTS = 'network.pPorts'
     DEVNO = 'generic.devNo'
@@ -571,8 +586,6 @@ class IMMClient(object):
             anames = {}
             for adata in adapterdata['items']:
                 skipadapter = False
-                if not adata[self.ADP_OOB]:
-                    continue
                 aname = adata[self.ADP_NAME]
                 if aname in anames:
                     anames[aname] += 1
@@ -592,13 +605,34 @@ class IMMClient(object):
                 for fundata in adata[self.ADP_FUN]:
                     bdata['pcislot'] = '{0:02x}:{1:02x}'.format(
                         fundata[self.BUSNO], fundata[self.DEVNO])
-                    serialdata = fundata.get('vpd.serialNo', None)
+                    serialdata = fundata.get(self.ADP_SERIALNO, None)
                     if (serialdata and serialdata != 'N/A' and
                             '---' not in serialdata):
                         bdata['serial'] = serialdata
-                    partnum = fundata.get('vpd.partNo', None)
+                    partnum = fundata.get(self.ADP_PARTNUM, None)
                     if partnum and partnum != 'N/A':
-                        bdata['partnumber'] = partnum
+                        bdata['Part Number'] = partnum
+                    cardtype = funtypes.get(fundata.get('funType', None),
+                                            None)
+                    if cardtype is not None:
+                        bdata['Type'] = cardtype
+                    venid = fundata.get(self.ADP_VENID, None)
+                    if venid is not None:
+                        bdata['PCI Vendor ID'] = '{0:04x}'.format(venid)
+                    devid = fundata.get(self.ADP_DEVID, None)
+                    if devid is not None:
+                        bdata['PCI Device ID'] = '{0:04x}'.format(devid)
+                    venid = fundata.get(self.ADP_SUBVENID, None)
+                    if venid is not None:
+                        bdata['PCI Subsystem Vendor ID'] = '{0:04x}'.format(
+                            venid)
+                    devid = fundata.get(self.ADP_SUBDEVID, None)
+                    if devid is not None:
+                        bdata['PCI Subsystem Device ID'] = '{0:04x}'.format(
+                            devid)
+                    fruno = fundata.get(self.ADP_FRU, None)
+                    if fruno is not None:
+                        bdata['FRU Number'] = fruno
                     if self.PORTS in fundata:
                         for portinfo in fundata[self.PORTS]:
                             for lp in portinfo['logicalPorts']:
@@ -685,6 +719,13 @@ class XCCClient(IMMClient):
     ADP_LABEL = 'connectorLabel'
     ADP_SLOTNO = 'slotNo'
     ADP_OOB = 'oobSupported'
+    ADP_PARTNUM = 'vpd_partNo'
+    ADP_SERIALNO = 'vpd_serialNo'
+    ADP_VENID = 'generic_vendorId'
+    ADP_SUBVENID = 'generic_subVendor'
+    ADP_DEVID = 'generic_devId'
+    ADP_SUBDEVID = 'generic_subDevId'
+    ADP_FRU = 'vpd_cardSKU'
     BUSNO = 'generic_busNo'
     PORTS = 'network_pPorts'
     DEVNO = 'generic_devNo'
