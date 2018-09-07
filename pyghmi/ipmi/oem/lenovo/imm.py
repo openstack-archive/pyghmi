@@ -586,12 +586,6 @@ class IMMClient(object):
             anames = {}
             for adata in adapterdata['items']:
                 skipadapter = False
-                aname = adata[self.ADP_NAME]
-                if aname in anames:
-                    anames[aname] += 1
-                    aname = '{0} {1}'.format(aname, anames[aname])
-                else:
-                    anames[aname] = 1
                 clabel = adata[self.ADP_LABEL]
                 if clabel == 'Unknown':
                     continue
@@ -601,7 +595,13 @@ class IMMClient(object):
                         clabel = 'ML2 (Slot {0})'.format(aslot)
                     else:
                         clabel = 'Slot {0}'.format(aslot)
-                bdata = {'location': clabel}
+                aname = adata[self.ADP_NAME]
+                bdata = {'location': clabel, 'name': aname}
+                if aname in anames:
+                    anames[aname] += 1
+                    aname = '{0} {1}'.format(aname, anames[aname])
+                else:
+                    anames[aname] = 1
                 for fundata in adata[self.ADP_FUN]:
                     bdata['pcislot'] = '{0:02x}:{1:02x}'.format(
                         fundata[self.BUSNO], fundata[self.DEVNO])
