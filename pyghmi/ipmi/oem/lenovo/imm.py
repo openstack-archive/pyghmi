@@ -796,7 +796,7 @@ class XCCClient(IMMClient):
         rsp = self.wc.grab_json_response(
             '/api/function/raid_conf?params=raidlink_GetStatus')
         if rsp['items'][0]['status'] != 2:
-            raise pygexc.TemporaryError('Storage configuration unavilable in '
+            raise pygexc.TemporaryError('Storage configuration unavailable in '
                                         'current state (try boot to setup or '
                                         'an OS)')
         if not cfgspec:
