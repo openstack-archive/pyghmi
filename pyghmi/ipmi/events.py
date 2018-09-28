@@ -123,6 +123,7 @@ slot_types = {
     9: 'PCIe',
     10: 'SCSI',
     11: 'SATA/SAS',
+    12: 'USB',
 }
 
 power_states = {
@@ -251,8 +252,8 @@ def decode_eventdata(sensor_type, offset, eventdata, sdr):
         return 'Requested {0] while {1}'.format(eventdata[1], eventdata[2])
     elif sensor_type == 0x1d and offset == 7:
         return restart_causes.get(eventdata[1], 'Unknown')
-    elif sensor_type == 0x21 and offset == 0x9:
-        return '{0} {1}'.format(slot_types.get(eventdata[1], 'Unknown'),
+    elif sensor_type == 0x21:
+        return '{0} Slot/Connector {1}'.format(slot_types.get(eventdata[1], 'Unknown'),
                                 eventdata[2])
 
     elif sensor_type == 0x23:
