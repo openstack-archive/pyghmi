@@ -140,6 +140,7 @@ class Command(object):
         self.bmc = bmc
         self._sdr = None
         self._oem = None
+        self._oemknown = False
         self._netchannel = None
         self._ipv6support = None
         self.certverify = None
@@ -220,9 +221,10 @@ class Command(object):
         method does an interrogation to identify the OEM.
 
         """
-        if self._oem:
+        if self._oemknown:
             return
-        self._oem = get_oem_handler(self._get_device_id(), self)
+        self._oem, self._oemknown = get_oem_handler(self._get_device_id(),
+                                                    self)
 
     def get_bootdev(self):
         """Get current boot device override information.

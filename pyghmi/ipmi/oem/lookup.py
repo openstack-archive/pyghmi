@@ -26,6 +26,7 @@ oemmap = {
 
 def get_oem_handler(oemid, ipmicmd):
     try:
-        return oemmap[oemid['manufacturer_id']].OEMHandler(oemid, ipmicmd)
+        return (oemmap[oemid['manufacturer_id']].OEMHandler(oemid, ipmicmd),
+                True)
     except KeyError:
-        return generic.OEMHandler(oemid, ipmicmd)
+        return generic.OEMHandler(oemid, ipmicmd), False
