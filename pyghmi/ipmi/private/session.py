@@ -540,6 +540,7 @@ class Session(object):
     def _mark_broken(self, error=None):
         # since our connection has failed retries
         # deregister our keepalive facility
+        self.lastpayload = none
         with util.protect(KEEPALIVE_SESSIONS):
             Session.keepalive_sessions.pop(self, None)
         with util.protect(WAITING_SESSIONS):
@@ -1655,6 +1656,7 @@ class Session(object):
             self._mark_broken()
             return
         elif self.sessioncontext == 'FAILED':
+            self.lastpayload = None
             self.nowait = False
             return
         if self.sessioncontext == 'OPENSESSION':
@@ -1746,6 +1748,7 @@ class Session(object):
                                             struct.pack("I", self.sessionid)),
                          retry=False)
         # stop trying for a keepalive,
+        self.lastpayload = None
         with util.protect(KEEPALIVE_SESSIONS):
             Session.keepalive_sessions.pop(self, None)
         self.logged = 0
