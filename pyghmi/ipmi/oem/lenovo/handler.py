@@ -330,6 +330,10 @@ class OEMHandler(generic.OEMHandler):
     def is_fpc(self):
         """True if the target is a Lenovo nextscale fan power controller
         """
+        if self.has_imm or self.has_xcc:
+            return None
+        if self._fpc_variant is not None:
+            return self._fpc_variant
         fpc_ids = ((19046, 32, 1063), (20301, 32, 462))
         smm_id = (19046, 32, 1180)
         currid = (self.oemid['manufacturer_id'], self.oemid['device_id'],
@@ -381,29 +385,29 @@ class OEMHandler(generic.OEMHandler):
                 yield inv
 
     def get_sensor_data(self):
-        if self.is_fpc:
-            for name in nextscale.get_sensor_names(self._fpc_variant):
-                yield nextscale.get_sensor_reading(name, self.ipmicmd,
-                                                   self._fpc_variant)
-        elif self.has_imm:
+        if self.has_imm:
             for name in self.immhandler.get_oem_sensor_names(self.ipmicmd):
                 yield self.immhandler.get_oem_sensor_reading(name,
                                                              self.ipmicmd)
+        elif self.is_fpc:
+            for name in nextscale.get_sensor_names(self._fpc_variant):
+                yield nextscale.get_sensor_reading(name, self.ipmicmd,
+                                                   self._fpc_variant)
 
     def get_sensor_descriptions(self):
-        if self.is_fpc:
-            return nextscale.get_sensor_descriptions(self._fpc_variant)
-        elif self.has_imm:
+        if self.has_imm:
             return self.immhandler.get_oem_sensor_descriptions(self.ipmicmd)
+        elif self.is_fpc:
+            return nextscale.get_sensor_descriptions(self._fpc_variant)
         return ()
 
     def get_sensor_reading(self, sensorname):
-        if self.is_fpc:
-            return nextscale.get_sensor_reading(sensorname, self.ipmicmd,
-                                                self._fpc_variant)
-        elif self.has_imm:
+        if self.has_imm:
             return self.immhandler.get_oem_sensor_reading(sensorname,
                                                           self.ipmicmd)
+        elif self.is_fpc:
+            return nextscale.get_sensor_reading(sensorname, self.ipmicmd,
+                                                self._fpc_variant)
         return ()
 
     def get_inventory_of_component(self, component):
@@ -679,17 +683,17 @@ class OEMHandler(generic.OEMHandler):
             self.smmhandler.set_domain(name)
 
     def set_hostname(self, hostname):
-        if self.is_fpc:
-            return self.smmhandler.set_hostname(hostname)
-        elif self.has_xcc:
+        if self.has_xcc:
             return self.immhandler.set_hostname(hostname)
+        elif self.is_fpc:
+            return self.smmhandler.set_hostname(hostname)
         return super(OEMHandler, self).set_hostname(hostname)
 
     def get_hostname(self):
-        if self.is_fpc:
-            return self.smmhandler.get_hostname()
-        elif self.has_xcc:
+        if self.has_xcc:
             return self.immhandler.get_hostname()
+        elif self.is_fpc:
+            return self.smmhandler.get_hostname()
         return super(OEMHandler, self).get_hostname()
 
     """ Gets a remote console launcher for a Lenovo ThinkServer.
