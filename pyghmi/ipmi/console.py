@@ -58,6 +58,7 @@ class Console(object):
         self.activated = False
         self.force_session = force
         self.port = port
+        self.ipmi_session = None
         self.ipmi_session = session.Session(bmc=bmc,
                                             userid=userid,
                                             password=password,
@@ -74,6 +75,8 @@ class Console(object):
         if 'error' in response:
             self._print_error(response['error'])
             return
+        while not self.ipmi_session:
+            Session.wait_for_rsp(0)
         # Send activate sol payload directive
         # netfn= 6 (application)
         # command = 0x48 (activate payload)
