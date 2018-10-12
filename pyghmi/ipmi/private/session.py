@@ -484,6 +484,7 @@ class Session(object):
                     self.iterwaiters.append(onlogon)
             return
         self.broken = False
+        self.socket = None
         self.logged = 0
         self.privlevel = privlevel
         self.maxtimeout = 3  # be aggressive about giving up on initial packet
@@ -556,7 +557,8 @@ class Session(object):
         self.errormsg = error
         if not self.broken:
             self.broken = True
-            self.socketpool[self.socket] -= 1
+            if self.socket:
+                self.socketpool[self.socket] -= 1
 
     def onlogon(self, parameter):
         if 'error' in parameter:
