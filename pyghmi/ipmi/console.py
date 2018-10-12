@@ -58,6 +58,8 @@ class Console(object):
         self.activated = False
         self.force_session = force
         self.port = port
+        self.ipmi_session = None
+        self.callgotsession = None
         self.ipmi_session = session.Session(bmc=bmc,
                                             userid=userid,
                                             password=password,
@@ -67,12 +69,18 @@ class Console(object):
         # induce one iteration of the loop, now that we would be
         # prepared for it in theory
         session.Session.wait_for_rsp(0)
+        if self.callgotsession is not None:
+            self._got_session(self.callgotsession)
+            self.callgotsession = False
 
     def _got_session(self, response):
         """Private function to navigate SOL payload activation
         """
         if 'error' in response:
             self._print_error(response['error'])
+            return
+        if not self.ipmi_session:
+            self.callgotsession = response
             return
         # Send activate sol payload directive
         # netfn= 6 (application)
