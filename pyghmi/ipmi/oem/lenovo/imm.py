@@ -1115,7 +1115,7 @@ class XCCClient(IMMClient):
                         disks=disks, raid=pool['rdlvlstr'], volumes=volumes,
                         id=(cid, pool['id']), hotspares=spares,
                         capacity=totalsize, available_capacity=freesize))
-                for disk in cinfo['unconfiguredDisks']:
+                for disk in cinfo.get('unconfiguredDisks', ()):
                     # can be unused, global hot spare, or JBOD
                     standalonedisks.append(
                         storage.Disk(
