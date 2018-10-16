@@ -803,6 +803,7 @@ class XCCClient(IMMClient):
             return True
         for pool in cfgspec.arrays:
             self._parse_storage_cfgspec(pool)
+        self.weblogout()
         return True
 
     def get_diagnostic_data(self, savefile, progress=None):
@@ -968,11 +969,12 @@ class XCCClient(IMMClient):
     def clear_storage_arrays(self):
         rsp = self.wc.grab_json_response(
             '/api/function', {'raidlink_ClearRaidConf': '1'})
+        self.weblogout()
         if rsp['return'] != 0:
             raise Exception('Unexpected return to clear config: ' + repr(rsp))
 
     def remove_storage_configuration(self, cfgspec):
-        realcfg = self.get_storage_configuration()
+        realcfg = self.get_storage_configuration(False)
         for pool in cfgspec.arrays:
             for volume in pool.volumes:
                 vid = str(volume.id[1])
@@ -984,9 +986,10 @@ class XCCClient(IMMClient):
                 self._wait_storage_async()
         for disk in cfgspec.disks:
             self._make_available(disk, realcfg)
+        self.weblogout()
 
     def apply_storage_configuration(self, cfgspec):
-        realcfg = self.get_storage_configuration()
+        realcfg = self.get_storage_configuration(False)
         for disk in cfgspec.disks:
             if disk.status.lower() == 'jbod':
                 self._make_jbod(disk, realcfg)
@@ -998,6 +1001,7 @@ class XCCClient(IMMClient):
         for pool in cfgspec.arrays:
             if pool.disks:
                 self._create_array(pool)
+        self.weblogout()
 
     def _create_array(self, pool):
         params = self._parse_array_spec(pool)
@@ -1015,7 +1019,7 @@ class XCCClient(IMMClient):
             if vol.name is None:
                 # need to iterate while there exists a volume of that name
                 if currvolnames is None:
-                    currcfg = self.get_storage_configuration()
+                    currcfg = self.get_storage_configuration(False)
                     currvolnames = set([])
                     for pool in currcfg.arrays:
                         for volume in pool.volumes:
@@ -1080,7 +1084,7 @@ class XCCClient(IMMClient):
             drives.append(drive)
         return controller
 
-    def get_storage_configuration(self):
+    def get_storage_configuration(self, logout=True):
         rsp = self.wc.grab_json_response(
             '/api/function/raid_alldevices?params=storage_GetAllDevices')
         standalonedisks = []
@@ -1122,6 +1126,8 @@ class XCCClient(IMMClient):
                             name=disk['name'], description=disk['type'],
                             id=(cid, disk['id']), status=disk['RAIDState'],
                             serial=disk['serialNo'], fru=disk['fruPartNo']))
+        if logout:
+            self.weblogout()
         return storage.ConfigSpec(disks=standalonedisks, arrays=pools)
 
     def attach_remote_media(self, url, user, password):
