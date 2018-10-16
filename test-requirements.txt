@@ -1,4 +1,4 @@
-hacking>=0.5.6
+hacking>=1.1.0,<1.2.0
 coverage>=4.0
 fixtures>=3.0.0
 python-subunit>=1.0.0
