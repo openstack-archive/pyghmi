@@ -977,7 +977,7 @@ class XCCClient(IMMClient):
         realcfg = self.get_storage_configuration(False)
         for pool in cfgspec.arrays:
             for volume in pool.volumes:
-                vid = str(volume.id[1])
+                vid = '{0},{1}'.format(volume.id[1], volume.id[0])
                 rsp = self.wc.grab_json_response(
                     '/api/function', {'raidlink_RemoveVolumeAsync': vid})
                 if rsp['return'] != 0:
