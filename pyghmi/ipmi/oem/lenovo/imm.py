@@ -1089,7 +1089,7 @@ class XCCClient(IMMClient):
             '/api/function/raid_alldevices?params=storage_GetAllDevices')
         standalonedisks = []
         pools = []
-        for item in rsp['items']:
+        for item in rsp.get('items', []):
             for cinfo in item['controllerInfo']:
                 cid = cinfo['id']
                 for pool in cinfo['pools']:
