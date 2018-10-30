@@ -104,7 +104,11 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         self.broken = False
         self.thehost = host
         self.theport = port
-        httplib.HTTPConnection.__init__(self, host, port, strict, **kwargs)
+        try:
+            httplib.HTTPConnection.__init__(self, host, port, strict=strict,
+                                            **kwargs)
+        except TypeError:
+            httplib.HTTPConnection.__init__(self, host, port, **kwargs)
         self.cert_reqs = ssl.CERT_NONE  # verification will be done ssh style..
         if clone:
             self._certverify = clone._certverify
@@ -142,9 +146,13 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
     def getresponse(self):
         try:
             rsp = super(SecureHTTPConnection, self).getresponse()
-            for hdr in rsp.msg.headers:
-                if hdr.startswith('Set-Cookie:'):
-                    c = Cookie.BaseCookie(hdr[11:])
+            try:
+                hdrs = [x.split(':', 1) for x in rsp.msg.headers]
+            except AttributeError:
+                hdrs = rsp.msg.items()
+            for hdr in hdrs:
+                if hdr[0] == 'Set-Cookie':
+                    c = Cookie.BaseCookie(hdr[1])
                     for k in c:
                         self.cookies[k] = c[k].value
         except httplib.BadStatusLine:
