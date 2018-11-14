@@ -925,6 +925,8 @@ class OEMHandler(generic.OEMHandler):
     def get_description(self):
         if self.has_xcc:
             return self.immhandler.get_description()
+        if self.is_fpc:
+            return {'height': self._fpc_variant, 'slot': 0}
         return super(OEMHandler, self).get_description()
 
     def get_system_configuration(self, hideadvanced):
