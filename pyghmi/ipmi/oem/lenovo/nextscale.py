@@ -422,6 +422,8 @@ class SMMClient(object):
         if rsp.status != 200:
             raise Exception('Error validating firmware')
         progress({'phase': 'apply', 'progress': 0.0})
+        self.wc.request('POST', '/data', 'set=securityrollback:1')
+        self.wc.getresponse().read()
         self.wc.request('POST', '/data', 'set=fwUpdate:1')
         rsp = self.wc.getresponse()
         rsp.read()
