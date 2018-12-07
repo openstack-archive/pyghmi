@@ -1428,7 +1428,7 @@ class XCCClient(IMMClient):
         rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebSetFileName': rsp['items'][0]['path']}))
         if rsp['return'] == 25:
-            raise Exception('Temporory error validating update, try again')
+            raise Exception('Temporary error validating update, try again')
         if rsp['return'] != 0:
             raise Exception('Unexpected return to set filename: ' + repr(rsp))
         progress({'phase': 'validating',
@@ -1439,6 +1439,20 @@ class XCCClient(IMMClient):
             raise Exception('Update image not intended for this system')
         if rsp['return'] != 0:
             raise Exception('Unexpected return to verify: ' + repr(rsp))
+        verifystatus = 0
+        while verifystatus != 1:
+            rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
+                {'UPD_WebVerifyUploadFileStatus': 1}))
+            if rsp['return'] == 2:
+                # The XCC firmware predates the FileStatus api
+                break
+            if rsp['return'] != 0:
+                raise Exception('Unexpected return to verifystate: {0}'.format(repr(rsp)))
+            verifystatus = rsp['status']
+            if verifystatus == 2:
+                raise Exception('Failed to verify firmware image')
+            if verifystatus != 1:
+                ipmisession.Session.pause(1)
         progress({'phase': 'validating',
                   'progress': 99.0})
         self._refresh_token()
