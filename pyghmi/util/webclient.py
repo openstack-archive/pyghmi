@@ -162,6 +162,13 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
 
     def grab_json_response(self, url, data=None, referer=None, headers=None):
         self.lastjsonerror = None
+        body, status = self.grab_json_response_with_status(self, url, data, referer, headers)
+        if status == 200:
+            return body
+        self.lastjsonerror = body
+        return {}
+
+    def grab_json_response_with_status(self, url, data=None, referer=None, headers=None):
         webclient = self.dupe()
         if isinstance(data, dict):
             data = json.dumps(data)
@@ -171,10 +178,11 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         else:
             webclient.request('GET', url, referer=referer, headers=headers)
         rsp = webclient.getresponse()
-        if rsp.status == 200:
-            return json.loads(rsp.read())
-        self.lastjsonerror = rsp.read()
-        return {}
+        status = rsp.status
+        body = rsp.read()
+        if rsp.status >= 200 and rsp.status < 300:
+            return json.loads(rsp.read()) if body else {}, status
+        return body, status
 
     def download(self, url, file):
         """Download a file to filename or file object
