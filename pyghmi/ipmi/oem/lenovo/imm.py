@@ -1455,7 +1455,7 @@ class XCCClient(IMMClient):
                 raise Exception('Failed to verify firmware image')
             if verifystatus != 1:
                 ipmisession.Session.pause(1)
-            if verifystatus not in (0, 255):
+            if verifystatus not in (0, 1, 255):
                 raise Exception(
                     'Unexpected reply to verifystate: ' + repr(rsp))
         progress({'phase': 'validating',
