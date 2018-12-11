@@ -40,6 +40,7 @@ TYPE_UNKNOWN = 0
 TYPE_SENSOR = 1
 TYPE_FRU = 2
 
+shared_sdrs = {}
 
 def ones_complement(value, bits):
     # utility function to help with the large amount of 2s
@@ -663,11 +664,21 @@ class SDR(object):
         # NOTE(jbjohnso): not looking to support the various options in op
         # support, ignore those for now, reservation if some BMCs can't read
         # full SDR in one slurp
+        modtime = struct.unpack('!Q', repinfo['data'][5:13])[0]
         recid = 0
         rsvid = 0  # partial 'get sdr' will require this
         offset = 0
         size = 0xff
         chunksize = 128
+        try:
+            csdrs = shared_sdrs[
+                (self.fw_major, self.fw_minor, self.mfg_id, self.prod_id,
+                 self.device_id, modtime)]
+            self.sensors = csdrs['sensors']
+            self.fru = csdrs['fru']
+            return
+        except KeyError:
+            pass
         self.broken_sensor_ids = {}
         while recid != 0xffff:  # per 33.12 Get SDR command, 0xffff marks end
             newrecid = 0
@@ -724,6 +735,11 @@ class SDR(object):
                 del self.sensors[sid]
             except KeyError:
                 pass
+        shared_sdrs[(self.fw_major, self.fw_minor, self.mfg_id, self.prod_id,
+                     self.device_id, modtime)] = {
+            'sensors': self.sensors,
+            'fru': self.fru,
+        }
 
     def get_sensor_numbers(self):
         for number in self.sensors:
