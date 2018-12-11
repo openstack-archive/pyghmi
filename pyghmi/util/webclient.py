@@ -162,7 +162,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
 
     def grab_json_response(self, url, data=None, referer=None, headers=None):
         self.lastjsonerror = None
-        body, status = self.grab_json_response_with_status(self, url, data, referer, headers)
+        body, status = self.grab_json_response_with_status(url, data, referer, headers)
         if status == 200:
             return body
         self.lastjsonerror = body
