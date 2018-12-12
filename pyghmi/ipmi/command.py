@@ -138,6 +138,7 @@ class Command(object):
         # operations without pushing the async complexities up the stack
         self.onlogon = onlogon
         self.bmc = bmc
+        self._sdrcachedir = None
         self._sdr = None
         self._oem = None
         self._oemknown = False
@@ -164,6 +165,17 @@ class Command(object):
                                                 port=port,
                                                 kg=kg,
                                                 privlevel=privlevel)
+
+    def set_sdr_cachedir(self, path):
+        """Register use of a directory for SDR cache.
+
+        Takes the given directory and uses it to persist SDR cache run to run.
+        This can greatly improve performance across runs.
+
+        :param path:
+        :return:
+        """
+        self._sdrcachedir = path
 
     def register_key_handler(self, callback, type='tls'):
         """Assign a verification handler for a public key
@@ -541,7 +553,7 @@ class Command(object):
         # sdr timestamp, our data version revision, aux firmware revision,
         # and oem defined field
         if self._sdr is None:
-            self._sdr = sdr.SDR(self)
+            self._sdr = sdr.SDR(self, self._sdrcachedir)
         return self._sdr
 
     def get_event_log(self, clear=False):
@@ -588,8 +600,7 @@ class Command(object):
         returns an iterable of string descriptions
         """
         yield "System"
-        if self._sdr is None:
-            self._sdr = sdr.SDR(self)
+        self.init_sdr()
         for fruid in sorted(self._sdr.fru):
             yield self._sdr.fru[fruid].fru_name
         self.oem_init()
@@ -605,8 +616,7 @@ class Command(object):
         self.oem_init()
         if component == 'System':
             return self._get_zero_fru()
-        if self._sdr is None:
-            self._sdr = sdr.SDR(self)
+        self.init_sdr()
         for fruid in self._sdr.fru:
             if self._sdr.fru[fruid].fru_name == component:
                 return self._oem.process_fru(fru.FRU(
@@ -649,8 +659,7 @@ class Command(object):
         """
         self.oem_init()
         yield ("System", self._get_zero_fru())
-        if self._sdr is None:
-            self._sdr = sdr.SDR(self)
+        self.init_sdr()
         for fruid in sorted(self._sdr.fru):
             fruinf = fru.FRU(
                 ipmicmd=self, fruid=fruid, sdr=self._sdr.fru[fruid]).info
@@ -712,8 +721,7 @@ class Command(object):
         :param sensorname:  Name of the desired sensor
         :returns: sdr.SensorReading object
         """
-        if self._sdr is None:
-            self._sdr = sdr.SDR(self)
+        self.init_sdr()
         for sensor in self._sdr.get_sensor_numbers():
             if self._sdr.sensors[sensor].name == sensorname:
                 rsp = self.raw_command(command=0x2d, netfn=4, data=(sensor,))
@@ -910,8 +918,7 @@ class Command(object):
 
         :returns: Iterator of sdr.SensorReading objects
         """
-        if self._sdr is None:
-            self._sdr = sdr.SDR(self)
+        self.init_sdr()
         for sensor in self._sdr.get_sensor_numbers():
             rsp = self.raw_command(command=0x2d, netfn=4, data=(sensor,))
             if 'error' in rsp:
@@ -930,8 +937,7 @@ class Command(object):
 
         :returns: Iterator of dicts describing each sensor
         """
-        if self._sdr is None:
-            self._sdr = sdr.SDR(self)
+        self.init_sdr()
         for sensor in self._sdr.get_sensor_numbers():
             yield {'name': self._sdr.sensors[sensor].name,
                    'type': self._sdr.sensors[sensor].sensor_type}

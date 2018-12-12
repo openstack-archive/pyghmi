@@ -30,11 +30,18 @@
 # skipped for now
 
 import math
+import os
 import pyghmi.constants as const
 import pyghmi.exceptions as exc
 import pyghmi.ipmi.private.constants as ipmiconst
+import random
+import string
 import struct
 import weakref
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 TYPE_UNKNOWN = 0
 TYPE_SENSOR = 1
@@ -604,10 +611,11 @@ class SDR(object):
 
     :param ipmicmd: A Command class object
     """
-    def __init__(self, ipmicmd):
+    def __init__(self, ipmicmd, cachedir=None):
         self.ipmicmd = weakref.proxy(ipmicmd)
         self.sensors = {}
         self.fru = {}
+        self.cachedir = cachedir
         self.read_info()
 
     def read_info(self):
@@ -679,7 +687,31 @@ class SDR(object):
             return
         except KeyError:
             pass
+        cachefilename = None
         self.broken_sensor_ids = {}
+        if self.cachedir:
+            cachefilename = 'sdrcache.{0}.{1}.{2}.{3}.{4}.{5}'.format(
+                self.mfg_id, self.prod_id, self.device_id, self.fw_major,
+                self.fw_minor, modtime)
+            cachefilename = os.path.join(self.cachedir, cachefilename)
+        if cachefilename and os.path.isfile(cachefilename):
+            with open(cachefilename, 'r') as cfile:
+                csdrs = pickle.load(cfile)
+                for sdrdata in csdrs:
+                    self.add_sdr(sdrdata)
+                for sid in self.broken_sensor_ids:
+                    try:
+                        del self.sensors[sid]
+                    except KeyError:
+                        pass
+                shared_sdrs[
+                    (self.fw_major, self.fw_minor, self.mfg_id, self.prod_id,
+                     self.device_id, modtime)] = {
+                    'sensors': self.sensors,
+                    'fru': self.fru,
+                }
+                return
+        sdrraw = [] if cachefilename else None
         while recid != 0xffff:  # per 33.12 Get SDR command, 0xffff marks end
             newrecid = 0
             currlen = 0
@@ -724,6 +756,8 @@ class SDR(object):
                 if (offset + size) > currlen:
                     size = currlen - offset
             self.add_sdr(sdrdata)
+            if sdrraw is not None:
+                sdrraw.append(sdrdata)
             offset = 0
             if size != 0xff:
                 size = 5
@@ -740,6 +774,12 @@ class SDR(object):
             'sensors': self.sensors,
             'fru': self.fru,
         }
+        if cachefilename:
+            suffix = ''.join(
+                random.choice(string.ascii_lowercase) for _ in range(12))
+            with open(cachefilename + '.' + suffix, 'w') as cfile:
+                pickle.dump(sdrraw, cfile)
+            os.rename(cachefilename + '.' + suffix, cachefilename)
 
     def get_sensor_numbers(self):
         for number in self.sensors:
