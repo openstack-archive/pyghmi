@@ -304,6 +304,21 @@ class SMMClient(object):
                 if '"ST2"' in line:
                     self.st2 = line.split()[-1].replace(
                         '"', '').replace(',', '')
+        if not self.st2:
+            wc.request('GET', '/scripts/index.ajs')
+            rsp = wc.getresponse()
+            body = rsp.read()
+            if rsp.status != 200:
+                raise Exception(body)
+            for line in body.split('\n'):
+                if '"ST1"' in line:
+                    self.st1 = line.split()[-1].replace(
+                        '"', '').replace(',', '')
+                if '"ST2"' in line:
+                    self.st2 = line.split()[-1].replace(
+                        '"', '').replace(',', '')
+        if not self.st2:
+            raise Exception('Unable to locate ST2 token')
         wc.set_header('ST2', self.st2)
         return wc
 
