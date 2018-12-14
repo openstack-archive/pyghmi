@@ -1444,7 +1444,7 @@ class XCCClient(IMMClient):
             rsp = self.wc.grab_json_response(
                 '/api/providers/fwupdate',
                 json.dumps({'UPD_WebVerifyUploadFileStatus': 1}))
-            if rsp['return'] == 2:
+            if not rsp or rsp['return'] == 2:
                 # The XCC firmware predates the FileStatus api
                 break
             if rsp['return'] != 0:
