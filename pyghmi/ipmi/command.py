@@ -133,7 +133,7 @@ class Command(object):
     """
 
     def __init__(self, bmc=None, userid=None, password=None, port=623,
-                 onlogon=None, kg=None, privlevel=4):
+                 onlogon=None, kg=None, privlevel=4, verifycallback=None):
         # TODO(jbjohnso): accept tuples and lists of each parameter for mass
         # operations without pushing the async complexities up the stack
         self.onlogon = onlogon
@@ -144,7 +144,7 @@ class Command(object):
         self._oemknown = False
         self._netchannel = None
         self._ipv6support = None
-        self.certverify = None
+        self.certverify = verifycallback
         if bmc is None:
             self.ipmi_session = localsession.Session()
         elif onlogon is not None:

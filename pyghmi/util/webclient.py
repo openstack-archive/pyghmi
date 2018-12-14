@@ -16,6 +16,7 @@
 # sake of typical internal management devices.  Compatibility back to python
 # 2.6 as is found in commonly used enterprise linux distributions.
 
+import base64
 import json
 import pyghmi.exceptions as pygexc
 import socket
@@ -125,6 +126,10 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
     def set_header(self, key, value):
         self.stdheaders[key] = value
 
+    def set_basic_credentials(self, username, password):
+        self.stdheaders['Authorization'] = 'Basic {0}'.format(
+            base64.b64encode(':'.join((username, password))))
+
     def connect(self):
         addrinfo = socket.getaddrinfo(self.host, self.port)[0]
         # workaround problems of too large mtu, moderately frequent occurance
@@ -168,15 +173,20 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         self.lastjsonerror = body
         return {}
 
-    def grab_json_response_with_status(self, url, data=None, referer=None, headers=None):
+    def grab_json_response_with_status(self, url, data=None, referer=None,
+                                       headers=None, method=None):
         webclient = self.dupe()
         if isinstance(data, dict):
             data = json.dumps(data)
         if data:
-            webclient.request('POST', url, data, referer=referer,
+            if not method:
+                method = 'POST'
+            webclient.request(method, url, data, referer=referer,
                               headers=headers)
         else:
-            webclient.request('GET', url, referer=referer, headers=headers)
+            if not method:
+                method = 'GET'
+            webclient.request(method, url, referer=referer, headers=headers)
         rsp = webclient.getresponse()
         body = rsp.read()
         if rsp.status >= 200 and rsp.status < 300:
