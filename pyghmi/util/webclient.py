@@ -139,7 +139,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         self.sock = ssl.wrap_socket(plainsock, cert_reqs=self.cert_reqs)
         # txtcert = self.sock.getpeercert()  # currently not possible
         bincert = self.sock.getpeercert(binary_form=True)
-        if not self._certverify(bincert):
+        if self._certverify is not None and not self._certverify(bincert):
             raise pygexc.UnrecognizedCertificate('Unknown certificate',
                                                  bincert)
 
