@@ -487,7 +487,7 @@ class OEMHandler(generic.OEMHandler):
         else:
             raise pygexc.UnsupportedFunctionality()
 
-    def process_fru(self, fru):
+    def process_fru(self, fru, name=None):
         if fru is None:
             return fru
         if self.has_tsm:
@@ -551,6 +551,8 @@ class OEMHandler(generic.OEMHandler):
                     idx = idx + 6
             except (AttributeError, KeyError, IndexError):
                 pass
+            if self.has_xcc and name and name.startswith('PSU '):
+                self.immhandler.augment_psu_info(fru, name)
             return fru
         elif self.is_fpc == 2:  # SMM variant
             fru['oem_parser'] = 'lenovo'

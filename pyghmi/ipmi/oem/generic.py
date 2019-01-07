@@ -167,7 +167,7 @@ class OEMHandler(object):
         """
         return None
 
-    def process_fru(self, fru):
+    def process_fru(self, fru, name=None):
         """Modify a fru entry with OEM understanding.
 
         Given a fru, clarify 'extra' fields according to OEM rules and

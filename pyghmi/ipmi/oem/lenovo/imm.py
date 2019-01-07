@@ -422,6 +422,9 @@ class IMMClient(object):
                 raise Exception(result['reason'])
         self.weblogout()
 
+    def fetch_psu_firmware(self):
+        return []
+
     def fetch_agentless_firmware(self):
         adapterdata = self.get_cached_data('lenovo_cached_adapters')
         if not adapterdata:
@@ -1176,6 +1179,24 @@ class XCCClient(IMMClient):
     def keepalive(self):
         self._refresh_token_wc(self._keepalivesession)
 
+    def fetch_psu_firmware(self):
+        psudata = self.get_cached_data('lenovo_cached_psu')
+        if not psudata:
+            if self.wc:
+                psudata = self.wc.grab_json_response(
+                    '/api/function/psu_update?params=GetPsuListAndFW')
+                if psudata:
+                    self.datacache['lenovo_cached_psu'] = (
+                        psudata, util._monotonic_time())
+        if not psudata:
+            return
+        for psu in psudata['items']:
+            yield ('PSU {0}'.format(psu['slot']),
+                   {
+                       'model': psu['model'],
+                       'version': psu['version'],
+                   })
+
     def get_firmware_inventory(self, bmcver, components):
         # First we fetch the system firmware found in imm properties
         # then check for agentless, if agentless, get adapter info using
@@ -1264,6 +1285,8 @@ class XCCClient(IMMClient):
                 'core', 'uefi', 'bios', 'xcc', 'bmc', 'imm', 'fpga',
                 'lxpm'))):
             for firm in self.fetch_agentless_firmware():
+                yield firm
+            for firm in self.fetch_psu_firmware():
                 yield firm
 
     def detach_remote_media(self):
@@ -1533,6 +1556,30 @@ class XCCClient(IMMClient):
         if bank == 'backup':
             return 'complete'
         return 'pending'
+
+    def add_psu_hwinfo(self, hwmap):
+        psud = self.wc.grab_json_response('/api/dataset/imm_power_supplies')
+        if not psud:
+            return
+        for psus in psud['items'][0]['power']:
+            hwmap['PSU {0}'.format(psus['name'])] = {
+                'Wattage': psus['rated_power'],
+                'FRU Number': psus['fru_number'],
+            }
+
+    def augment_psu_info(self, info, psuname):
+        psud = self.get_cached_data('lenovo_cached_psuhwinfo')
+        if not psud:
+            psud = self.wc.grab_json_response('/api/dataset/imm_power_supplies')
+            if not psud:
+                return
+            self.datacache['lenovo_cached_psuhwinfo'] = (
+                psud, util._monotonic_time())
+        matchname = int(psuname.split(' ')[1])
+        for psus in psud['items'][0]['power']:
+            if psus['name'] == matchname:
+                info['Wattage'] = psus['rated_power']
+                break
 
     def get_health(self, summary):
         wc = self.get_webclient(False)

@@ -620,7 +620,8 @@ class Command(object):
         for fruid in self._sdr.fru:
             if self._sdr.fru[fruid].fru_name == component:
                 return self._oem.process_fru(fru.FRU(
-                    ipmicmd=self, fruid=fruid, sdr=self._sdr.fru[fruid]).info)
+                    ipmicmd=self, fruid=fruid, sdr=self._sdr.fru[fruid]).info,
+                                             component)
         return self._oem.get_inventory_of_component(component)
 
     def _get_zero_fru(self):
@@ -664,7 +665,8 @@ class Command(object):
             fruinf = fru.FRU(
                 ipmicmd=self, fruid=fruid, sdr=self._sdr.fru[fruid]).info
             if fruinf is not None:
-                fruinf = self._oem.process_fru(fruinf)
+                fruinf = self._oem.process_fru(fruinf,
+                                               self._sdr.fru[fruid].fru_name)
             yield (self._sdr.fru[fruid].fru_name, fruinf)
         for componentpair in self._oem.get_oem_inventory():
             yield componentpair
