@@ -1469,6 +1469,7 @@ class XCCClient(IMMClient):
             raise Exception('Unexpected return to verify: ' + repr(rsp))
         verifystatus = 0
         while verifystatus != 1:
+            self._refresh_token()
             rsp = self.wc.grab_json_response(
                 '/api/providers/fwupdate',
                 json.dumps({'UPD_WebVerifyUploadFileStatus': 1}))
