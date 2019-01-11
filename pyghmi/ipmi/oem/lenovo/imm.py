@@ -1468,13 +1468,15 @@ class XCCClient(IMMClient):
         if rsp['return'] != 0:
             raise Exception('Unexpected return to verify: ' + repr(rsp))
         verifystatus = 0
+        verifyuploadfilersp = None
         while verifystatus != 1:
             self._refresh_token()
-            rsp = self.wc.grab_json_response(
+            rsp, status = self.wc.grab_json_response_with_status(
                 '/api/providers/fwupdate',
                 json.dumps({'UPD_WebVerifyUploadFileStatus': 1}))
-            if not rsp or rsp['return'] == 2:
+            if not rsp or status != 200  or rsp['return'] == 2:
                 # The XCC firmware predates the FileStatus api
+                verifyuploadfilersp = rsp
                 break
             if rsp['return'] != 0:
                 raise Exception(
@@ -1494,6 +1496,8 @@ class XCCClient(IMMClient):
         if len(rsp['items']) != 1:
             raise Exception('Unexpected result: ' + repr(rsp))
         firmtype = rsp['items'][0]['firmware_type']
+        if not firmtype:
+            raise Exception('Unknown firmware description returned: ' + repr(rsp['items'][0]) + ' last verify return was: ' + repr(verifyuploadfilersp) + ' with code ' + status)
         if firmtype not in (
                 'TDM', 'WINDOWS DRIV', 'LINUX DRIVER', 'UEFI', 'IMM'):
             # adapter firmware
