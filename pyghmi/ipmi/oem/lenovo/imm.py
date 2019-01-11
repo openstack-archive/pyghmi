@@ -268,6 +268,7 @@ class IMMClient(object):
     def get_webclient(self):
         cv = self.ipmicmd.certverify
         wc = webclient.SecureHTTPConnection(self.imm, 443, verifycallback=cv)
+        wc.vintage = None
         try:
             wc.connect()
         except socket.error as se:
@@ -301,7 +302,8 @@ class IMMClient(object):
 
     @property
     def wc(self):
-        if not self._wc:
+        if (not self._wc or (self._wc.vintage and
+                             self._wc.vintage < util._monotonic_time() - 30)):
             self._wc = self.get_webclient()
         return self._wc
 
@@ -757,6 +759,7 @@ class XCCClient(IMMClient):
     def get_webclient(self, login=True):
         cv = self.ipmicmd.certverify
         wc = webclient.SecureHTTPConnection(self.imm, 443, verifycallback=cv)
+        wc.vintage = util._monotonic_time()
         try:
             wc.connect()
         except socket.error as se:
@@ -1402,6 +1405,7 @@ class XCCClient(IMMClient):
         wc.grab_json_response('/api/providers/identity')
         if '_csrf_token' in wc.cookies:
             wc.set_header('X-XSRF-TOKEN', self.wc.cookies['_csrf_token'])
+            wc.vintage = util._monotonic_time()
 
     def set_hostname(self, hostname):
         self.wc.grab_json_response('/api/dataset', {'IMM_HostName': hostname})
