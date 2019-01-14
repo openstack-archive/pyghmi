@@ -968,3 +968,13 @@ class OEMHandler(generic.OEMHandler):
         if self.has_xcc:
             return self.immhandler.get_health(summary)
         return super(OEMHandler, self).get_health(summary)
+
+    def get_licenses(self):
+        if self.has_xcc:
+            return self.immhandler.get_licenses()
+        return super(OEMHandler, self).get_licenses()
+
+    def apply_license(self, filename, progress=None):
+        if self.has_xcc:
+            return self.immhandler.apply_license(filename, progress)
+        return super(OEMHandler, self).apply_license(filename, progress)
