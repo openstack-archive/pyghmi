@@ -1604,3 +1604,19 @@ class XCCClient(IMMClient):
             # The XCC reports healthy, no need to interrogate
             raise pygexc.BypassGenericBehavior()
         # Will use the generic handling for unhealthy systems
+
+    def get_licenses(self):
+        licdata = self.wc.grab_json_response('/api/providers/imm_fod')
+        for lic in licdata.get('items', [{}])[0].get('keys', []):
+            if lic['status'] == 0:
+                yield {'name': lic['feature']}
+
+    def apply_license(self, filename, progress=None):
+        uploadthread = webclient.FileUploader(self.wc, '/upload', filename)
+        uploadthread.start()
+        uploadthread.join()
+        rsp = json.loads(uploadthread.rsp)
+        licpath = rsp.get('items', [{}])[0].get('path', None)
+        if licpath:
+            self.wc.grab_json_response({'FOD_LicenseKeyInstall': licpath})
+        return self.get_licenses()

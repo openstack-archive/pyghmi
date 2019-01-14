@@ -348,3 +348,9 @@ class OEMHandler(object):
         Takes a key value pair and applies it against the system configuration
         """
         raise exc.UnsupportedFunctionality()
+
+    def get_licenses(self):
+        raise exc.UnsupportedFunctionality()
+
+    def apply_license(self, filename, progress=None):
+        raise exc.UnsupportedFunctionality()
