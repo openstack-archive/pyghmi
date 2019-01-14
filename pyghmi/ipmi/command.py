@@ -1982,3 +1982,11 @@ class Command(object):
         """
         self.oem_init()
         return self._oem.list_media()
+
+    def get_licenses(self):
+        self.oem_init()
+        return self._oem.get_licenses()
+
+    def apply_license(self, filename, progress=None):
+        self.oem_init()
+        return self._oem.apply_license(filename, progress)
