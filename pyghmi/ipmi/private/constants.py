@@ -1148,7 +1148,7 @@ sensor_type_offsets = {
     0x1e: {  # boot error
         0: {
             'desc': 'No bootable media',
-            'severity': const.Health.Failed,
+            'severity': const.Health.Ok,
             'deassertion_desc': 'No bootable media deasserted',
             'deassertion_severity': const.Health.Ok,
         },
