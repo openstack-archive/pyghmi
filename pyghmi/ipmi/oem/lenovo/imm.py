@@ -1603,6 +1603,25 @@ class XCCClient(IMMClient):
         if 'items' in rsp and len(rsp['items']) == 0:
             # The XCC reports healthy, no need to interrogate
             raise pygexc.BypassGenericBehavior()
+        for item in rsp['items']:
+            # while usually the ipmi interrogation shall explain things,
+            # just in case there is a gap, make sure at least the
+            # health field is accurately updated
+            if (item['severity'] == 'W' and
+                    summary['health'] < pygconst.Health.Warning):
+                summary['health'] = pygconst.Health.Warning
+            if (item['severity'] == 'E' and
+                    summary['health'] < pygconst.Health.Critical):
+                summary['health'] = pygconst.Health.Critical
+            if item['cmnid'] == 'FQXSPPW0104J':
+                # This event does not get modeled by the sensors
+                # add a made up sensor to explain
+                summary['badreadings'].append(
+                    sdr.SensorReading({'name': item['source'],
+                                       'states': ['Not Redundant'],
+                                       'state_ids': [3],
+                                       'health': pygconst.Health.Warning,
+                                       'type': 'Power'}, ''))
         # Will use the generic handling for unhealthy systems
 
     def get_licenses(self):
