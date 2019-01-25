@@ -611,7 +611,7 @@ class OEMHandler(generic.OEMHandler):
         elif self.is_fpc:
             return nextscale.get_fpc_firmware(bmcver, self.ipmicmd,
                                               self._fpc_variant)
-        return super(OEMHandler, self).get_oem_firmware(bmcver)
+        return super(OEMHandler, self).get_oem_firmware(bmcver, components)
 
     def get_diagnostic_data(self, savefile, progress):
         if self.has_xcc:
