@@ -67,6 +67,8 @@ class Command(object):
         self.wc = webclient.SecureHTTPConnection(
             bmc, 443, verifycallback=verifycallback)
         self._varbmcurl = bmcurl
+        self._varbiosurl = None
+        self._varsetbiosurl = None
         self._varchassisurl = chassisurl
         self._varresetbmcurl = None
         self._storedsysinfvintage = 0
@@ -210,6 +212,28 @@ class Command(object):
         return {'bootdev': reqbootdev}
 
     @property
+    def _biosurl(self):
+        if not self._varbiosurl:
+            self._varbmcurl = self.sysinfo.get('Bios', {}).get('@odata.id',
+                                                              None)
+        if self._varbmcurl is None:
+            raise exc.UnsupportedFunctionality(
+                'Bios management not detected on this platform')
+        return self._varbmcurl
+
+    @property
+    def _setbiosurl(self):
+        if self._varsetbiosurl is None:
+            biosinfo = self._do_web_request(self._biosurl)
+            self._varsetbiosurl = biosinfo.get(
+                '@Redfish.Settings', {}).get('SettingsObject', {}).get(
+                '@odata.id', None)
+        if self._varsetbiosurl is None:
+            raise exc.UnsupportedFunctionality('Ability to set BIOS settings '
+                                               'not detected on this platform')
+        return self._varsetbiosurl
+
+    @property
     def _bmcurl(self):
         if not self._varbmcurl:
             self._varbmcurl = self.sysinfo.get('Links', {}).get(
@@ -283,6 +307,17 @@ class Command(object):
                     if funinfo['Status']['Health'] not in ('OK', None):
                         summary['badcomponents'].append(funinfo['Name'])
         return summary
+
+    def get_system_configuration(self, hideadvanced=True):
+        biosinfo = self._do_web_request(self._biosurl)
+        currsettings = {}
+        for setting in biosinfo.get('Attributes', {}):
+            currsettings[setting] = {'value': biosinfo['Attributes'][setting]}
+        return currsettings
+
+    def set_system_configuration(self, changeset):
+        redfishsettings = {'Attributes': changeset}
+        self._do_web_request(self._setbiosurl, redfishsettings, 'PATCH')
 
 
 if __name__ == '__main__':
