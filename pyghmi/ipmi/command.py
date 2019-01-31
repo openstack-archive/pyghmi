@@ -1586,6 +1586,9 @@ class Command(object):
             'proprietary': 5,
             'no_access': 0x0F,
         }
+        self.oem_init()
+        self._oem.set_user_access(
+            uid, channel, callback, link_auth, ipmi_msg, privilege_level)
         data = [b, uid & 0b00111111,
                 privilege_levels[privilege_level] & 0b00001111, 0]
         response = self.raw_command(netfn=0x06, command=0x43, data=data)
@@ -1824,11 +1827,11 @@ class Command(object):
         if channel is None:
             channel = self.get_network_channel()
         self.set_user_name(uid, name)
+        self.set_user_password(uid, password=password)
+        self.set_user_password(uid, mode='enable', password=password)
         self.set_user_access(uid, channel, callback=callback,
                              link_auth=link_auth, ipmi_msg=ipmi_msg,
                              privilege_level=privilege_level)
-        self.set_user_password(uid, password=password)
-        self.set_user_password(uid, mode='enable', password=password)
         return True
 
     def user_delete(self, uid, channel=None):

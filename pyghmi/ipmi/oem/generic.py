@@ -316,6 +316,10 @@ class OEMHandler(object):
         """
         raise exc.UnsupportedFunctionality()
 
+    def set_user_access(self, uid, channel, callback, link_auth, ipmi_msg,
+                        privilege_level):
+        return  # Nothing to do
+
     def set_alert_ipv6_destination(self, ip, destination, channel):
         """Set an IPv6 alert destination
 

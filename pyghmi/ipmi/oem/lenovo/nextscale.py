@@ -251,6 +251,15 @@ class SMMClient(object):
         self.password = ipmicmd.ipmi_session.password
         self._wc = None
 
+    def set_user_priv(self, uid, priv):
+        if priv.lower() == 'administrator':
+            rsp = self.ipmicmd.xraw_command(netfn=6, command=0x46, data=(uid,))
+            username = bytes(rsp['data']).rstrip(b'\x00')
+            self.wc.request(
+                'POST', '/data', b'set=user({0},1,{1},511,,4,15,0)'.format(
+                    uid, username))
+            rsp = self.wc.getresponse()
+
     def reseat_bay(self, bay):
         self.ipmicmd.xraw_command(netfn=0x32, command=0xa4,
                                   data=[int(bay), 2])

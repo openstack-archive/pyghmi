@@ -326,6 +326,11 @@ class OEMHandler(generic.OEMHandler):
             return True
         return None
 
+    def set_user_access(self, uid, channel, callback, link_auth, ipmi_msg,
+                        privilege_level):
+        if self.is_fpc and  self._fpc_variant == 2:
+            self.smmhandler.set_user_priv(uid, privilege_level)
+
     @property
     def is_fpc(self):
         """True if the target is a Lenovo nextscale fan power controller
