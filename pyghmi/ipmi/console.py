@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -237,23 +238,25 @@ class Console(object):
 
     def _sendpendingoutput(self):
         with self.outputlock:
+            dobreak = False
+            chunk = ''
             if len(self.pendingoutput) == 0:
                 return
             if isinstance(self.pendingoutput[0], dict):
                 if 'break' in self.pendingoutput[0]:
-                    self._sendoutput("", sendbreak=True)
+                    dobreak = True
                 else:
+                    del self.pendingoutput[0]
                     raise ValueError
                 del self.pendingoutput[0]
-                return
-            if len(self.pendingoutput[0]) > self.maxoutcount:
+            elif len(self.pendingoutput[0]) > self.maxoutcount:
                 chunk = self.pendingoutput[0][:self.maxoutcount]
                 self.pendingoutput[0] = self.pendingoutput[0][
                     self.maxoutcount:]
             else:
                 chunk = self.pendingoutput[0]
                 del self.pendingoutput[0]
-            self._sendoutput(chunk)
+            self._sendoutput(chunk, sendbreak=dobreak)
 
     def _sendoutput(self, output, sendbreak=False):
         self.myseq += 1
