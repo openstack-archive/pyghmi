@@ -1,7 +1,10 @@
 cd `dirname $0`
+# If not PBR, use the setup.py.tmpl
+python -c 'import pbr' || ./makesetup
 VERSION=`python setup.py --version`
 python setup.py sdist
 cp dist/pyghmi-$VERSION.tar.gz ~/rpmbuild/SOURCES
-rpmbuild -bs python-pyghmi.spec
+grep -v python.-pbr python-pyghmi.spec > currentbuild.spec
+rpmbuild -bs currentbuild.spec
 rm $1/python-pyghmi-*rpm
 cp ~/rpmbuild/SRPMS/python-pyghmi-$VERSION-1.src.rpm $1/

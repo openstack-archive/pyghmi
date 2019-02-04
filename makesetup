@@ -1,0 +1,10 @@
+#!/bin/sh
+cd `dirname $0`
+VERSION=`git describe|cut -d- -f 1`
+NUMCOMMITS=`git describe|cut -d- -f 2`
+if [ "$NUMCOMMITS" != "$VERSION"  ]; then
+    VERSION=$VERSION.dev$NUMCOMMITS.g`git describe|cut -d- -f 3`
+fi
+echo $VERSION > VERSION
+sed -e "s/#VERSION#/$VERSION/" setup.py.tmpl > setup.py
+
