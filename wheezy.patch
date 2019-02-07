@@ -1,0 +1,79 @@
+diff --git a/lower-constraints.txt b/lower-constraints.txt
+index a02749a..1741a51 100644
+--- a/lower-constraints.txt
++++ b/lower-constraints.txt
+@@ -1,5 +1,4 @@
+ coverage===4.0
+-cryptography===2.1
+ fixtures===3.0.0
+ openstackdocstheme==1.18.1
+ oslotest===3.2.0
+diff --git a/pyghmi/ipmi/private/session.py b/pyghmi/ipmi/private/session.py
+index 0cd2043..c31020d 100644
+--- a/pyghmi/ipmi/private/session.py
++++ b/pyghmi/ipmi/private/session.py
+@@ -28,8 +28,8 @@ import struct
+ import threading
+ 
+ 
+-from cryptography.hazmat.backends import default_backend
+-from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
++from Cryptodome.Cipher import AES
++
+ 
+ import pyghmi.exceptions as exc
+ from pyghmi.ipmi.private import constants
+@@ -309,10 +309,6 @@ class Session(object):
+     # can do something like reassign our threading and select modules
+     socketchecking = None
+ 
+-    # Maintain single Cryptography backend for all IPMI sessions (seems to be
+-    # thread-safe)
+-    _crypto_backend = default_backend()
+-
+     @classmethod
+     def _cleanup(cls):
+         for sesskey in list(cls.bmc_handlers):
+@@ -872,14 +868,9 @@ class Session(object):
+                 iv = os.urandom(16)
+                 message += iv
+                 payloadtocrypt = bytes(payload + _aespad(payload))
+-                crypter = Cipher(
+-                    algorithm=algorithms.AES(self.aeskey),
+-                    mode=modes.CBC(iv),
+-                    backend=self._crypto_backend
+-                )
+-                encryptor = crypter.encryptor()
+-                message += encryptor.update(payloadtocrypt
+-                                            ) + encryptor.finalize()
++                crypter = AES.new(self.aeskey, AES.MODE_CBC, iv)
++                crypted = crypter.encrypt(payloadtocrypt)
++                message += crypted
+             else:  # no confidetiality algorithm
+                 message.append(psize & 0xff)
+                 message.append(psize >> 8)
+@@ -1367,14 +1358,9 @@ class Session(object):
+             payload = data[16:16 + psize]
+             if encrypted:
+                 iv = data[16:32]
+-                crypter = Cipher(
+-                    algorithm=algorithms.AES(self.aeskey),
+-                    mode=modes.CBC(bytes(iv)),
+-                    backend=self._crypto_backend
+-                )
+-                decryptor = crypter.decryptor()
+-                payload = bytearray(decryptor.update(bytes(payload[16:])
+-                                                     ) + decryptor.finalize())
++                decrypter = AES.new(self.aeskey, AES.MODE_CBC, iv)
++                decrypted = decrypter.decrypt(payload[16:])
++                payload = decrypted
+                 padsize = payload[-1] + 1
+                 payload = payload[:-padsize]
+             if ptype == 0:
+diff --git a/requirements.txt b/requirements.txt
+index 1fb58a9..26ff921 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -1 +1 @@
+-cryptography>=2.1  # BSD/Apache-2.0
++pycryptodomex>=2.6

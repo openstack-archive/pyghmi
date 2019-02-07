@@ -28,8 +28,8 @@ import struct
 import threading
 
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
+from Cryptodome.Cipher import AES
+
 
 import pyghmi.exceptions as exc
 from pyghmi.ipmi.private import constants
@@ -308,10 +308,6 @@ class Session(object):
     # this will be a lock.  Delay the assignment so that a calling framework
     # can do something like reassign our threading and select modules
     socketchecking = None
-
-    # Maintain single Cryptography backend for all IPMI sessions (seems to be
-    # thread-safe)
-    _crypto_backend = default_backend()
 
     @classmethod
     def _cleanup(cls):
@@ -872,14 +868,9 @@ class Session(object):
                 iv = os.urandom(16)
                 message += iv
                 payloadtocrypt = bytes(payload + _aespad(payload))
-                crypter = Cipher(
-                    algorithm=algorithms.AES(self.aeskey),
-                    mode=modes.CBC(iv),
-                    backend=self._crypto_backend
-                )
-                encryptor = crypter.encryptor()
-                message += encryptor.update(payloadtocrypt
-                                            ) + encryptor.finalize()
+                crypter = AES.new(self.aeskey, AES.MODE_CBC, iv)
+                crypted = crypter.encrypt(payloadtocrypt)
+                message += crypted
             else:  # no confidetiality algorithm
                 message.append(psize & 0xff)
                 message.append(psize >> 8)
@@ -1367,14 +1358,9 @@ class Session(object):
             payload = data[16:16 + psize]
             if encrypted:
                 iv = data[16:32]
-                crypter = Cipher(
-                    algorithm=algorithms.AES(self.aeskey),
-                    mode=modes.CBC(bytes(iv)),
-                    backend=self._crypto_backend
-                )
-                decryptor = crypter.decryptor()
-                payload = bytearray(decryptor.update(bytes(payload[16:])
-                                                     ) + decryptor.finalize())
+                decrypter = AES.new(self.aeskey, AES.MODE_CBC, iv)
+                decrypted = decrypter.decrypt(payload[16:])
+                payload = decrypted
                 padsize = payload[-1] + 1
                 payload = payload[:-padsize]
             if ptype == 0:
