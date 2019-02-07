@@ -1,5 +1,12 @@
 #!/bin/bash
 cd `dirname $0`
+mkdir -p /tmp/pyghmi
+cp -a * /tmp/pyghmi
+cd /tmp/pyghmi
+if grep wheezy /etc/os-release; then
+    # wheezy is difficult on pyca, use cryptodomex for that platform
+    patch -p1 < wheezy.patch
+fi
 # If not PBR, use the setup.py.tmpl
 python -c 'import pbr' || ./makesetup
 VERSION=`python setup.py --version`
