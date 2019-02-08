@@ -966,7 +966,7 @@ class Session(object):
             self.onlogon({'error': errstr})
             return
         data = response['data']
-        self.sessionid = struct.unpack("<I", struct.pack("4B", *data[0:4]))[0]
+        self.sessionid = struct.unpack("<I", bytes(data[0:4]))[0]
         self.authtype = 2
         self._activate_session(data[4:])
 
@@ -986,9 +986,8 @@ class Session(object):
             self.onlogon({'error': errstr})
             return
         data = response['data']
-        self.sessionid = struct.unpack("<I", struct.pack("4B", *data[1:5]))[0]
-        self.sequencenumber = struct.unpack("<I",
-                                            struct.pack("4B", *data[5:9]))[0]
+        self.sessionid = struct.unpack("<I", bytes(data[1:5]))[0]
+        self.sequencenumber = struct.unpack("<I", bytes(data[5:9]))[0]
         self._req_priv_level()
 
     def _req_priv_level(self):
@@ -1020,13 +1019,13 @@ class Session(object):
         self.onlogon({'success': True})
 
     def _get_session_challenge(self):
-        reqdata = [2]
+        reqdata = bytearray([2])
         if len(self.userid) > 16:
             raise exc.IpmiException(
                 "Username too long for IPMI, must not exceed 16")
         padneeded = 16 - len(self.userid)
         userid = self.userid + ('\x00' * padneeded)
-        reqdata += struct.unpack("!16B", userid)
+        reqdata += userid
         self.ipmicallback = self._got_session_challenge
         self._send_ipmi_net_payload(netfn=0x6, command=0x39, data=reqdata)
 
@@ -1036,18 +1035,18 @@ class Session(object):
         # login attempts from the past
         self.localsid += 1
         self.rmcptag += 1
-        data = [
+        data = bytearray([
             self.rmcptag,
             0,  # request as much privilege as the channel will give us
             0, 0,  # reserved
-        ]
-        data += list(struct.unpack("4B", struct.pack("<I", self.localsid)))
-        data += [
+        ])
+        data += struct.pack("<I", self.localsid)
+        data += bytearray([
             0, 0, 0, 8, 1, 0, 0, 0,  # table 13-17, SHA-1
             1, 0, 0, 8, 1, 0, 0, 0,  # SHA-1 integrity
             2, 0, 0, 8, 1, 0, 0, 0,  # AES privacy
             # 2,0,0,8,0,0,0,0, #no privacy confalgo
-        ]
+        ])
         self.sessioncontext = 'OPENSESSION'
         self.send_payload(
             payload=data,
@@ -1269,8 +1268,8 @@ class Session(object):
             # things off ignore the second reply since we have one
             # satisfactory answer
         if data[4] in (0, 2):  # This is an ipmi 1.5 paylod
-            remsequencenumber = struct.unpack('<I', data[5:9])[0]
-            remsessid = struct.unpack("<I", data[9:13])[0]
+            remsequencenumber = struct.unpack('<I', bytes(data[5:9]))[0]
+            remsessid = struct.unpack("<I", bytes(data[9:13]))[0]
             if (remsequencenumber == 0 and remsessid == 0 and
                     qent[2] in Session.bmc_handlers):
                 # So a new ipmi client happens to get a previously seen and
@@ -1354,10 +1353,10 @@ class Session(object):
                 self.k1, data[4:-12], hashlib.sha1).digest()[:12]
             if authcode != expectedauthcode:
                 return  # BMC failed to assure integrity to us, drop it
-            sid = struct.unpack("<I", data[6:10])[0]
+            sid = struct.unpack("<I", bytes(data[6:10]))[0]
             if sid != self.localsid:  # session id mismatch, drop it
                 return
-            remseqnumber = struct.unpack("<I", data[10:14])[0]
+            remseqnumber = struct.unpack("<I", bytes(data[10:14]))[0]
             if (hasattr(self, 'remseqnumber') and
                 (remseqnumber < self.remseqnumber) and
                     (self.remseqnumber != 0xffffffff)):
@@ -1419,11 +1418,10 @@ class Session(object):
         # shall be used.  As such, the allowedpriv field is actually
         # not particularly useful.  got_rakp2 is a good place to
         # gracefully detect and downgrade privilege for retry
-        localsid = struct.unpack("<I", struct.pack("4B", *data[4:8]))[0]
+        localsid = struct.unpack("<I", bytes(data[4:8]))[0]
         if self.localsid != localsid:
             return -9
-        self.pendingsessionid = struct.unpack(
-            "<I", struct.pack("4B", *data[8:12]))[0]
+        self.pendingsessionid = struct.unpack("<I", bytes(data[8:12]))[0]
         # TODO(jbjohnso): currently, we take it for granted that the responder
         # accepted our integrity/auth/confidentiality proposal
         self.lastpayload = None
@@ -1433,13 +1431,11 @@ class Session(object):
         self.rmcptag += 1
         self.randombytes = os.urandom(16)
         userlen = len(self.userid)
-        payload = [self.rmcptag, 0, 0, 0] + \
-            list(struct.unpack("4B",
-                 struct.pack("<I", self.pendingsessionid))) +\
-            list(struct.unpack("16B", self.randombytes)) +\
-            [self.nameonly | self.privlevel, 0, 0] +\
-            [userlen] +\
-            list(struct.unpack("%dB" % userlen, self.userid))
+        payload = bytearray([self.rmcptag, 0, 0, 0]) + \
+            struct.pack("<I", self.pendingsessionid) + \
+            self.randombytes +\
+            bytearray([self.nameonly | self.privlevel, 0, 0, userlen]) + \
+            self.userid
         self.sessioncontext = "EXPECTINGRAKP2"
         self.send_payload(
             payload=payload, payload_type=constants.payload_types['rakp1'])
@@ -1469,11 +1465,11 @@ class Session(object):
                 errstr = "Unrecognized RMCP code %d" % data[1]
             self.onlogon({'error': errstr + " in RAKP2"})
             return -9
-        localsid = struct.unpack("<I", struct.pack("4B", *data[4:8]))[0]
+        localsid = struct.unpack("<I", bytes(data[4:8]))[0]
         if localsid != self.localsid:
             return -9  # discard mismatch in the session identifier
-        self.remoterandombytes = struct.pack("16B", *data[8:24])
-        self.remoteguid = struct.pack("16B", *data[24:40])
+        self.remoterandombytes = bytes(data[8:24])
+        self.remoteguid = bytes(data[24:40])
         userlen = len(self.userid)
         hmacdata = struct.pack("<II", localsid, self.pendingsessionid) +\
             self.randombytes + self.remoterandombytes + self.remoteguid +\
@@ -1540,7 +1536,7 @@ class Session(object):
                 errstr = "Unrecognized RMCP code %d" % data[1]
             self.onlogon({'error': errstr + " reported in RAKP4"})
             return -9
-        localsid = struct.unpack("<I", struct.pack("4B", *data[4:8]))[0]
+        localsid = struct.unpack("<I", bytes(data[4:8]))[0]
         if localsid != self.localsid:  # ignore if wrong session id indicated
             return -9
         hmacdata = self.randombytes +\

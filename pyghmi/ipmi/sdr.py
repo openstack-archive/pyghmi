@@ -672,7 +672,7 @@ class SDR(object):
         # NOTE(jbjohnso): not looking to support the various options in op
         # support, ignore those for now, reservation if some BMCs can't read
         # full SDR in one slurp
-        modtime = struct.unpack('!Q', repinfo['data'][5:13])[0]
+        modtime = struct.unpack('!Q', bytes(repinfo['data'][5:13]))[0]
         recid = 0
         rsvid = 0  # partial 'get sdr' will require this
         offset = 0
