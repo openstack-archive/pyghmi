@@ -311,6 +311,7 @@ class LenovoFirmwareConfig(object):
                     ldata = setting.find("list_data")
                     extraorder = False
                     currentdict = {}
+                    currentdef = {}
                     if ldata is not None:
                         is_list = True
                         current = []
@@ -334,13 +335,24 @@ class LenovoFirmwareConfig(object):
                                         choice.find('value').text)
                                 except ValueError:
                                     lenovo_value = choice.find('value').text
-                        if choice.get("default") == "true":
+                        hasdefault = choice.get('default')
+                        if hasdefault == "true":
                             default = label
+                        elif hasdefault is not None:
+                            try:
+                                a = int(hasdefault)
+                                currentdef[a] = label
+                            except ValueError:
+                                pass
                         if choice.get("reset-required") == "true":
                             reset = True
                     if len(currentdict) > 0:
                         for order in sorted(currentdict):
                             current.append(currentdict[order])
+                    if len(currentdef) > 0:
+                        default = []
+                        for order in sorted(currentdef):
+                            default.append(currentdef[order])
                     optionname = "%s.%s" % (lenovo_id, name)
                     options[optionname] = dict(current=current,
                                                default=default,
