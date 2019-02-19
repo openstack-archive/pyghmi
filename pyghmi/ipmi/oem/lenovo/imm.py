@@ -972,10 +972,10 @@ class XCCClient(IMMClient):
         rsp = self.wc.grab_json_response(
             '/api/function',
             {'raidlink_DiskStateAction': '{0},{1}'.format(disk.id[1], state)})
-        if rsp['return'] != 0:
+        if rsp.get('return', -1) != 0:
             raise Exception(
                 'Unexpected return to set disk state: {0}'.format(
-                    rsp['return']))
+                    rsp.get('return', -1)))
 
     def clear_storage_arrays(self):
         rsp = self.wc.grab_json_response(
@@ -991,7 +991,7 @@ class XCCClient(IMMClient):
                 vid = '{0},{1}'.format(volume.id[1], volume.id[0])
                 rsp = self.wc.grab_json_response(
                     '/api/function', {'raidlink_RemoveVolumeAsync': vid})
-                if rsp['return'] != 0:
+                if rsp.get('return', -1) != 0:
                     raise Exception(
                         'Unexpected return to volume deletion: ' + repr(rsp))
                 self._wait_storage_async()
@@ -1364,16 +1364,18 @@ class XCCClient(IMMClient):
                    "WebUploadName": thename}
         rsp = self.wc.grab_json_response('/api/providers/rp_rdoc_addfile',
                                          addfile)
-        if rsp['return'] != 0:
-            raise Exception('Unrecognized return: ' + repr(rsp))
+        if rsp.get('return', -1) != 0:
+            errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
+            raise Exception('Unrecognized return: ' + errmsg)
         rsp = self.wc.grab_json_response('/api/providers/rp_rdoc_getfiles')
         if 'items' not in rsp or len(rsp['items']) == 0:
             raise Exception(
                 'Image upload was not accepted, it may be too large')
         rsp = self.wc.grab_json_response('/api/providers/rp_rdoc_mountall',
                                          {})
-        if rsp['return'] != 0:
-            raise Exception('Unrecognized return: ' + repr(rsp))
+        if rsp.get('return', -1) != 0:
+            errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
+            raise Exception('Unrecognized return: ' + errmsg)
         if progress:
             progress({'phase': 'complete'})
         self.weblogout()
@@ -1459,18 +1461,20 @@ class XCCClient(IMMClient):
         self._refresh_token()
         rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebSetFileName': rsp['items'][0]['path']}))
-        if rsp['return'] == 25:
+        if rsp.get('return', 0) == 25:
             raise Exception('Temporary error validating update, try again')
-        if rsp['return'] != 0:
-            raise Exception('Unexpected return to set filename: ' + repr(rsp))
+        if rsp.get('return', -1) != 0:
+            errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
+            raise Exception('Unexpected return to set filename: ' + errmsg)
         progress({'phase': 'validating',
                   'progress': 25.0})
         rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebVerifyUploadFile': 1}))
-        if rsp['return'] == 115:
+        if rsp.get('return', 0) == 115:
             raise Exception('Update image not intended for this system')
-        if rsp['return'] != 0:
-            raise Exception('Unexpected return to verify: ' + repr(rsp))
+        elif rsp.get('return', -1) != 0:
+            errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
+            raise Exception('Unexpected return to verify: ' + errmsg)
         verifystatus = 0
         verifyuploadfilersp = None
         while verifystatus != 1:
@@ -1478,11 +1482,11 @@ class XCCClient(IMMClient):
             rsp, status = self.wc.grab_json_response_with_status(
                 '/api/providers/fwupdate',
                 json.dumps({'UPD_WebVerifyUploadFileStatus': 1}))
-            if not rsp or status != 200  or rsp['return'] == 2:
+            if not rsp or status != 200  or rsp.get('return', -1) == 2:
                 # The XCC firmware predates the FileStatus api
                 verifyuploadfilersp = rsp
                 break
-            if rsp['return'] != 0:
+            if rsp.get('return', -1) != 0:
                 raise Exception(
                     'Unexpected return to verifystate: {0}'.format(repr(rsp)))
             verifystatus = rsp['status']
@@ -1491,6 +1495,7 @@ class XCCClient(IMMClient):
             if verifystatus != 1:
                 ipmisession.Session.pause(1)
             if verifystatus not in (0, 1, 255):
+                errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
                 raise Exception(
                     'Unexpected reply to verifystate: ' + repr(rsp))
         progress({'phase': 'validating',
@@ -1524,7 +1529,7 @@ class XCCClient(IMMClient):
                 raise Exception('Could not find matching adapter for update')
             rsp = self.wc.grab_json_response('/api/function', json.dumps(
                 {'pci_SetOOBFWSlots': selector}))
-            if rsp['return'] != 0:
+            if rsp.get('return', -1) != 0:
                 raise Exception(
                     'Unexpected result from PCI select: ' + repr(rsp))
         else:
@@ -1544,9 +1549,10 @@ class XCCClient(IMMClient):
                 '/api/providers/fwupdate', json.dumps(
                     {'UPD_WebStartOptionalAction': 2}))
 
-        if rsp['return'] != 0:
+        if rsp.get('return', -1) != 0:
+            errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
             raise Exception('Unexpected result starting update: ' +
-                            rsp['return'])
+                            errmsg)
         complete = False
         while not complete:
             ipmisession.Session.pause(3)
