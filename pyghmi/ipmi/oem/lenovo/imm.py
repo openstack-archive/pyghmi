@@ -1466,6 +1466,7 @@ class XCCClient(IMMClient):
         if rsp.get('return', -1) != 0:
             errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
             raise Exception('Unexpected return to set filename: ' + errmsg)
+        self._refresh_token()
         progress({'phase': 'validating',
                   'progress': 25.0})
         rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
