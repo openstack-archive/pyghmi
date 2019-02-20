@@ -172,6 +172,10 @@ class IMMClient(object):
         self.fwovintage = util._monotonic_time()
         retcfg = {}
         for opt in self.fwo:
+            if 'AvagoMegaRAIDConfigurationTool' in opt:
+                # Suppress the Avago configuration to be consistent with
+                # other tools.
+                continue
             if (hideadvanced and self.fwo[opt]['lenovo_protect'] or
                     self.fwo[opt]['hidden']):
                 # Do not enumerate hidden settings
