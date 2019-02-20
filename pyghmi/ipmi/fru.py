@@ -225,7 +225,9 @@ class FRU(object):
             # strictly speaking, \xff should be a y with diaeresis, but
             # erring on the side of that not being very relevant in practice
             # to fru info, particularly the last values
-            retinfo = retinfo.rstrip('\xff\x00 ')
+            # Additionally 0xfe has been observed, which should be a thorn, but
+            # again assuming termination of string is more likely than thorn.
+            retinfo = retinfo.rstrip('\xfe\xff\x00 ')
             if lang in (0, 25):
                 try:
                     retinfo = retinfo.decode('iso-8859-1')
