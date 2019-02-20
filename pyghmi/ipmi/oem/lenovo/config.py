@@ -273,6 +273,8 @@ class LenovoFirmwareConfig(object):
             if lenovo_id == 'iSCSI':
                 # Do not support iSCSI at this time
                 continue
+            cfglabel = config.find('mriName')
+            cfglabel = lenovo_id if cfglabel is None else cfglabel.text
             for group in config.iter("group"):
                 lenovo_group = group.get("ID")
                 for setting in group.iter("setting"):
@@ -353,7 +355,8 @@ class LenovoFirmwareConfig(object):
                         default = []
                         for order in sorted(currentdef):
                             default.append(currentdef[order])
-                    optionname = "%s.%s" % (lenovo_id, name)
+                    optionname = "%s.%s" % (cfglabel, name)
+                    alias = "%s.%s" % (lenovo_id, name)
                     options[optionname] = dict(current=current,
                                                default=default,
                                                possible=possible,
@@ -370,7 +373,8 @@ class LenovoFirmwareConfig(object):
                                                readonly_expression=readonly,
                                                hide_expression=hide,
                                                sortid=sortid,
-                                               lenovo_instance="")
+                                               lenovo_instance="",
+                                               alias=alias)
                     sortid = sortid + 1
         for opt in options:
             opt = options[opt]

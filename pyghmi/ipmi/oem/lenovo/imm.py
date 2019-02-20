@@ -201,6 +201,11 @@ class IMMClient(object):
                     if fnmatch.fnmatch(rkey.lower(), key.lower()):
                         changeset[rkey] = changeset[key]
                         found = True
+                    elif self.fwo[rkey].get('alias', None) != rkey:
+                        calias = self.fwo[rkey]['alias']
+                        if fnmatch.fnmatch(calias.lower(), key.lower()):
+                            changeset[rkey] = changeset[key]
+                            found = True
                 if found:
                     del changeset[key]
                 else:
