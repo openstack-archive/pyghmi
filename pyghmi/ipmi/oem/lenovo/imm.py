@@ -172,7 +172,7 @@ class IMMClient(object):
         self.fwovintage = util._monotonic_time()
         retcfg = {}
         for opt in self.fwo:
-            if 'AvagoMegaRAIDConfigurationTool' in opt:
+            if 'MegaRAIDConfigurationTool' in opt:
                 # Suppress the Avago configuration to be consistent with
                 # other tools.
                 continue
