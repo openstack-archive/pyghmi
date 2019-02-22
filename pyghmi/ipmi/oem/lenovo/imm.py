@@ -1526,20 +1526,23 @@ class XCCClient(IMMClient):
             webid = rsp['items'][0]['webfile_build_id']
             locations = webid[webid.find('[')+1:webid.find(']')]
             locations = locations.split(':')
-            if len(locations) > 1:
-                raise Exception("Multiple of the same adapter not supported")
-            validselector = locations[0].replace('#', '-')
+            validselectors = set([])
+            for loc in locations:
+                validselectors.add(loc.replace('#', '-'))
             rsp = self.wc.grab_json_response(
                 '/api/function/adapter_update?params=pci_GetAdapterListAndFW')
+            foundselectors = []
             for adpitem in rsp['items']:
                 selector = '{0}-{1}'.format(adpitem['location'],
                                             adpitem['slotNo'])
-                if selector == validselector:
-                    break
+                if selector in validselectors:
+                    foundselectors.append(selector)
+                    if len(foundselectors) == len(validselectors):
+                        break
             else:
                 raise Exception('Could not find matching adapter for update')
             rsp = self.wc.grab_json_response('/api/function', json.dumps(
-                {'pci_SetOOBFWSlots': selector}))
+                {'pci_SetOOBFWSlots': '|'.join(foundselectors)}))
             if rsp.get('return', -1) != 0:
                 errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
                 raise Exception(
