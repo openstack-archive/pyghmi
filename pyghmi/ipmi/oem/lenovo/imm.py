@@ -867,12 +867,14 @@ class XCCClient(IMMClient):
                         yield self.get_disk_hardware(diskent)
                 for diskent in adp.get('aimDisks', ()):
                     if mode==0:
-                        yield self.get_disk_firmware(diskent, 'M.2-')
+                        yield self.get_disk_firmware(diskent)
                     elif mode==1:
-                        yield self.get_disk_hardware(diskent, 'M.2-')
+                        yield self.get_disk_hardware(diskent)
 
     def get_disk_hardware(self, diskent, prefix=''):
         bdata = {}
+        if not prefix and diskent['location'].startswith('M.2'):
+            prefix = 'M.2-'
         diskname = 'Disk {1}{0}'.format(diskent['slotNo'], prefix)
         bdata['Model'] = diskent['productName'].rstrip()
         bdata['Serial Number'] = diskent['serialNo'].rstrip()
