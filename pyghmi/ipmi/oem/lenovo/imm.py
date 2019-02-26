@@ -1455,6 +1455,8 @@ class XCCClient(IMMClient):
                 progress({'phase': 'upload',
                           'progress': 100.0 * rsp['received'] / rsp['size']})
             elif rsp['state'] != 'done':
+                if rsp.get('status', None) == 413:
+                    raise Exception('Payload is larger than supported')
                 raise Exception('Unexpected result:' + repr(rsp))
             uploadstate = rsp['state']
             self._refresh_token()
