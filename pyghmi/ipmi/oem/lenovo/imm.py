@@ -1519,7 +1519,7 @@ class XCCClient(IMMClient):
         if not firmtype:
             raise Exception('Unknown firmware description returned: ' + repr(
                 rsp['items'][0]) + ' last verify return was: ' + repr(
-                    verifyuploadfilersp) + ' with code ' + status)
+                    verifyuploadfilersp) + ' with code {0}'.format(status))
         if firmtype not in (
                 'TDM', 'WINDOWS DRIV', 'LINUX DRIVER', 'UEFI', 'IMM'):
             # adapter firmware
