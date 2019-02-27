@@ -93,6 +93,7 @@ class IMMClient(object):
     ADP_URL = '/designs/imm/dataproviders/imm_adapters.php'
     ADP_NAME = 'adapter.adapterName'
     ADP_FUN = 'adapter.functions'
+    ADP_FU_URL = None
     ADP_LABEL = 'adapter.connectorLabel'
     ADP_SLOTNO = 'adapter.slotNo'
     ADP_OOB = 'adapter.oobSupported'
@@ -437,7 +438,11 @@ class IMMClient(object):
         return []
 
     def fetch_agentless_firmware(self):
-        adapterdata = self.get_cached_data('lenovo_cached_adapters')
+        cd = self.get_cached_data('lenovo_cached_adapters')
+        if cd:
+            adapterdata, fwu = cd
+        else:
+            adapterdata = None
         if not adapterdata:
             if self.updating:
                 raise pygexc.TemporaryError(
@@ -445,9 +450,14 @@ class IMMClient(object):
             if self.wc:
                 adapterdata = self.wc.grab_json_response(
                     self.ADP_URL, referer=self.adp_referer)
+                if self.ADP_FU_URL:
+                    fwu = self.wc.grab_json_response(self.ADP_FU_URL,
+                    referer=self.adp_referer)
+                else:
+                    fwu = None
                 if adapterdata:
                     self.datacache['lenovo_cached_adapters'] = (
-                        adapterdata, util._monotonic_time())
+                        (adapterdata, fwu), util._monotonic_time())
         if adapterdata and 'items' in adapterdata:
             anames = {}
             for adata in adapterdata['items']:
@@ -480,6 +490,13 @@ class IMMClient(object):
                             except ValueError:
                                 pass
                         yield ('{0} {1}'.format(aname, fname), bdata)
+                for fwi in fwu.get('items'):
+                    if fwi.get('key', -1) == adata.get('key', -2):
+                        if fwi.get('fw_status', 0) == 2:
+                            bdata = {}
+                            if 'fw_version_pend' in fwi:
+                                bdata['version'] = fwi['fw_version_pend']
+                            yield('{0} Pending Update'.format(aname), bdata)
         for disk in self.disk_inventory():
             yield disk
         self.weblogout()
@@ -730,6 +747,7 @@ class XCCClient(IMMClient):
     ADP_URL = '/api/dataset/imm_adapters?params=pci_GetAdapters'
     ADP_NAME = 'adapterName'
     ADP_FUN = 'functions'
+    ADP_FU_URL = '/api/function/adapter_update?params=pci_GetAdapterListAndFW'
     ADP_LABEL = 'connectorLabel'
     ADP_SLOTNO = 'slotNo'
     ADP_OOB = 'oobSupported'
