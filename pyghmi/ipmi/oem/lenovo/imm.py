@@ -1476,7 +1476,7 @@ class XCCClient(IMMClient):
         self._refresh_token()
         rsp = self.wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebSetFileName': rsp['items'][0]['path']}))
-        if rsp.get('return', 0) == 25:
+        if rsp.get('return', 0) in (25, 108):
             raise Exception('Temporary error validating update, try again')
         if rsp.get('return', -1) != 0:
             errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
