@@ -888,6 +888,12 @@ class XCCClient(IMMClient):
                         yield self.get_disk_firmware(diskent)
                     elif mode==1:
                         yield self.get_disk_hardware(diskent)
+                if mode == 1:
+                    bdata = {'Description': 'Unmanaged Disk'}
+                    if adp.get('m2Type', -1) == 2:
+                        yield ('M.2 Disk', bdata)
+                    for umd in adp.get('unmanagedDisks', []):
+                        yield ('Disk {0}'.format(umd['slotNo']), bdata)
 
     def get_disk_hardware(self, diskent, prefix=''):
         bdata = {}
