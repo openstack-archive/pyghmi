@@ -227,7 +227,7 @@ class FRU(object):
             # to fru info, particularly the last values
             # Additionally 0xfe has been observed, which should be a thorn, but
             # again assuming termination of string is more likely than thorn.
-            retinfo = retinfo.rstrip('\xfe\xff\x00 ')
+            retinfo = retinfo.rstrip('\xfe\xff\x10\x03\x00 ')
             if lang in (0, 25):
                 try:
                     retinfo = retinfo.decode('iso-8859-1')
