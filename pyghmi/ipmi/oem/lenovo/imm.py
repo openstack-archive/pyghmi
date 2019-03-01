@@ -438,7 +438,7 @@ class IMMClient(object):
         return []
 
     def fetch_agentless_firmware(self):
-        cd = self.get_cached_data('lenovo_cached_adapters')
+        cd = self.get_cached_data('lenovo_cached_adapters_fu')
         if cd:
             adapterdata, fwu = cd
         else:
@@ -456,7 +456,7 @@ class IMMClient(object):
                 else:
                     fwu = None
                 if adapterdata:
-                    self.datacache['lenovo_cached_adapters'] = (
+                    self.datacache['lenovo_cached_adapters_fu'] = (
                         (adapterdata, fwu), util._monotonic_time())
         if adapterdata and 'items' in adapterdata:
             anames = {}
