@@ -260,6 +260,21 @@ class IMMClient(object):
                 self.fwo = None
                 raise
 
+    def set_property(self, propname, value):
+        if not isinstance(value, int) or value > 255:
+            raise Exception('Unsupported property value')
+        propname = propname.encode('utf-8')
+        proplen = len(propname) | 0b10000000
+        valuelen = 0x11
+        cmdlen = len(propname) + len(valuelen) + 3
+        cdata = bytearray([3, 0, cmdlen, 1, proplen]) + propname
+        cdata += bytearray([valuelen, value])
+        rsp = self.ipmicmd.xraw_command(netfn=0x3a, command=0xc4, data=cdata)
+        rsp['data'] = bytearray(rsp['data'])
+        if rsp['data'][0] != 0:
+            raise Exception('Unknown response setting property: {0}'.format(
+                rsp['data'][0]))
+
     def get_property(self, propname):
         propname = propname.encode('utf-8')
         proplen = len(propname) | 0b10000000
@@ -1577,6 +1592,7 @@ class XCCClient(IMMClient):
                 errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
                 raise Exception(
                     'Unexpected result from PCI select: ' + errmsg)
+            self.set_property('/v2/ibmc/uefi/force-inventory', 1)
         else:
             rsp = self.wc.grab_json_response(
                 '/api/dataset/imm_firmware_update')
