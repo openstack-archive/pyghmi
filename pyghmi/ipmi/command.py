@@ -703,6 +703,7 @@ class Command(object):
         warning, critical, or failed assessments.
         """
         summary = {'badreadings': [], 'health': const.Health.Ok}
+        fallbackreadings = []
         try:
             self.oem_init()
             self._oem.get_health(summary)
@@ -712,6 +713,9 @@ class Command(object):
                     summary['badreadings'].append(reading)
         except exc.BypassGenericBehavior:
             pass
+        except exc.FallbackData as fd:
+            if not summary['badreadings']:
+                summary['badreadings'] = fd.fallbackdata
         return summary
 
     def get_sensor_reading(self, sensorname):

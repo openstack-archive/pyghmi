@@ -60,3 +60,11 @@ class BypassGenericBehavior(PyghmiException):
     # Indicates that an OEM handler wants to abort any standards based
     # follow up
     pass
+
+class FallbackData(PyghmiException):
+    # Indicates the OEM handler has data to be used if the generic
+    # check comes up empty
+    def __init__(self, fallbackdata):
+        self.fallbackdata = fallbackdata
+
+    pass

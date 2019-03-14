@@ -1678,16 +1678,18 @@ class XCCClient(IMMClient):
             else:
                 # The XCC reports healthy, no need to interrogate
                 raise pygexc.BypassGenericBehavior()
+        fallbackdata = []
+        hmap = {
+            'E': pygconst.Health.Critical,
+            'W': pygconst.Health.Warning,
+        }
         for item in rsp.get('items', ()):
             # while usually the ipmi interrogation shall explain things,
             # just in case there is a gap, make sure at least the
             # health field is accurately updated
-            if (item['severity'] == 'W' and
-                    summary['health'] < pygconst.Health.Warning):
-                summary['health'] = pygconst.Health.Warning
-            if (item['severity'] == 'E' and
-                    summary['health'] < pygconst.Health.Critical):
-                summary['health'] = pygconst.Health.Critical
+            itemseverity = hmap.get(item.get('severity', 'E'), 'E')
+            if (summary['health'] < itemseverity):
+                summary['health'] = itemseverity
             if item['cmnid'] == 'FQXSPPW0104J':
                 # This event does not get modeled by the sensors
                 # add a made up sensor to explain
@@ -1697,10 +1699,27 @@ class XCCClient(IMMClient):
                                        'state_ids': [3],
                                        'health': pygconst.Health.Warning,
                                        'type': 'Power'}, ''))
+            elif item['cmnid'] == 'FQXSFMA0041K':
+                summary['badreadings'].append(
+                    sdr.SensorReading({
+                        'name': 'Optane DCPDIMM',
+                        'health': pygconst.Health.Warning,
+                        'type': 'Memory',
+                        'states': ['Near/Far Memory Ratio not recommended']},
+                        '')
+                )
+            else:
+                fallbackdata.append(sdr.SensorReading({
+                    'name': item['source'],
+                    'states': [item['message']],
+                    'health': itemseverity,
+                    'type': item['source'],
+                }, ''))
         if summary.get('health', pygconst.Health.Ok) == pygconst.Health.Ok:
             # Fault LED is lit without explanation, mark critical
             # to encourage examination
             summary['health'] = pygconst.Health.Critical
+        raise pygexc.FallbackData(fallbackdata)
         # Will use the generic handling for unhealthy systems
 
     def get_licenses(self):
