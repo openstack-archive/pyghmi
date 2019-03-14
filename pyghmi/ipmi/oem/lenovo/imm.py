@@ -1705,7 +1705,7 @@ class XCCClient(IMMClient):
                         'name': 'Optane DCPDIMM',
                         'health': pygconst.Health.Warning,
                         'type': 'Memory',
-                        'states': ['Near/Far Memory Ratio not recommended']},
+                        'states': [item['message']]},
                         '')
                 )
             else:
