@@ -1668,9 +1668,17 @@ class XCCClient(IMMClient):
         wc = self.get_webclient(False)
         rsp = wc.grab_json_response('/api/providers/imm_active_events')
         if 'items' in rsp and len(rsp['items']) == 0:
-            # The XCC reports healthy, no need to interrogate
-            raise pygexc.BypassGenericBehavior()
-        for item in rsp['items']:
+            ledcheck = self.wc.grab_json_response(
+                '/api/dataset/imm_status_power')
+            for led in ledcheck.get('items', [{}])[0].get('LEDs', ()):
+                if led.get('name', None) == 'Fault':
+                    if led.get('status', 0) == 0:
+                        raise pygexc.BypassGenericBehavior()
+                    break
+            else:
+                # The XCC reports healthy, no need to interrogate
+                raise pygexc.BypassGenericBehavior()
+        for item in rsp.get('items', ()):
             # while usually the ipmi interrogation shall explain things,
             # just in case there is a gap, make sure at least the
             # health field is accurately updated
@@ -1689,6 +1697,10 @@ class XCCClient(IMMClient):
                                        'state_ids': [3],
                                        'health': pygconst.Health.Warning,
                                        'type': 'Power'}, ''))
+        if summary.get('health', pygconst.Health.Ok) == pygconst.Health.Ok:
+            # Fault LED is lit without explanation, mark critical
+            # to encourage examination
+            summary['health'] = pygconst.Health.Critical
         # Will use the generic handling for unhealthy systems
 
     def get_licenses(self):
