@@ -22,6 +22,8 @@ import os
 import pyghmi.exceptions as exc
 import pyghmi.constants as const
 import pyghmi.util.webclient as webclient
+import socket
+import struct
 import time
 
 powerstates = {
@@ -68,6 +70,16 @@ _healthmap = {
 }
 
 
+def _mask_to_cidr(mask):
+    maskn = socket.inet_pton(socket.AF_INET, mask)
+    maskn = struct.unpack('!I', maskn)[0]
+    cidr = 32
+    while maskn & 0b1 == 0 and cidr > 0:
+        cidr -= 1
+        maskn >>= 1
+    return cidr
+
+
 class SensorReading(object):
     def __init__(self, healthinfo):
         self.name = healthinfo['Name']
@@ -86,6 +98,7 @@ class Command(object):
             bmc, 443, verifycallback=verifycallback)
         self._varbmcurl = bmcurl
         self._varbiosurl = None
+        self._varbmcnicurl = None
         self._varsetbiosurl = None
         self._varchassisurl = chassisurl
         self._varresetbmcurl = None
@@ -232,12 +245,12 @@ class Command(object):
     @property
     def _biosurl(self):
         if not self._varbiosurl:
-            self._varbmcurl = self.sysinfo.get('Bios', {}).get('@odata.id',
+            self._varbiosurl = self.sysinfo.get('Bios', {}).get('@odata.id',
                                                               None)
-        if self._varbmcurl is None:
+        if self._varbiosurl is None:
             raise exc.UnsupportedFunctionality(
                 'Bios management not detected on this platform')
-        return self._varbmcurl
+        return self._varbiosurl
 
     @property
     def _setbiosurl(self):
@@ -257,6 +270,32 @@ class Command(object):
             self._varbmcurl = self.sysinfo.get('Links', {}).get(
                 'ManagedBy', [{}])[0].get('@odata.id', None)
         return self._varbmcurl
+
+    @property
+    def _bmcnicurl(self):
+        if not self._varbmcnicurl:
+            bmcinfo = self._do_web_request(self._bmcurl)
+            nicurl = bmcinfo.get('EthernetInterfaces', {}).get('@odata.id',
+                                                               None)
+            niclist = self._do_web_request(nicurl)
+            foundnics = 0
+            lastnicurl = None
+            for nic in niclist.get('Members', []):
+                curl = nic.get('@odata.id', None)
+                if not curl:
+                    continue
+                nicinfo = self._do_web_request(curl)
+                if nicinfo.get('Links', {}).get('HostInterface', None):
+                    # skip host interface
+                    continue
+                foundnics += 1
+                lastnicurl = curl
+            if foundnics != 1:
+                raise exc.PyghmiException(
+                    'BMC does not have exactly one interface')
+            self._varbmcnicurl = lastnicurl
+        return self._varbmcnicurl
+
 
     @property
     def _bmcreseturl(self):
@@ -332,6 +371,27 @@ class Command(object):
     def set_system_configuration(self, changeset):
         redfishsettings = {'Attributes': changeset}
         self._do_web_request(self._setbiosurl, redfishsettings, 'PATCH')
+
+    def get_net_configuration(self):
+        netcfg = self._do_web_request(self._bmcnicurl)
+        ipv4 = netcfg.get('IPv4Addresses', {})
+        if not ipv4:
+            raise exc.PyghmiException('Unable to locate network information')
+        retval = {}
+        if len(netcfg['IPv4Addresses']) != 1:
+            raise exc.PyghmiException('Multiple IP addresses not supported')
+        currip = netcfg['IPv4Addresses'][0]
+        cidr = _mask_to_cidr(currip['SubnetMask'])
+        retval['ipv4_address'] = '{0}/{1}'.format(currip['Address'], cidr)
+        retval['mac_address'] = netcfg['MACAddress']
+        hasgateway = _mask_to_cidr(currip['Gateway'])
+        retval['ipv4_gateway'] = currip['Gateway'] if hasgateway else None
+        retval['ipv4_configuration'] = currip['AddressOrigin']
+        return retval
+
+    def get_hostname(self):
+        netcfg = self._do_web_request(self._bmcnicurl)
+        return netcfg['HostName']
 
 
 if __name__ == '__main__':
