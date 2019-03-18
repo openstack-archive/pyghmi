@@ -60,6 +60,24 @@ boot_devices_read = {
     'SDCard': 'sdcard',
 }
 
+
+_healthmap = {
+    'Critical': const.Health.Critical,
+    'Warning': const.Health.Warning,
+    'OK': const.Health.Ok,
+}
+
+
+class SensorReading(object):
+    def __init__(self, healthinfo):
+        self.name = healthinfo['Name']
+        self.health = _healthmap[healthinfo['Status']['Health']]
+        self.states = [healthinfo['Status']['Health']]
+        self.value = None
+        self.state_ids = None
+        self.imprecision = None
+        self.units = None
+
 class Command(object):
 
     def __init__(self, bmc, userid, password, verifycallback, sysurl=None,
@@ -268,16 +286,10 @@ class Command(object):
         ledstate = self.sysinfo['IndicatorLED']
         return {'identifystate': self._idstatemap[ledstate]}
 
-    _healthmap = {
-        'Critical': const.Health.Critical,
-        'Warning': const.Health.Warning,
-        'OK': const.Health.Ok,
-    }
-
     def get_health(self, verbose=True):
         health = self.sysinfo.get('Status', {}).get('HealthRollup', None)
-        health = self._healthmap[health]
-        summary = {'badcomponents': [], 'health': health}
+        health = _healthmap[health]
+        summary = {'badreadings': [], 'health': health}
         if health > 0 and verbose:
             # now have to manually peruse all psus, fans, processors, ram,
             # storage
@@ -286,7 +298,7 @@ class Command(object):
                 for cpu in self._do_web_request(procurl).get('Members', []):
                     cinfo = self._do_web_request(cpu['@odata.id'])
                     if cinfo['Status']['Health'] != 'OK':
-                        summary['badcomponents'].append(cinfo['Name'])
+                        summary['badreadings'].append(SensorReading(cinfo))
             if self.sysinfo.get('MemorySummary', {}).get('Status', {}).get(
                     'HealthRollup', 'OK') not in ('OK', None):
                 dimmfound = False
@@ -294,18 +306,20 @@ class Command(object):
                         self.sysinfo['Memory']['@odata.id'])['Members']:
                     dimminfo = self._do_web_request(mem)
                     if dimminfo['Status']['Health'] not in ('OK', None):
-                        summary['badcomponents'].append(dimminfo['Name'])
+                        summary['badreadings'].append(SensorReading(dimminfo))
                         dimmfound = True
                 if not dimmfound:
-                    summary['badcomponents'].append('Memory')
+                    meminfo = self.sysinfo['MemorySummary']
+                    meminfo['Name'] = 'Memory'
+                    summary['badreadings'].append(SensorReading(meminfo))
                 for adapter in self.sysinfo['PCIeDevices']:
                     adpinfo = self._do_web_request(adapter['@odata.id'])
                     if adpinfo['Status']['Health'] not in ('OK', None):
-                        summary['badcomponents'].append(adpinfo['Name'])
+                        summary['badreadings'].append(SensorReading(adpinfo))
                 for fun in self.sysinfo['PCIeFunctions']:
                     funinfo = self._do_web_request(fun['@odata.id'])
                     if funinfo['Status']['Health'] not in ('OK', None):
-                        summary['badcomponents'].append(funinfo['Name'])
+                        summary['badreadings'].append(SensorReading(funinfo))
         return summary
 
     def get_system_configuration(self, hideadvanced=True):
