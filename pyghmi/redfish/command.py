@@ -193,7 +193,7 @@ class Command(object):
     @property
     def sysinfo(self):
         now = os.times()[4]
-        if self._storedsysinfvintage < now - 1:
+        if self._storedsysinfvintage < now - 2:
             self._storedsysinfvintage = now
             self._storedsysinfo = self._do_web_request(self.sysurl)
         return self._storedsysinfo
@@ -466,7 +466,7 @@ class Command(object):
             fwname = fwi.get('Name', 'Unknown')
             currinf['version'] = fwi.get('Version', 'Unknown')
             currinf['date'] = _parse_time(fwi.get('ReleaseDate', ''))
-            if not (currinfo['version'] or currinfo['date']):
+            if not (currinf['version'] or currinf['date']):
                 continue
             #TODO: OEM extended data with buildid
             currstate = fwi.get('Status', {}).get('State', 'Unknown')
@@ -477,6 +477,91 @@ class Command(object):
             elif currstate == 'StandbySpare':
                 currinf['state'] = 'backup'
             yield fwname, currinf
+
+    def get_inventory(self):
+        sysinfo = {
+            'UUID': self.sysinfo.get('UUID', ''),
+            'Serial Number': self.sysinfo.get('SerialNumber', ''),
+            'Manufacturer': self.sysinfo.get('Manufacturer', ''),
+            'Product Name': self.sysinfo.get('Model', ''),
+            'Model': self.sysinfo.get(
+                'SKU', self.sysinfo.get('PartNumber', '')),
+        }
+        yield ('System', sysinfo)
+        for cpu in self._get_cpu_inventory():
+            yield cpu
+        for mem in self._get_mem_inventory():
+            yield mem
+        for adp in self._get_adp_inventory():
+            yield adp
+
+    def _get_adp_inventory(self):
+        adpurls = self.sysinfo.get('PCIeDevices', [])
+        if not adpurls:
+            return
+        for adpurl in adpurls:
+            adpinfo = self._do_web_request(adpurl['@odata.id'])
+            aname = adpinfo.get('Name', 'Unknown')
+            functions = adpinfo.get('Links', {}).get('PCIeFunctions', [])
+            nicidx = 1
+            yieldinf = {}
+            for fun in functions:
+                funinfo = self._do_web_request(fun['@odata.id'])
+                yieldinf['PCI Device ID'] = funinfo['DeviceId'].replace('0x',
+                                                                        '')
+                yieldinf['PCI Vendor ID'] = funinfo['VendorId'].replace('0x',
+                                                                        '')
+                yieldinf['PCI Subsystem Device ID'] = funinfo[
+                    'SubsystemId'].replace('0x', '')
+                yieldinf['PCI Subsystem Vendor ID'] = funinfo[
+                    'SubsystemVendorId'].replace('0x', '')
+                yieldinf['Type'] = funinfo['DeviceClass']
+                for nicinfo in funinfo.get('Links', {}).get(
+                        'EthernetInterfaces', []):
+                    nicinfo = self._do_web_request(nicinfo['@odata.id'])
+                    macaddr = nicinfo.get('MACAddress', None)
+                    if macaddr:
+                        yieldinf['MAC Address {0}'.format(nicidx)] = macaddr
+                        nicidx += 1
+            yield aname, yieldinf
+
+    def _get_cpu_inventory(self):
+        cpurl = self.sysinfo.get('Processors', {}).get('@odata.id', None)
+        if cpurl is None:
+            return
+        cpurl = self._do_web_request(cpurl)
+        for cpu in cpurl.get('Members', []):
+            currcpuinfo = self._do_web_request(cpu['@odata.id'])
+            name = currcpuinfo.get('Name', 'CPU')
+            cpuinfo = {'Model': currcpuinfo.get('Model', None)}
+            yield (name, cpuinfo)
+
+    def _get_mem_inventory(self):
+        memurl = self.sysinfo.get('Memory', {}).get('@odata.id', None)
+        if not memurl:
+            return
+        memurl = self._do_web_request(memurl)
+        for mem in memurl.get('Members', []):
+            currmeminfo = self._do_web_request(mem['@odata.id'])
+            name = currmeminfo.get('Name', 'Memory')
+            if currmeminfo.get(
+                    'Status', {}).get('State', 'Absent') == 'Absent':
+                yield (name, None)
+                continue
+            currspeed = currmeminfo.get('OperatingSpeedMhz', None)
+            if currspeed:
+                currspeed = int(currspeed)
+                currspeed = currspeed * 8 - (currspeed * 8 % 100)
+            meminfo = {
+                'capacity_mb': currmeminfo.get('CapacityMiB', None),
+                'manufacturer': currmeminfo.get('Manufacturer', None),
+                'memory_type': currmeminfo.get('MemoryDeviceType', None),
+                'model': currmeminfo.get('PartNumber', None),
+                'module_type': currmeminfo.get('BaseModuleType', None),
+                'serial': currmeminfo.get('SerialNumber', None),
+                'speed': currspeed,
+            }
+            yield (name, meminfo)
 
 
 if __name__ == '__main__':
