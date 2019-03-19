@@ -17,6 +17,8 @@
 # The command module for redfish systems.  Provides https-only support
 # for redfish compliant endpoints
 
+from datetime import datetime
+from dateutil import tz
 import json
 import os
 import pyghmi.exceptions as exc
@@ -69,6 +71,41 @@ _healthmap = {
     'OK': const.Health.Ok,
 }
 
+def _parse_time(timeval):
+    if timeval is None:
+        return None
+    try:
+        retval = datetime.strptime(timeval, '%Y-%m-%dT%H:%M:%SZ')
+        return retval.replace(tzinfo=tz.tzutc())
+    except ValueError:
+        pass
+    try:
+        positive = None
+        offset = None
+        if '+' in timeval:
+            timeval, offset = timeval.split('+', 1)
+            positive = 1
+        elif len(timeval.split('-')) > 3:
+            timeval, offset = timeval.rsplit('-', 1)
+            positive = -1
+        if positive:
+            hrs, mins = offset.split(':', 1)
+            secs = int(hrs) * 60 + int(mins)
+            secs = secs * 60 * positive
+            retval = datetime.strptime(timeval, '%Y-%m-%dT%H:%M:%S')
+            return retval.replace(tzinfo=tz.tzoffset('', secs))
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(timeval, '%Y-%m-%dT%H:%M:%S')
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(timeval, '%Y-%m-%d')
+    except ValueError:
+        pass
+    return None
+
 
 def _mask_to_cidr(mask):
     maskn = socket.inet_pton(socket.AF_INET, mask)
@@ -103,6 +140,8 @@ class Command(object):
         self._varchassisurl = chassisurl
         self._varresetbmcurl = None
         self._storedsysinfvintage = 0
+        self._varupdateservice = None
+        self._varfwinventory = None
         self.wc.set_basic_credentials(userid, password)
         self.wc.set_header('Content-Type', 'application/json')
         overview = self.wc.grab_json_response('/redfish/v1/')
@@ -124,6 +163,32 @@ class Command(object):
             self.sysurl = systems[0]['@odata.id']
         self.powerurl = self.sysinfo.get('Actions', {}).get(
             '#ComputerSystem.Reset', {}).get('target', None)
+
+    @property
+    def _updateservice(self):
+        if not self._varupdateservice:
+            overview = self._do_web_request('/redfish/v1/')
+            us = overview.get('UpdateService', {}).get('@odata.id', None)
+            if not us:
+                raise exc.UnsupportedFunctionality(
+                    'BMC does not implement extended firmware information')
+            self._varupdateservice = us
+        return self._varupdateservice
+
+    @property
+    def _fwinventory(self):
+        if not self._varfwinventory:
+            usi = self._do_web_request(self._updateservice)
+            self._varfwinventory = usi.get('FirmwareInventory', {}).get(
+                '@odata.id', None)
+            if not self._varfwinventory:
+                raise exc.UnsupportedFunctionality(
+                    'BMC does not implement extended firmware information')
+        return self._varfwinventory
+
+
+
+
 
     @property
     def sysinfo(self):
@@ -392,6 +457,26 @@ class Command(object):
     def get_hostname(self):
         netcfg = self._do_web_request(self._bmcnicurl)
         return netcfg['HostName']
+
+    def get_firmware(self, components=()):
+        fwlist = self._do_web_request(self._fwinventory)
+        for fwurl in [x['@odata.id'] for x in fwlist.get('Members', [])]:
+            fwi = self._do_web_request(fwurl)
+            currinf = {}
+            fwname = fwi.get('Name', 'Unknown')
+            currinf['version'] = fwi.get('Version', 'Unknown')
+            currinf['date'] = _parse_time(fwi.get('ReleaseDate', ''))
+            if not (currinfo['version'] or currinfo['date']):
+                continue
+            #TODO: OEM extended data with buildid
+            currstate = fwi.get('Status', {}).get('State', 'Unknown')
+            if currstate == 'StandbyOffline':
+                currinf['state'] = 'pending'
+            elif currstate == 'Enabled':
+                currinf['state'] = 'active'
+            elif currstate == 'StandbySpare':
+                currinf['state'] = 'backup'
+            yield fwname, currinf
 
 
 if __name__ == '__main__':
