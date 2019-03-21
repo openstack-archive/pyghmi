@@ -265,8 +265,8 @@ class IMMClient(object):
             raise Exception('Unsupported property value')
         propname = propname.encode('utf-8')
         proplen = len(propname) | 0b10000000
-        valuelen = 0x11
-        cmdlen = len(propname) + len(valuelen) + 3
+        valuelen = 0x11  # The value is always one byte, for now
+        cmdlen = len(propname) + 4 # the flags byte, two tlv bytes, and value
         cdata = bytearray([3, 0, cmdlen, 1, proplen]) + propname
         cdata += bytearray([valuelen, value])
         rsp = self.ipmicmd.xraw_command(netfn=0x3a, command=0xc4, data=cdata)
