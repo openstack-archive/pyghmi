@@ -130,18 +130,19 @@ class SensorReading(object):
 class Command(object):
 
     def __init__(self, bmc, userid, password, verifycallback, sysurl=None,
-                 bmcurl=None, chassisurl=None):
+                 bmcurl=None, chassisurl=None, pool=None):
         self.wc = webclient.SecureHTTPConnection(
             bmc, 443, verifycallback=verifycallback)
+        self._urlcache = {}
         self._varbmcurl = bmcurl
         self._varbiosurl = None
         self._varbmcnicurl = None
         self._varsetbiosurl = None
         self._varchassisurl = chassisurl
         self._varresetbmcurl = None
-        self._storedsysinfvintage = 0
         self._varupdateservice = None
         self._varfwinventory = None
+        self._gpool = pool
         self.wc.set_header('Accept', 'application/json')
         self.wc.set_header('User-Agent', 'pyghmi')
         overview = self.wc.grab_json_response('/redfish/v1/')
@@ -194,15 +195,12 @@ class Command(object):
 
     @property
     def sysinfo(self):
-        now = os.times()[4]
-        if self._storedsysinfvintage < now - 2:
-            self._storedsysinfvintage = now
-            self._storedsysinfo = self._do_web_request(self.sysurl)
-        return self._storedsysinfo
+        return self._do_web_request(self.sysurl)
 
 
     def get_power(self):
-        return {'powerstate': str(self.sysinfo['PowerState'].lower())}
+        currinfo = self._do_web_request(self.sysurl, cache=False)
+        return {'powerstate': str(currinfo['PowerState'].lower())}
 
     def set_power(self, powerstate, wait=False):
         if powerstate == 'boot':
@@ -230,11 +228,27 @@ class Command(object):
             return {'powerstate': reqpowerstate}
         return {'pendingpowerstate': reqpowerstate}
 
-    def _do_web_request(self, url, payload=None, method=None):
-        res = self.wc.grab_json_response_with_status(url, payload,
-                                                     method=method)
+    def _get_cache(self, url):
+        now = os.times()[4]
+        cachent = self._urlcache.get(url, None)
+        if cachent and cachent['vintage'] > now - 30:
+            return cachent['contents']
+        return None
+
+    def _do_web_request(self, url, payload=None, method=None, cache=True):
+        res = None
+        if cache and payload is None and method is None:
+            res = self._get_cache(url)
+        if res:
+            return res
+        wc = self.wc.dupe()
+        res = wc.grab_json_response_with_status(url, payload,
+                                                method=method)
         if res[1] < 200 or res[1] >=300:
             raise exc.PyghmiException(res[0])
+        if payload is None and method is None:
+            self._urlcache[url] = {'contents': res[0],
+                                   'vintage': os.times()[4]}
         return res[0]
 
     def get_bootdev(self):
@@ -462,23 +476,43 @@ class Command(object):
 
     def get_firmware(self, components=()):
         fwlist = self._do_web_request(self._fwinventory)
-        for fwurl in [x['@odata.id'] for x in fwlist.get('Members', [])]:
-            fwi = self._do_web_request(fwurl)
-            currinf = {}
-            fwname = fwi.get('Name', 'Unknown')
-            currinf['version'] = fwi.get('Version', 'Unknown')
-            currinf['date'] = _parse_time(fwi.get('ReleaseDate', ''))
-            if not (currinf['version'] or currinf['date']):
-                continue
-            #TODO: OEM extended data with buildid
-            currstate = fwi.get('Status', {}).get('State', 'Unknown')
-            if currstate == 'StandbyOffline':
-                currinf['state'] = 'pending'
-            elif currstate == 'Enabled':
-                currinf['state'] = 'active'
-            elif currstate == 'StandbySpare':
-                currinf['state'] = 'backup'
-            yield fwname, currinf
+        fwurls = [x['@odata.id'] for x in fwlist.get('Members', [])]
+        if self._gpool:
+            for fwinfo in self._gpool.imap(self.extract_fwinfo, fwurls):
+                if fwinfo[0]:
+                    yield fwinfo
+        else:
+            for fwurl in fwurls:
+                fwname, currinf = self.extract_fwinfo(fwurl)
+                if fwname:
+                    yield fwname, currinf
+
+    def extract_fwinfo(self, fwurl):
+        fwi = self._do_web_request(fwurl)
+        currinf = {}
+        fwname = fwi.get('Name', 'Unknown')
+        currinf['version'] = fwi.get('Version', 'Unknown')
+        currinf['date'] = _parse_time(fwi.get('ReleaseDate', ''))
+        if not (currinf['version'] or currinf['date']):
+            return None, None
+        # TODO: OEM extended data with buildid
+        currstate = fwi.get('Status', {}).get('State', 'Unknown')
+        if currstate == 'StandbyOffline':
+            currinf['state'] = 'pending'
+        elif currstate == 'Enabled':
+            currinf['state'] = 'active'
+        elif currstate == 'StandbySpare':
+            currinf['state'] = 'backup'
+        return fwname, currinf
+
+    def get_inventory_descriptions(self):
+        yield "System"
+        for cpu in self._get_cpu_inventory(True):
+            yield cpu
+        for mem in self._get_mem_inventory(True):
+            yield mem
+        for adp in self._get_adp_inventory(True):
+            yield adp
 
     def get_inventory(self):
         sysinfo = {
@@ -497,13 +531,16 @@ class Command(object):
         for adp in self._get_adp_inventory():
             yield adp
 
-    def _get_adp_inventory(self):
+    def _get_adp_inventory(self, onlyname=False):
         adpurls = self.sysinfo.get('PCIeDevices', [])
         if not adpurls:
             return
         for adpurl in adpurls:
             adpinfo = self._do_web_request(adpurl['@odata.id'])
             aname = adpinfo.get('Name', 'Unknown')
+            if onlyname:
+                yield aname
+                continue
             functions = adpinfo.get('Links', {}).get('PCIeFunctions', [])
             nicidx = 1
             yieldinf = {}
@@ -527,7 +564,7 @@ class Command(object):
                         nicidx += 1
             yield aname, yieldinf
 
-    def _get_cpu_inventory(self):
+    def _get_cpu_inventory(self, onlynames=False):
         cpurl = self.sysinfo.get('Processors', {}).get('@odata.id', None)
         if cpurl is None:
             return
@@ -535,10 +572,13 @@ class Command(object):
         for cpu in cpurl.get('Members', []):
             currcpuinfo = self._do_web_request(cpu['@odata.id'])
             name = currcpuinfo.get('Name', 'CPU')
+            if onlynames:
+                yield name
+                continue
             cpuinfo = {'Model': currcpuinfo.get('Model', None)}
             yield (name, cpuinfo)
 
-    def _get_mem_inventory(self):
+    def _get_mem_inventory(self, onlyname=False):
         memurl = self.sysinfo.get('Memory', {}).get('@odata.id', None)
         if not memurl:
             return
@@ -546,6 +586,9 @@ class Command(object):
         for mem in memurl.get('Members', []):
             currmeminfo = self._do_web_request(mem['@odata.id'])
             name = currmeminfo.get('Name', 'Memory')
+            if onlyname:
+                yield name
+                continue
             if currmeminfo.get(
                     'Status', {}).get('State', 'Absent') == 'Absent':
                 yield (name, None)
