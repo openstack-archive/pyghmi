@@ -142,9 +142,11 @@ class Command(object):
         self._storedsysinfvintage = 0
         self._varupdateservice = None
         self._varfwinventory = None
+        self.wc.set_header('Accept', 'application/json')
+        self.wc.set_header('User-Agent', 'pyghmi')
+        overview = self.wc.grab_json_response('/redfish/v1/')
         self.wc.set_basic_credentials(userid, password)
         self.wc.set_header('Content-Type', 'application/json')
-        overview = self.wc.grab_json_response('/redfish/v1/')
         systems = overview['Systems']['@odata.id']
         members = self.wc.grab_json_response(systems)
         systems = members['Members']
