@@ -133,6 +133,8 @@ class Command(object):
                  bmcurl=None, chassisurl=None, pool=None):
         self.wc = webclient.SecureHTTPConnection(
             bmc, 443, verifycallback=verifycallback)
+        self._hwnamemap = {}
+        self._fwnamemap = {}
         self._urlcache = {}
         self._varbmcurl = bmcurl
         self._varbiosurl = None
@@ -234,6 +236,19 @@ class Command(object):
         if cachent and cachent['vintage'] > now - 30:
             return cachent['contents']
         return None
+
+    def _do_bulk_requests(self, urls, cache=True):
+        if self._gpool:
+            urls = [(x, None, None, cache) for x in urls]
+            for res in self._gpool.starmap(self._do_web_request_withurl, urls):
+                yield res
+        else:
+            for url in urls:
+                yield self._do_web_request_withurl(url, cache=cache)
+
+    def _do_web_request_withurl(self, url, payload=None, method=None,
+                                cache=True):
+        return self._do_web_request(url, payload, method, cache), url
 
     def _do_web_request(self, url, payload=None, method=None, cache=True):
         res = None
@@ -477,20 +492,26 @@ class Command(object):
     def get_firmware(self, components=()):
         fwlist = self._do_web_request(self._fwinventory)
         fwurls = [x['@odata.id'] for x in fwlist.get('Members', [])]
-        if self._gpool:
-            for fwinfo in self._gpool.imap(self.extract_fwinfo, fwurls):
-                if fwinfo[0]:
-                    yield fwinfo
-        else:
-            for fwurl in fwurls:
-                fwname, currinf = self.extract_fwinfo(fwurl)
-                if fwname:
-                    yield fwname, currinf
+        self._fwnamemap = {}
+        for res in self._do_bulk_requests(fwurls):
+            res = self._extract_fwinfo(res)
+            if res[0] is None:
+                continue
+            yield res
 
-    def extract_fwinfo(self, fwurl):
-        fwi = self._do_web_request(fwurl)
+    def _extract_fwinfo(self, inf):
         currinf = {}
+        fwi, url = inf
         fwname = fwi.get('Name', 'Unknown')
+        if fwname in self._fwnamemap:
+            fwname = fwi.get('Id', fwname)
+        if fwname in self._fwnamemap:
+            # Block duplicates for by name retrieval
+            self._fwnamemap[fwname] = None
+        else:
+            self._fwnamemap[fwname] = url
+        currinf['name'] = fwname
+        currinf['id'] = fwi.get('Id', None)
         currinf['version'] = fwi.get('Version', 'Unknown')
         currinf['date'] = _parse_time(fwi.get('ReleaseDate', ''))
         if not (currinf['version'] or currinf['date']):
@@ -505,16 +526,17 @@ class Command(object):
             currinf['state'] = 'backup'
         return fwname, currinf
 
-    def get_inventory_descriptions(self):
+    def get_inventory_descriptions(self, withids=False):
         yield "System"
-        for cpu in self._get_cpu_inventory(True):
+        self._hwnamemap = {}
+        for cpu in self._get_cpu_inventory(True, withids):
             yield cpu
-        for mem in self._get_mem_inventory(True):
+        for mem in self._get_mem_inventory(True, withids):
             yield mem
-        for adp in self._get_adp_inventory(True):
+        for adp in self._get_adp_inventory(True, withids):
             yield adp
 
-    def get_inventory(self):
+    def get_inventory(self, withids=False):
         sysinfo = {
             'UUID': self.sysinfo.get('UUID', ''),
             'Serial Number': self.sysinfo.get('SerialNumber', ''),
@@ -524,28 +546,43 @@ class Command(object):
                 'SKU', self.sysinfo.get('PartNumber', '')),
         }
         yield ('System', sysinfo)
-        for cpu in self._get_cpu_inventory():
+        self._hwnamemap = {}
+        for cpu in self._get_cpu_inventory(withids=withids):
             yield cpu
-        for mem in self._get_mem_inventory():
+        for mem in self._get_mem_inventory(withids=withids):
             yield mem
-        for adp in self._get_adp_inventory():
+        for adp in self._get_adp_inventory(withids=withids):
             yield adp
 
-    def _get_adp_inventory(self, onlyname=False):
-        adpurls = self.sysinfo.get('PCIeDevices', [])
-        if not adpurls:
-            return
-        for adpurl in adpurls:
-            adpinfo = self._do_web_request(adpurl['@odata.id'])
+    def _get_adp_inventory(self, onlyname=False, withids=False, urls=None):
+        if not urls:
+            adpurls = self.sysinfo.get('PCIeDevices', [])
+            if not adpurls:
+                return
+            urls = [x['@odata.id'] for x in adpurls]
+        for inf in self._do_bulk_requests(urls):
+            adpinfo, url = inf
             aname = adpinfo.get('Name', 'Unknown')
+            if aname in self._hwnamemap:
+                aname = adpinfo.get('Id', aname)
+            if aname in self._hwnamemap:
+                self._hwnamemap[aname] = None
+            else:
+                self._hwnamemap[aname] = (url, self._get_adp_inventory)
             if onlyname:
+                if withids:
+                    yield aname, adpinfo.get('Id', aname)
                 yield aname
                 continue
             functions = adpinfo.get('Links', {}).get('PCIeFunctions', [])
             nicidx = 1
-            yieldinf = {}
-            for fun in functions:
-                funinfo = self._do_web_request(fun['@odata.id'])
+            if withids:
+                yieldinf = {'Id': adpinfo.get('Id', aname)}
+            else:
+                yieldinf = {}
+            funurls = [x['@odata.id'] for x in functions]
+            for fun in self._do_bulk_requests(funurls):
+                funinfo, url = fun
                 yieldinf['PCI Device ID'] = funinfo['DeviceId'].replace('0x',
                                                                         '')
                 yieldinf['PCI Vendor ID'] = funinfo['VendorId'].replace('0x',
@@ -564,28 +601,40 @@ class Command(object):
                         nicidx += 1
             yield aname, yieldinf
 
-    def _get_cpu_inventory(self, onlynames=False):
-        cpurl = self.sysinfo.get('Processors', {}).get('@odata.id', None)
-        if cpurl is None:
-            return
-        cpurl = self._do_web_request(cpurl)
-        for cpu in cpurl.get('Members', []):
-            currcpuinfo = self._do_web_request(cpu['@odata.id'])
+    def _get_cpu_inventory(self, onlynames=False, withids=False, urls=None):
+        if not urls:
+            cpurl = self.sysinfo.get('Processors', {}).get('@odata.id', None)
+            if cpurl is None:
+                return
+            cpurl = self._do_web_request(cpurl)
+            urls = [x['@odata.id'] for x in cpurl.get('Members', [])]
+        for res in self._do_bulk_requests(urls):
+            currcpuinfo, url = res
             name = currcpuinfo.get('Name', 'CPU')
+            if name in self._hwnamemap:
+                self._hwnamemap[name] = None
+            else:
+                self._hwnamemap[name] = (url, self._get_cpu_inventory)
             if onlynames:
                 yield name
                 continue
             cpuinfo = {'Model': currcpuinfo.get('Model', None)}
             yield (name, cpuinfo)
 
-    def _get_mem_inventory(self, onlyname=False):
-        memurl = self.sysinfo.get('Memory', {}).get('@odata.id', None)
-        if not memurl:
-            return
-        memurl = self._do_web_request(memurl)
-        for mem in memurl.get('Members', []):
-            currmeminfo = self._do_web_request(mem['@odata.id'])
+    def _get_mem_inventory(self, onlyname=False, withids=False, urls=None):
+        if not urls:
+            memurl = self.sysinfo.get('Memory', {}).get('@odata.id', None)
+            if not memurl:
+                return
+            memurl = self._do_web_request(memurl)
+            urls = [x['@odata.id'] for x in memurl.get('Members', [])]
+        for mem in self._do_bulk_requests(urls):
+            currmeminfo, url = mem
             name = currmeminfo.get('Name', 'Memory')
+            if name in self._hwnamemap:
+                self._hwnamemap[name] = None
+            else:
+                self._hwnamemap[name] = (url, self._get_mem_inventory)
             if onlyname:
                 yield name
                 continue
