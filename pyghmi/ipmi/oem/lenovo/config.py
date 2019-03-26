@@ -116,11 +116,14 @@ class _ExpEngine(object):
 def _eval_conditional(expression, cfg, setting):
     if not expression:
         return False, ()
-    parsed = ast.parse(expression)
-    parsed = parsed.body[0].value
-    evaluator = _ExpEngine(cfg, setting)
-    result = evaluator.process(parsed)
-    return result, evaluator.relatedsettings
+    try:
+        parsed = ast.parse(expression)
+        parsed = parsed.body[0].value
+        evaluator = _ExpEngine(cfg, setting)
+        result = evaluator.process(parsed)
+        return result, evaluator.relatedsettings
+    except SyntaxError:
+        return False, ()
 
 
 class LenovoFirmwareConfig(object):
