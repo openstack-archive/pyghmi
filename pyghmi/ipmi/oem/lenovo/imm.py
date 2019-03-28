@@ -1393,6 +1393,7 @@ class XCCClient(IMMClient):
 
     def upload_media(self, filename, progress=None):
         xid = random.randint(0, 1000000000)
+        self._refresh_token()
         uploadthread = webclient.FileUploader(
             self.wc, '/upload?X-Progress-ID={0}'.format(xid), filename, None)
         uploadthread.start()
@@ -1416,6 +1417,7 @@ class XCCClient(IMMClient):
                    "WebUploadName": thename}
         rsp = self.wc.grab_json_response('/api/providers/rp_rdoc_addfile',
                                          addfile)
+        self._refresh_token()
         if rsp.get('return', -1) != 0:
             errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
             raise Exception('Unrecognized return: ' + errmsg)
@@ -1423,8 +1425,10 @@ class XCCClient(IMMClient):
         if 'items' not in rsp or len(rsp['items']) == 0:
             raise Exception(
                 'Image upload was not accepted, it may be too large')
+        self._refresh_token()
         rsp = self.wc.grab_json_response('/api/providers/rp_rdoc_mountall',
                                          {})
+        self._refresh_token()
         if rsp.get('return', -1) != 0:
             errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
             raise Exception('Unrecognized return: ' + errmsg)
