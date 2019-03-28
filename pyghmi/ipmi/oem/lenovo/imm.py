@@ -1578,6 +1578,7 @@ class XCCClient(IMMClient):
             validselectors = set([])
             for loc in locations:
                 validselectors.add(loc.replace('#', '-'))
+            self._refresh_token()
             rsp = self.wc.grab_json_response(
                 '/api/function/adapter_update?params=pci_GetAdapterListAndFW')
             foundselectors = []
@@ -1590,6 +1591,7 @@ class XCCClient(IMMClient):
                         break
             else:
                 raise Exception('Could not find matching adapter for update')
+            self._refresh_token()
             rsp = self.wc.grab_json_response('/api/function', json.dumps(
                 {'pci_SetOOBFWSlots': '|'.join(foundselectors)}))
             if rsp.get('return', -1) != 0:
@@ -1598,6 +1600,7 @@ class XCCClient(IMMClient):
                     'Unexpected result from PCI select: ' + errmsg)
             self.set_property('/v2/ibmc/uefi/force-inventory', 1)
         else:
+            self._refresh_token()
             rsp = self.wc.grab_json_response(
                 '/api/dataset/imm_firmware_update')
             if rsp['items'][0]['upgrades'][0]['id'] != 1:
