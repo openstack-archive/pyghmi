@@ -1723,9 +1723,16 @@ class XCCClient(IMMClient):
                     'type': item['source'],
                 }, ''))
         if summary.get('health', pygconst.Health.Ok) == pygconst.Health.Ok:
-            # Fault LED is lit without explanation, mark critical
-            # to encourage examination
-            summary['health'] = pygconst.Health.Critical
+            # Fault LED is lit without explanation, mark to encourage
+            # examination
+            summary['health'] = pygconst.Health.Warning
+            if not fallbackdata:
+                fallbackdata.append(sdr.SensorReading({
+                    'name': 'Fault LED',
+                    'states': ['Active'],
+                    'health': pygconst.Health.Warning,
+                    'type': 'LED',
+                }, ''))
         raise pygexc.FallbackData(fallbackdata)
         # Will use the generic handling for unhealthy systems
 
