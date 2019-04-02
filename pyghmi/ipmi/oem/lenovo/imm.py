@@ -1498,7 +1498,7 @@ class XCCClient(IMMClient):
                 progress({'phase': 'upload',
                           'progress': 100.0 * rsp['received'] / rsp['size']})
             elif rsp['state'] != 'done':
-                if rsp.get('status', None) == 413:
+                if rsp.get('status', None) == 413 or uploadthread.rspstatus == 413:
                     raise Exception('File is larger than supported')
                 raise Exception('Unexpected result:' + repr(rsp))
             uploadstate = rsp['state']

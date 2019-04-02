@@ -53,11 +53,17 @@ class FileUploader(threading.Thread):
         self.data = data
         self.otherfields = otherfields
         self.formname = formname
+        self.rsp = ''
+        self.rspstatus = 500
         super(FileUploader, self).__init__()
 
     def run(self):
-        self.rsp = self.wc.upload(self.url, self.filename, self.data,
-                                  self.formname, otherfields=self.otherfields)
+        try:
+            self.rsp = self.wc.upload(self.url, self.filename, self.data,
+                                    self.formname, otherfields=self.otherfields)
+        except Exception:
+            self.rspstatus = self.wc.rspstatus
+            raise
 
 
 class FileDownloader(threading.Thread):
@@ -244,6 +250,7 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
             del uploadforms[filename]
         except KeyError:  # something could have already deleted it
             pass
+        self.rspstatus = rsp.status
         if rsp.status != 200:
             raise Exception('Unexpected response in file upload: ' +
                             rsp.read())
