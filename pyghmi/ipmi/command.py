@@ -706,16 +706,15 @@ class Command(object):
         fallbackreadings = []
         try:
             self.oem_init()
-            self._oem.get_health(summary)
+            fallbackreadings = self._oem.get_health(summary)
             for reading in self.get_sensor_data():
                 if reading.health != const.Health.Ok:
                     summary['health'] |= reading.health
                     summary['badreadings'].append(reading)
         except exc.BypassGenericBehavior:
             pass
-        except exc.FallbackData as fd:
-            if not summary['badreadings']:
-                summary['badreadings'] = fd.fallbackdata
+        if not summary['badreadings']:
+            summary['badreadings'] = fallbackreadings
         return summary
 
     def get_sensor_reading(self, sensorname):

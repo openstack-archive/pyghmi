@@ -1733,7 +1733,7 @@ class XCCClient(IMMClient):
                     'health': pygconst.Health.Warning,
                     'type': 'LED',
                 }, ''))
-        raise pygexc.FallbackData(fallbackdata)
+        return fallbackdata
         # Will use the generic handling for unhealthy systems
 
     def get_licenses(self):

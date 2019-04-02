@@ -302,7 +302,7 @@ class OEMHandler(object):
         :param summary: The health summary as prepared by the generic function
         :return: Nothing, modifies the summary object
         """
-        return
+        return []
 
     def set_hostname(self, hostname):
         """OEM specific hook to specify name information
