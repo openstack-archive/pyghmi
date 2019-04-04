@@ -492,6 +492,8 @@ class IMMClient(object):
                         if fname in donenames:
                             # ignore redundant entry
                             continue
+                        if not fname:
+                            continue
                         donenames.add(fname)
                         bdata = {}
                         if 'versionStr' in firm and firm['versionStr']:
