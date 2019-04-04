@@ -278,8 +278,15 @@ class LenovoFirmwareConfig(object):
                 continue
             cfglabel = config.find('mriName')
             cfglabel = lenovo_id if cfglabel is None else cfglabel.text
-            for group in config.iter("group"):
-                lenovo_group = group.get("ID")
+            if lenovo_id == 'SYSTEM_PROD_DATA':
+                theiter = [config]
+            else:
+                theiter = config.iter('group')
+            for group in theiter:
+                if lenovo_id == 'SYSTEM_PROD_DATA':
+                    lenovo_group = None
+                else:
+                    lenovo_group = group.get("ID")
                 for setting in group.iter("setting"):
                     is_list = False
                     lenovo_setting = setting.get("ID")
@@ -423,12 +430,14 @@ class LenovoFirmwareConfig(object):
             changes = True
             config = etree.Element('config', ID=options[option]['lenovo_id'])
             configurations.append(config)
-            group = etree.Element('group', ID=options[option]['lenovo_group'])
-            config.append(group)
             setting = etree.Element('setting',
                                     ID=options[option]['lenovo_setting'])
-            group.append(setting)
-
+            if options[option]['lenovo_group'] is not None:
+                group = etree.Element('group', ID=options[option]['lenovo_group'])
+                config.append(group)
+                group.append(setting)
+            else:
+                config.append(setting)
             if is_list:
                 container = etree.Element('list_data')
                 setting.append(container)
