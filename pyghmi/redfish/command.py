@@ -475,6 +475,9 @@ class Command(object):
             raise exc.PyghmiException('Unable to locate network information')
         retval = {}
         if len(netcfg['IPv4Addresses']) != 1:
+            netcfg['IPv4Addresses'] = [x for x in
+                netcfg['IPv4Addresses'] if x['Address'] != '0.0.0.0']
+        if len(netcfg['IPv4Addresses']) != 1:
             raise exc.PyghmiException('Multiple IP addresses not supported')
         currip = netcfg['IPv4Addresses'][0]
         cidr = _mask_to_cidr(currip['SubnetMask'])
