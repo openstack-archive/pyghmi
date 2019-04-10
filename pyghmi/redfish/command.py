@@ -550,6 +550,9 @@ class Command(object):
         }
         yield ('System', sysinfo)
         self._hwnamemap = {}
+        memurl = self.sysinfo.get('Memory', {}).get('@odata.id', None)
+        cpurl = self.sysinfo.get('Processors', {}).get('@odata.id', None)
+        list(self._do_bulk_requests([memurl, cpurl]))
         adpurls = self._get_adp_urls()
         cpurls = self._get_cpu_urls()
         memurls = self._get_mem_urls()
