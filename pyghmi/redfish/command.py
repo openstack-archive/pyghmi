@@ -550,19 +550,23 @@ class Command(object):
         }
         yield ('System', sysinfo)
         self._hwnamemap = {}
-        for cpu in self._get_cpu_inventory(withids=withids):
+        adpurls = self._get_adp_urls()
+        cpurls = self._get_cpu_urls()
+        memurls = self._get_mem_urls()
+        allurls = adpurls + cpurls + memurls
+        list(self._do_bulk_requests(allurls))
+        for cpu in self._get_cpu_inventory(withids=withids, urls=cpurls):
             yield cpu
-        for mem in self._get_mem_inventory(withids=withids):
+        for mem in self._get_mem_inventory(withids=withids, urls=memurls):
             yield mem
-        for adp in self._get_adp_inventory(withids=withids):
+        for adp in self._get_adp_inventory(withids=withids, urls=adpurls):
             yield adp
 
     def _get_adp_inventory(self, onlyname=False, withids=False, urls=None):
         if not urls:
-            adpurls = self.sysinfo.get('PCIeDevices', [])
-            if not adpurls:
-                return
-            urls = [x['@odata.id'] for x in adpurls]
+            urls = self._get_adp_urls()
+        if not urls:
+            return
         for inf in self._do_bulk_requests(urls):
             adpinfo, url = inf
             aname = adpinfo.get('Name', 'Unknown')
@@ -604,13 +608,19 @@ class Command(object):
                         nicidx += 1
             yield aname, yieldinf
 
+    def _get_adp_urls(self):
+        adpurls = self.sysinfo.get('PCIeDevices', [])
+        if adpurls:
+            urls = [x['@odata.id'] for x in adpurls]
+        else:
+            urls = []
+        return urls
+
     def _get_cpu_inventory(self, onlynames=False, withids=False, urls=None):
         if not urls:
-            cpurl = self.sysinfo.get('Processors', {}).get('@odata.id', None)
-            if cpurl is None:
-                return
-            cpurl = self._do_web_request(cpurl)
-            urls = [x['@odata.id'] for x in cpurl.get('Members', [])]
+            urls = self._get_cpu_urls()
+        if not urls:
+            return
         for res in self._do_bulk_requests(urls):
             currcpuinfo, url = res
             name = currcpuinfo.get('Name', 'CPU')
@@ -624,13 +634,20 @@ class Command(object):
             cpuinfo = {'Model': currcpuinfo.get('Model', None)}
             yield (name, cpuinfo)
 
+    def _get_cpu_urls(self):
+        cpurl = self.sysinfo.get('Processors', {}).get('@odata.id', None)
+        if cpurl is None:
+            urls = []
+        else:
+            cpurl = self._do_web_request(cpurl)
+            urls = [x['@odata.id'] for x in cpurl.get('Members', [])]
+        return urls
+
     def _get_mem_inventory(self, onlyname=False, withids=False, urls=None):
         if not urls:
-            memurl = self.sysinfo.get('Memory', {}).get('@odata.id', None)
-            if not memurl:
-                return
-            memurl = self._do_web_request(memurl)
-            urls = [x['@odata.id'] for x in memurl.get('Members', [])]
+            urls = self._get_mem_urls()
+        if not urls:
+            return
         for mem in self._do_bulk_requests(urls):
             currmeminfo, url = mem
             name = currmeminfo.get('Name', 'Memory')
@@ -659,6 +676,15 @@ class Command(object):
                 'speed': currspeed,
             }
             yield (name, meminfo)
+
+    def _get_mem_urls(self):
+        memurl = self.sysinfo.get('Memory', {}).get('@odata.id', None)
+        if not memurl:
+            urls = []
+        else:
+            memurl = self._do_web_request(memurl)
+            urls = [x['@odata.id'] for x in memurl.get('Members', [])]
+        return urls
 
 
 if __name__ == '__main__':
