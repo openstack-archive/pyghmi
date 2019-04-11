@@ -305,6 +305,9 @@ class LenovoFirmwareConfig(object):
                     name = setting.find("mriName").text
                     help = setting.find("desc").text
                     onedata = setting.find('text_data')
+                    if onedata:
+                        if len(list(onedata.iter('instance'))) > 1:
+                            protect = True
                     if onedata is not None:
                         if onedata.get('password') == 'true':
                             protect = True
@@ -312,6 +315,10 @@ class LenovoFirmwareConfig(object):
                     if enumdata is not None:
                         if enumdata.get('maxinstance') is not None:
                             protect = True
+                        for currchoice in enumdata.iter('choice'):
+                            if len(list(currchoice.iter('instance'))) > 1:
+                                protect = True
+                                break
                     if onedata is None:
                         onedata = setting.find('numeric_data')
                     if onedata is not None:
