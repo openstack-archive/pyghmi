@@ -1533,6 +1533,8 @@ class XCCClient(IMMClient):
             {'UPD_WebVerifyUploadFile': 1}))
         if rsp.get('return', 0) == 115:
             raise Exception('Update image not intended for this system')
+        elif rsp.get('return', -1) == 108:
+            raise Exception('Temporary error validating update, try again')
         elif rsp.get('return', -1) != 0:
             errmsg = repr(rsp) if rsp else self.wc.lastjsonerror
             raise Exception('Unexpected return to verify: ' + errmsg)
