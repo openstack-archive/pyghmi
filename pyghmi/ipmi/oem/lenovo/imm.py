@@ -786,6 +786,8 @@ class XCCClient(IMMClient):
     def get_description(self):
         dsc = self.wc.grab_json_response('/DeviceDescription.json')
         dsc = dsc[0]
+        if not dsc.get('u-height', None):
+            return {}
         return {'height': int(dsc['u-height']), 'slot': int(dsc['slot'])}
 
     def clear_system_configuration(self):
