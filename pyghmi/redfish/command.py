@@ -116,6 +116,11 @@ def _mask_to_cidr(mask):
         maskn >>= 1
     return cidr
 
+def _cidr_to_mask(cidr):
+    return socket.inet_ntop(
+        socket.AF_INET, struct.pack(
+            '!I', (2**32-1) ^ (2**(32-cidr)-1)))
+
 
 class SensorReading(object):
     def __init__(self, healthinfo):
@@ -468,8 +473,32 @@ class Command(object):
         redfishsettings = {'Attributes': changeset}
         self._do_web_request(self._setbiosurl, redfishsettings, 'PATCH')
 
+    def set_net_configuration(self, ipv4_address=None, ipv4_configuration=None,
+                              ipv4_gateway=None):
+        patch = {}
+        ipinfo = {}
+        netmask = None
+        if ipv4_address:
+            if '/' in ipv4_address:
+                ipv4_address, cidr = ipv4_address.split('/')
+                netmask = _cidr_to_mask(int(cidr))
+            patch['IPv4StaticAddresses'] = [ipinfo]
+            ipinfo['Address'] = ipv4_address
+            if netmask:
+                ipinfo['SubnetMask'] = netmask
+        if ipv4_gateway:
+            patch['IPv4StaticAddresses'] = [ipinfo]
+            ipinfo['Gateway'] = ipv4_gateway
+        if ipv4_configuration.lower() == 'dhcp':
+            patch['DHCPv4'] = {'DHCPEnabled': True}
+        elif (ipv4_configuration == 'static' or
+                'IPv4StaticAddresses' in patch):
+            patch['DHCPv4'] = {'DHCPEnabled': False}
+        if patch:
+            self._do_web_request(self._bmcnicurl, patch, 'PATCH')
+
     def get_net_configuration(self):
-        netcfg = self._do_web_request(self._bmcnicurl)
+        netcfg = self._do_web_request(self._bmcnicurl, cache=False)
         ipv4 = netcfg.get('IPv4Addresses', {})
         if not ipv4:
             raise exc.PyghmiException('Unable to locate network information')
