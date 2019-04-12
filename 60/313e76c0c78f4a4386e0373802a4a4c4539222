@@ -1,0 +1,10 @@
+Code-Review+2: Jarrod Johnson <jjohnson2@lenovo.com>
+Workflow+1: Jarrod Johnson <jjohnson2@lenovo.com>
+Code-Review+1: Andriy Shevchenko <huang.zhiping@99cloud.net>
+Code-Review+1: 98k <18552437190@163.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Fri, 12 Apr 2019 18:30:33 +0000
+Reviewed-on: https://review.openstack.org/652121
+Project: openstack/pyghmi
+Branch: refs/heads/master
