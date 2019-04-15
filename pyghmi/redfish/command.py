@@ -469,6 +469,17 @@ class Command(object):
             currsettings[setting] = {'value': biosinfo['Attributes'][setting]}
         return currsettings
 
+    def clear_system_configuration(self):
+        """Clear the BIOS/UEFI configuration
+
+        """
+        biosinfo = self._do_web_request(self._biosurl)
+        rb = biosinfo.get('Actions', {}).get('#Bios.ResetBios', {})
+        rb = rb.get('target', '')
+        if not rb:
+            raise Exception('BIOS reset not detected on this system')
+        self._do_web_request(rb, {'Action': 'Bios.ResetBios'})
+
     def set_system_configuration(self, changeset):
         redfishsettings = {'Attributes': changeset}
         self._do_web_request(self._setbiosurl, redfishsettings, 'PATCH')
