@@ -18,15 +18,15 @@
 # for redfish compliant endpoints
 
 from datetime import datetime
-from dateutil import tz
 import json
 import os
-import pyghmi.exceptions as exc
-import pyghmi.constants as const
-import pyghmi.util.webclient as webclient
 import socket
 import struct
 import time
+import pyghmi.exceptions as exc
+import pyghmi.constants as const
+import pyghmi.util.webclient as webclient
+from dateutil import tz
 
 powerstates = {
     'on': 'On',
@@ -70,6 +70,7 @@ _healthmap = {
     'Warning': const.Health.Warning,
     'OK': const.Health.Ok,
 }
+
 
 def _parse_time(timeval):
     if timeval is None:
@@ -116,10 +117,11 @@ def _mask_to_cidr(mask):
         maskn >>= 1
     return cidr
 
+
 def _cidr_to_mask(cidr):
     return socket.inet_ntop(
         socket.AF_INET, struct.pack(
-            '!I', (2**32-1) ^ (2**(32-cidr)-1)))
+            '!I', (2**32 - 1) ^ (2**(32 - cidr) - 1)))
 
 
 class SensorReading(object):
@@ -131,6 +133,7 @@ class SensorReading(object):
         self.state_ids = None
         self.imprecision = None
         self.units = None
+
 
 class Command(object):
 
@@ -165,10 +168,10 @@ class Command(object):
                     break
             else:
                 raise exc.PyghmiException(
-                    'Specified sysurl not found: '.format(sysurl))
+                    'Specified sysurl not found: {0}'.format(sysurl))
         else:
             if len(systems) != 1:
-                raise pygexc.PyghmiException(
+                raise exc.PyghmiException(
                     'Multi system manager, sysurl is required parameter')
             self.sysurl = systems[0]['@odata.id']
         self.powerurl = self.sysinfo.get('Actions', {}).get(
@@ -196,14 +199,9 @@ class Command(object):
                     'BMC does not implement extended firmware information')
         return self._varfwinventory
 
-
-
-
-
     @property
     def sysinfo(self):
         return self._do_web_request(self.sysurl)
-
 
     def get_power(self):
         currinfo = self._do_web_request(self.sysurl, cache=False)
@@ -226,8 +224,8 @@ class Command(object):
             if reqpowerstate in ('softoff', 'shutdown'):
                 reqpowerstate = 'off'
             timeout = os.times()[4] + 300
-            while (self.get_power()['powerstate'] != reqpowerstate and
-                   os.times()[4] < timeout):
+            while (self.get_power()['powerstate'] != reqpowerstate
+                   and os.times()[4] < timeout):
                 time.sleep(1)
             if self.get_power()['powerstate'] != reqpowerstate:
                 raise exc.PyghmiException(
@@ -264,7 +262,7 @@ class Command(object):
         wc = self.wc.dupe()
         res = wc.grab_json_response_with_status(url, payload,
                                                 method=method)
-        if res[1] < 200 or res[1] >=300:
+        if res[1] < 200 or res[1] >= 300:
             raise exc.PyghmiException(res[0])
         if payload is None and method is None:
             self._urlcache[url] = {'contents': res[0],
@@ -288,19 +286,19 @@ class Command(object):
         elif overridestate == 'Continuous':
             persistent = True
         else:
-            raise exc.PyghmiException('Unrecognized Boot state: ' +
-                                      repr(overridestate))
+            raise exc.PyghmiException('Unrecognized Boot state: '
+                                      + repr(overridestate))
         uefimode = result.get('Boot', {}).get('BootSourceOverrideMode', None)
         if uefimode == 'UEFI':
             uefimode = True
-        elif uefimode ==  'Legacy':
+        elif uefimode == 'Legacy':
             uefimode = False
         else:
             raise exc.PyghmiException('Unrecognized mode: ' + uefimode)
         bootdev = result.get('Boot', {}).get('BootSourceOverrideTarget', None)
         if bootdev not in boot_devices_read:
-            raise exc.PyghmiException('Unrecognized boot target: ' +
-                                      repr(bootdev))
+            raise exc.PyghmiException('Unrecognized boot target: '
+                                      + repr(bootdev))
         bootdev = boot_devices_read[bootdev]
         return {'bootdev': bootdev, 'persistent': persistent,
                 'uefimode': uefimode}
@@ -325,16 +323,17 @@ class Command(object):
         :returns: dict or True -- If callback is not provided, the response
         """
         reqbootdev = bootdev
-        if (bootdev not in boot_devices_write and
-                bootdev not in boot_devices_read):
-            raise exc.InvalidParameterValue('Unsupported device ' +
-                                            repr(bootdev))
+        if (bootdev not in boot_devices_write
+                and bootdev not in boot_devices_read):
+            raise exc.InvalidParameterValue('Unsupported device '
+                                            + repr(bootdev))
         bootdev = boot_devices_write.get(bootdev, bootdev)
         if bootdev == 'None':
             payload = {'Boot': {'BootSourceOverrideEnabled': 'Disabled'}}
         else:
             payload = {'Boot': {
-                'BootSourceOverrideEnabled': 'Continuous' if persist else 'Once',
+                'BootSourceOverrideEnabled': 'Continuous' if persist
+                                             else 'Once',
                 'BootSourceOverrideTarget': bootdev,
             }}
             if uefiboot is not None:
@@ -347,7 +346,7 @@ class Command(object):
     def _biosurl(self):
         if not self._varbiosurl:
             self._varbiosurl = self.sysinfo.get('Bios', {}).get('@odata.id',
-                                                              None)
+                                                                None)
         if self._varbiosurl is None:
             raise exc.UnsupportedFunctionality(
                 'Bios management not detected on this platform')
@@ -359,7 +358,7 @@ class Command(object):
             biosinfo = self._do_web_request(self._biosurl)
             self._varsetbiosurl = biosinfo.get(
                 '@Redfish.Settings', {}).get('SettingsObject', {}).get(
-                '@odata.id', None)
+                    '@odata.id', None)
         if self._varsetbiosurl is None:
             raise exc.UnsupportedFunctionality('Ability to set BIOS settings '
                                                'not detected on this platform')
@@ -396,7 +395,6 @@ class Command(object):
                     'BMC does not have exactly one interface')
             self._varbmcnicurl = lastnicurl
         return self._varbmcnicurl
-
 
     @property
     def _bmcreseturl(self):
@@ -502,8 +500,8 @@ class Command(object):
             ipinfo['Gateway'] = ipv4_gateway
         if ipv4_configuration.lower() == 'dhcp':
             patch['DHCPv4'] = {'DHCPEnabled': True}
-        elif (ipv4_configuration == 'static' or
-                'IPv4StaticAddresses' in patch):
+        elif (ipv4_configuration == 'static'
+              or 'IPv4StaticAddresses' in patch):
             patch['DHCPv4'] = {'DHCPEnabled': False}
         if patch:
             self._do_web_request(self._bmcnicurl, patch, 'PATCH')
@@ -515,8 +513,9 @@ class Command(object):
             raise exc.PyghmiException('Unable to locate network information')
         retval = {}
         if len(netcfg['IPv4Addresses']) != 1:
-            netcfg['IPv4Addresses'] = [x for x in
-                netcfg['IPv4Addresses'] if x['Address'] != '0.0.0.0']
+            netcfg['IPv4Addresses'] = [
+                x for x in netcfg['IPv4Addresses']
+                if x['Address'] != '0.0.0.0']
         if len(netcfg['IPv4Addresses']) != 1:
             raise exc.PyghmiException('Multiple IP addresses not supported')
         currip = netcfg['IPv4Addresses'][0]
@@ -608,8 +607,8 @@ class Command(object):
     def _get_adp_inventory(self, onlyname=False, withids=False, urls=None):
         if not urls:
             urls = self._get_adp_urls()
-        if not urls:
-            return
+            if not urls:
+                return
         for inf in self._do_bulk_requests(urls):
             adpinfo, url = inf
             aname = adpinfo.get('Name', 'Unknown')
@@ -622,7 +621,8 @@ class Command(object):
             if onlyname:
                 if withids:
                     yield aname, adpinfo.get('Id', aname)
-                yield aname
+                else:
+                    yield aname
                 continue
             functions = adpinfo.get('Links', {}).get('PCIeFunctions', [])
             nicidx = 1
@@ -658,6 +658,16 @@ class Command(object):
         else:
             urls = []
         return urls
+
+    @property
+    def oem(self):
+        if not self._oem:
+            self._oem = oem.get_oem_handler(
+                self.sysinfo, self.sysurl, self.wc, self._urlcache)
+        return self._oem
+
+    def get_description(self):
+        return self.oem.get_description()
 
     def _get_cpu_inventory(self, onlynames=False, withids=False, urls=None):
         if not urls:
