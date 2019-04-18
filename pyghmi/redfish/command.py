@@ -17,7 +17,7 @@
 # The command module for redfish systems.  Provides https-only support
 # for redfish compliant endpoints
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
 import socket
@@ -94,7 +94,14 @@ def _parse_time(timeval):
             hrs, mins = offset.split(':', 1)
             secs = int(hrs) * 60 + int(mins)
             secs = secs * 60 * positive
+            ms = None
+            if '.' in timeval:
+                timeval, ms = timeval.split('.', 1)
+                ms = int(ms)
+                ms = timedelta(0, 0, 0, ms)
             retval = datetime.strptime(timeval, '%Y-%m-%dT%H:%M:%S')
+            if ms:
+                retval += ms
             return retval.replace(tzinfo=tz.tzoffset('', secs))
     except ValueError:
         pass
@@ -741,6 +748,37 @@ class Command(object):
             urls = [x['@odata.id'] for x in memurl.get('Members', [])]
         return urls
 
+    def get_event_log(self, clear=False):
+        bmcinfo = self._do_web_request(self._bmcurl)
+        lurl = bmcinfo.get('LogServices', {}).get('@odata.id', None)
+        if not lurl:
+            return
+        currtime = bmcinfo.get('DateTime', None)
+        correction = timedelta(0)
+        if currtime:
+            currtime = _parse_time(currtime)
+            now = datetime.now(tz.tzoffset('', 0))
+            correction
+            try:
+                correction = now - currtime
+            except TypeError:
+                correction = now - currtime.replace(tzinfo=tz.tzoffset('', 0))
+        lurls = self._do_web_request(lurl).get('Members', [])
+        for lurl in lurls:
+            lurl = lurl['@odata.id']
+            loginfo = self._do_web_request(lurl)
+            entries = loginfo.get('Entries', {}).get('@odata.id', None)
+            if not entries:
+                continue
+            entries = self._do_web_request(entries)
+            for log in entries.get('Members', []):
+                record = {}
+                entime = _parse_time(log.get('Created', '')) + correction
+                record['timestamp'] = entime.strftime('%Y-%m-%dT%H:%M:%S')
+                record['message'] = log.get('Message', None)
+                record['severity'] = _healthmap.get(
+                    entries.get('Severity', 'Warning'), const.Health.Critical)
+                yield record
 
 if __name__ == '__main__':
     import os
